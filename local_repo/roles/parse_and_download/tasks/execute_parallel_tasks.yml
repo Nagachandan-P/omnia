@@ -22,7 +22,7 @@
         log_file: "{{ base_path }}/{{ item.key }}_task_results.log"
         slog_file: "{{ base_path }}"
         software: "{{ item.key }}"
-        csv_file_path: "{{ base_path }}/{{item.key}}"
+        csv_file_path: "{{ base_path }}/{{ item.key }}"
         repo_store_path: "{{ nfs_shared_path }}"
         user_json_file: "{{ user_json_file }}"
         nthreads: "{{ (local_repo_py_module_vars[item.key].nthreads | default(local_repo_py_module_vars.default_vars.nthreads)) }}"
