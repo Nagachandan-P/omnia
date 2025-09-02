@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# pylint: disable=import-error,line-too-long,no-name-in-module,too-many-return-statements,too-many-statements,too-many-arguments,too-many-branches,too-many-locals
+# pylint: disable=import-error,no-name-in-module,too-many-return-statements,too-many-statements,too-many-arguments,too-many-positional-arguments,too-many-branches,too-many-locals
 
 """
 Handle pulp file downloads for local repository
@@ -25,6 +25,7 @@ import time
 import json
 from multiprocessing import Lock
 from jinja2 import Template
+from ansible.module_utils.local_repo.standard_logger import setup_standard_logger
 from ansible.module_utils.local_repo.parse_and_download import write_status_to_file,execute_command
 from ansible.module_utils.local_repo.rest_client import RestClient
 from ansible.module_utils.local_repo.common_functions import load_pulp_config
@@ -378,7 +379,7 @@ def process_file_without_download(repository_name, output_file, relative_path,
     finally:
         logger.info("#" * 30 + f" {process_file_without_download.__name__} end " + "#" * 30)
 
-def process_manifest(file,repo_store_path, status_file_path, cluster_os_type, cluster_os_version, arc,logger):
+def process_manifest(file,repo_store_path, status_file_path,logger):
     """
     Process a manifest file.
     Args:
@@ -403,7 +404,7 @@ def process_manifest(file,repo_store_path, status_file_path, cluster_os_type, cl
         subprocess.run(['wget', '-q', '--spider', '--tries=1', url], check=True)
 
         # Ensure the manifest directory exists
-        manifest_directory = os.path.join(repo_store_path, "offline_repo", "cluster",arc.lower(), cluster_os_type, cluster_os_version, "manifest", package_name)
+        manifest_directory = os.path.join(repo_store_path, "offline_repo", "cluster", "manifest", package_name)
         # # Determine the manifest file path
         file_path = os.path.join(manifest_directory, f"{package_name}.yaml")
         repository_name = "manifest" + package_name
@@ -426,7 +427,7 @@ def process_manifest(file,repo_store_path, status_file_path, cluster_os_type, cl
         logger.info("#" * 30 + f" {process_manifest.__name__} end " + "#" * 30)  # End of function
         return status
 
-def process_git(file,repo_store_path, status_file_path, cluster_os_type, cluster_os_version, arc,logger):
+def process_git(file,repo_store_path, status_file_path,logger):
     """
     Process a Git package.
     Args:
@@ -454,7 +455,7 @@ def process_git(file,repo_store_path, status_file_path, cluster_os_type, cluster
         logger.info(f"Processing Git Package: {package_name}, URL: {url}, Version: {version}")
 
         # Assuming you have a specific path to store Git packages
-        git_modules_directory = os.path.join(repo_store_path, "offline_repo", 'cluster',arc.lower(), cluster_os_type, cluster_os_version, 'git', package_name)
+        git_modules_directory = os.path.join(repo_store_path, "offline_repo", 'cluster', 'git', package_name)
         os.makedirs(git_modules_directory, exist_ok=True)  # Ensure the directory exists
 
         clone_directory = os.path.join(git_modules_directory, package_name)
@@ -501,7 +502,7 @@ def process_git(file,repo_store_path, status_file_path, cluster_os_type, cluster
         return status
 
 # Function to process a shell file
-def process_shell(file,repo_store_path, status_file_path,  cluster_os_type, cluster_os_version, arc,logger):
+def process_shell(file,repo_store_path, status_file_path,logger):
     """
     Process a shell package.
 
@@ -525,7 +526,7 @@ def process_shell(file,repo_store_path, status_file_path,  cluster_os_type, clus
         logger.info(f"Processing sh Package: {package_name}, URL: {url}")
 
         # Creating the local path to save the sh file
-        sh_directory = os.path.join(repo_store_path, "offline_repo", 'cluster',arc.lower(), cluster_os_type, cluster_os_version, 'shell', package_name)
+        sh_directory = os.path.join(repo_store_path, "offline_repo", 'cluster', 'shell', package_name)
         os.makedirs(sh_directory, exist_ok=True)  # Ensure the directory exists
 
         sh_path = os.path.join(sh_directory, f"{package_name}.sh")
@@ -547,7 +548,7 @@ def process_shell(file,repo_store_path, status_file_path,  cluster_os_type, clus
         logger.info("#" * 30 + f" {process_shell.__name__} end " + "#" * 30)  # End of function
         return status
 
-def process_ansible_galaxy_collection(file, repo_store_path, status_file_path, cluster_os_type, cluster_os_version, arc, logger):
+def process_ansible_galaxy_collection(file, repo_store_path, status_file_path, logger):
     """
     Process an Ansible Galaxy Collection.
 
@@ -576,7 +577,7 @@ def process_ansible_galaxy_collection(file, repo_store_path, status_file_path, c
         )
 
         # Assuming you have a specific path to store Ansible Galaxy Collections
-        galaxy_collections_directory = os.path.join(repo_store_path, "offline_repo", 'cluster', arc.lower(), cluster_os_type, cluster_os_version, 'ansible_galaxy_collection', package_name)
+        galaxy_collections_directory = os.path.join(repo_store_path, "offline_repo", 'cluster', 'ansible_galaxy_collection', package_name)
         galaxy_collections_directory = shlex.quote(galaxy_collections_directory).strip("'\"")
         os.makedirs(galaxy_collections_directory, exist_ok=True)  # Ensure the directory exists
         collections_tarball_path = os.path.join(galaxy_collections_directory, f'{package_name.replace(".", "-")}-{version}.tar.gz')
@@ -640,7 +641,7 @@ def process_ansible_galaxy_collection(file, repo_store_path, status_file_path, c
         logger.info("#" * 30 + f" {process_ansible_galaxy_collection.__name__} end " + "#" * 30)
         return status
 
-def process_tarball(package, repo_store_path, status_file_path, version_variables, cluster_os_type, cluster_os_version, arc, logger):
+def process_tarball(package, repo_store_path, status_file_path, version_variables, logger):
     """
     Process a tarball package.
 
@@ -679,7 +680,7 @@ def process_tarball(package, repo_store_path, status_file_path, version_variable
             url_support = False
 
     # Creating the local path to save the tarball
-    tarball_directory = os.path.join(repo_store_path, "offline_repo", 'cluster', arc.lower(), cluster_os_type, cluster_os_version, 'tarball', package_name)
+    tarball_directory = os.path.join(repo_store_path, "offline_repo", 'cluster', 'tarball', package_name)
 
     logger.info(f"Processing tarball to directory: {tarball_directory}")
 
@@ -721,11 +722,6 @@ def process_tarball(package, repo_store_path, status_file_path, version_variable
         except subprocess.CalledProcessError:
             logger.error(f"Error: Package {package_name} not found at {url}")
             status = "Failed"
-        finally:
-            write_status_to_file(status_file_path, package_name, package_type, status, logger, file_lock)
-            logger.info("#" * 30 + f" {process_tarball.__name__} end " + "#" * 30)  # End of function
-
-            return status
     elif path_support is True and url_support is False:
         try:
             shutil.copy(path, tarball_path)
@@ -746,7 +742,7 @@ def process_tarball(package, repo_store_path, status_file_path, version_variable
             return status
 
 def process_iso(package, repo_store_path, status_file_path,
-               cluster_os_type, cluster_os_version, version_variables, arc, logger):
+               cluster_os_type, cluster_os_version, version_variables, logger):
     """
     Process an ISO package.
 
@@ -773,7 +769,7 @@ def process_iso(package, repo_store_path, status_file_path,
     url_support = True
     package_name = package['package']
     package_type = package['type']
-    repository_name = "iso" + package_name + arc
+    repository_name = "iso" + package_name
 
     distribution_name = repository_name
     if 'url' in package:
@@ -790,7 +786,7 @@ def process_iso(package, repo_store_path, status_file_path,
             path_support = True
             url_support = False
 
-    iso_directory = os.path.join(repo_store_path, "offline_repo", 'cluster', arc.lower(), cluster_os_type, cluster_os_version, 'iso', package_name)
+    iso_directory = os.path.join(repo_store_path, "offline_repo", 'cluster', cluster_os_type, cluster_os_version, 'iso', package_name)
     base_path = iso_directory.strip("/")
     logger.info(f"Processing iso Package to directory: {iso_directory}")
 
@@ -851,7 +847,7 @@ def process_iso(package, repo_store_path, status_file_path,
             logger.info("#" * 30 + f" {process_iso.__name__} end " + "#" * 30)  # End of function
             return status
 
-def process_pip(package, repo_store_path, status_file_path,  cluster_os_type, cluster_os_version, arc,logger):
+def process_pip(package, repo_store_path, status_file_path, logger):
     """
     Process a pip package using Pulp.
 
@@ -876,8 +872,8 @@ def process_pip(package, repo_store_path, status_file_path,  cluster_os_type, cl
         logger.info(f"Processing Pip Package: {package_name}, Version: {version}")
 
         # Define storage path
-        pip_package_directory = os.path.join(repo_store_path, "offline_repo", 'cluster',arc.lower(), cluster_os_type, cluster_os_version, 'pip_module', package_name)
-        base_package_directory = os.path.join(repo_store_path, "offline_repo", 'cluster', arc.lower(), cluster_os_type, cluster_os_version,'pip_module', package_name)
+        pip_package_directory = os.path.join(repo_store_path, "offline_repo", 'cluster', 'pip_module', package_name)
+        base_package_directory = os.path.join(repo_store_path, "offline_repo", 'cluster', 'pip_module', package_name)
         base_package_directory = base_package_directory.strip("/")
 
         os.makedirs(pip_package_directory, exist_ok=True)  # Ensure directory exists

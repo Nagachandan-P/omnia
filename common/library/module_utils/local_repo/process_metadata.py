@@ -20,8 +20,6 @@ from pathlib import Path
 import os
 import json
 import yaml
-# Import default variables from config.py
-from ansible.module_utils.local_repo.config import ARCH_SUFFIXES
 
 def load_yaml(path):
     """
@@ -192,11 +190,12 @@ def handle_generate_metadata(sw_config,repo_data,output_file):
     os_type = get_os_type(config)
 
     # Define the keys in the repo_data to process, based on OS type
-    keys_to_process = (
-        [f'user_repo_url_{arch}' for arch in ARCH_SUFFIXES] +
-        [f'omnia_repo_url_{os_type}_{arch}' for arch in ARCH_SUFFIXES] +
-        [f'{os_type}_os_url_{arch}' for arch in ARCH_SUFFIXES]
-    )
+    keys_to_process = [
+        'user_repo_url',
+        f'omnia_repo_url_{os_type}',
+        f'{os_type}_os_url'
+    ]
+
     # Iterate over each key and generate/update policy metadata
     for key in keys_to_process:
         repo_list = repo_data.get(key, [])
