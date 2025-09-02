@@ -38,8 +38,8 @@
     - user_repo_url | length > 0
   block:
     - name: Check for newly added user repos
-      ansible.builtin.include_tasks: "{{ role_path }}/common/tasks/find_new_repo.yml"
-      loop: "{{ user_repo_url | default([], true) }}"
+      ansible.builtin.include_tasks: "{{ role_path }}/../common/tasks/find_new_repo.yml"
+      loop: "{{ vars['user_repo_url_' + cluster_arch] | default([], true) }}"
 
 - name: Block to execute when new user repos are added
   vars:
@@ -58,6 +58,7 @@
 
     - name: Loop through user repos and configure repofile
       ansible.builtin.include_tasks: generate_user_repofile.yml
+      loop: "{{ user_repo_url | default([], true) }}"
       loop: "{{ user_repo_url | default([], true) }}"
       loop_control:
         label: "{{ item.name }}"

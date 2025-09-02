@@ -27,19 +27,9 @@
         "type": "object",
         "properties": {
           "name": { "type": "string" },
-          "version": { "type": "string" },
-          "arch": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": ["x86_64", "aarch64"]
-            },
-            "minItems": 1,
-            "uniqueItems": true
-          }
+          "version": { "type": "string" }
         },
-        "required": ["name"],
-        "additionalProperties": false
+        "required": ["name"]
       },
       "description": "Array of software packages to be configured."
     },

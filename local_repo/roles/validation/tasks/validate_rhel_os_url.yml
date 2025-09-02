@@ -13,18 +13,21 @@
 # limitations under the License.
 ---
 
-- name: Fetching cluster os
-  ansible.builtin.set_fact:
-    cluster_os: "{{ ansible_distribution | lower }}"
+- name: Validate rhel_os_url
+  ansible.builtin.assert:
+    that:
+      - "rhel_os_url is defined"
+      - "rhel_os_url | type_debug == 'list'"
+      - "rhel_os_url | length > 0"
+    fail_msg: "{{ rhel_os_url_fail_msg }}"
 
-- name: Validate the input files and values
-  ansible.builtin.include_tasks: validation.yml
-
-- name: Validate repos configured during provisioning
-  ansible.builtin.include_tasks: validate_repo.yml
-
-- name: Update repos on cluster for {{ cluster_os }}
-  block:
-    - name: Update user repos for nodes on {{ cluster_os }}
-      ansible.builtin.include_role:
-        name: "{{ role_path }}/../{{ cluster_os }}"
+- name: Validate url and gpgkey presence in rhel_os_url
+  ansible.builtin.assert:
+    that:
+      - "item.name is defined and item.name !='' and item.name is not none "
+      - "item.url is defined and item.url !='' and item.url is not none "
+      - "item.gpgkey is defined"
+    fail_msg: "{{ rhel_os_url_fail_url_gpg_key_msg }}"
+  loop: "{{ rhel_os_url }}"
+  loop_control:
+    loop_var: item
