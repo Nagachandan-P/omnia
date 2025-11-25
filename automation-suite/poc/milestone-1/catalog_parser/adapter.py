@@ -1,0 +1,418 @@
+import json
+import os
+from collections import Counter
+from dataclasses import asdict
+from typing import Dict, Iterable, List, Tuple
+import argparse
+
+from parser import ParseCatalog
+from models import Catalog
+from generator import (
+    FeatureList,
+    Feature,
+    Package,
+    generate_functional_layer_json,
+    generate_infrastructure_json,
+    generate_base_os_json,
+    generate_miscellaneous_json,
+    _package_common_dict,
+)
+
+
+def _snake_case(name: str) -> str:
+    return name.strip().lower().replace(" ", "_")
+
+
+def _package_key(pkg: Package) -> Tuple[str, str, str]:
+    """Key used to detect common packages across features.
+
+    Uses (package, type, repo_name) to distinguish identical names in different repos/types.
+    """
+    return (pkg.package, pkg.type, pkg.repo_name)
+
+
+def _package_to_dict(pkg: Package) -> Dict[str, str]:
+    # Adapter-specific wrapper over the shared helper; note that the
+    # adapter JSONs intentionally do not include architecture.
+    return _package_common_dict(pkg)  # type: ignore[return-value]
+
+
+# -------------------------- Base OS / default packages --------------------------
+
+
+def build_default_packages_config(base_os: FeatureList) -> Dict:
+    """Build default_packages.json-style structure from Base OS FeatureList.
+
+    Expected FeatureList has a feature named "Base OS".
+    """
+    feature: Feature | None = base_os.features.get("Base OS")
+    if feature is None:
+        raise ValueError("Base OS feature not found in base_os FeatureList")
+
+    cluster = [_package_to_dict(pkg) for pkg in feature.packages]
+    return {"default_packages": {"cluster": cluster}}
+
+
+def _build_subconfig_from_base_os(
+    base_os: FeatureList, name: str, substrings: Iterable[str]
+) -> Dict | None:
+    """Generic helper to build nfs/openldap/openmpi-style configs.
+
+    Selects packages from Base OS whose package name contains any of the substrings.
+    Returns None if no packages match.
+    """
+    feature: Feature | None = base_os.features.get("Base OS")
+    if feature is None:
+        return None
+
+    lowered = [s.lower() for s in substrings]
+    selected = [
+        pkg
+        for pkg in feature.packages
+        if any(sub in pkg.package.lower() for sub in lowered)
+    ]
+    if not selected:
+        return None
+
+    cluster = [_package_to_dict(pkg) for pkg in selected]
+    return {name: {"cluster": cluster}}
+
+
+def build_nfs_config(base_os: FeatureList) -> Dict | None:
+    return _build_subconfig_from_base_os(base_os, "nfs", ["nfs"])
+
+
+def build_openldap_config(base_os: FeatureList) -> Dict | None:
+    return _build_subconfig_from_base_os(base_os, "openldap", ["ldap"])
+
+
+def build_openmpi_config(base_os: FeatureList) -> Dict | None:
+    return _build_subconfig_from_base_os(base_os, "openmpi", ["openmpi"])
+
+
+# -------------------------- K8s services from functional layer --------------------------
+
+
+def build_service_k8s_config(functional: FeatureList) -> Dict:
+    """Build service_k8s.json-like structure from functional FeatureList.
+
+    Uses feature names "K8S Controller" and "K8S Worker" if present.
+    Common packages (intersection) go into service_k8s; they are removed from the
+    controller/worker clusters.
+    """
+    controller: Feature | None = functional.features.get("K8S Controller")
+    worker: Feature | None = functional.features.get("K8S Worker")
+
+    if controller is None or worker is None:
+        raise ValueError("K8S Controller or K8S Worker feature not found in functional layer")
+
+    ctrl_pkgs = controller.packages
+    node_pkgs = worker.packages
+
+    ctrl_keys = {_package_key(p) for p in ctrl_pkgs}
+    node_keys = {_package_key(p) for p in node_pkgs}
+    common_keys = ctrl_keys & node_keys
+
+    def _filter(pkgs: List[Package], exclude: set[Tuple[str, str, str]]) -> List[Package]:
+        return [p for p in pkgs if _package_key(p) not in exclude]
+
+    # Keep order, but only one instance of each common key
+    seen_common: set[Tuple[str, str, str]] = set()
+    common_pkgs: List[Package] = []
+    for pkg in ctrl_pkgs + node_pkgs:
+        k = _package_key(pkg)
+        if k in common_keys and k not in seen_common:
+            seen_common.add(k)
+            common_pkgs.append(pkg)
+
+    return {
+        "service_kube_control_plane": {
+            "cluster": [_package_to_dict(p) for p in _filter(ctrl_pkgs, common_keys)]
+        },
+        "service_kube_node": {
+            "cluster": [_package_to_dict(p) for p in _filter(node_pkgs, common_keys)]
+        },
+        "service_k8s": {"cluster": [_package_to_dict(p) for p in common_pkgs]},
+    }
+
+
+# -------------------------- Slurm custom from functional layer --------------------------
+
+
+def build_slurm_custom_config(functional: FeatureList) -> Dict:
+    """Build slurm_custom.json-style structure from functional FeatureList.
+
+    Nodes used:
+      - "Login Node"
+      - "Compiler"
+      - "Slurm Controller"
+      - "Slurm Worker"
+
+    Common packages are those that appear in any 2 or more of these nodes. They
+    are removed from the individual node clusters and placed into slurms_custom.
+    """
+    login = functional.features.get("Login Node")
+    compiler = functional.features.get("Compiler")
+    slurm_ctrl = functional.features.get("Slurm Controller")
+    slurm_worker = functional.features.get("Slurm Worker")
+
+    if not all([login, compiler, slurm_ctrl, slurm_worker]):
+        raise ValueError("One or more required Slurm-related features not found in functional layer")
+
+    node_features: Dict[str, Feature] = {
+        "login_node": login,
+        "login_compiler_node": compiler,
+        "slurm_control_node": slurm_ctrl,
+        "slurm_node": slurm_worker,
+    }
+
+    # Count how many nodes each package appears in
+    key_counts: Counter[Tuple[str, str, str]] = Counter()
+    key_to_pkg: Dict[Tuple[str, str, str], Package] = {}
+
+    for feature in node_features.values():
+        seen_in_this_node: set[Tuple[str, str, str]] = set()
+        for pkg in feature.packages:
+            k = _package_key(pkg)
+            key_to_pkg.setdefault(k, pkg)
+            if k not in seen_in_this_node:
+                seen_in_this_node.add(k)
+                key_counts[k] += 1
+
+    common_keys = {k for k, count in key_counts.items() if count >= 2}
+
+    # Build node clusters without common packages
+    output: Dict[str, Dict] = {}
+    for node_name, feature in node_features.items():
+        filtered_pkgs = [
+            _package_to_dict(pkg)
+            for pkg in feature.packages
+            if _package_key(pkg) not in common_keys
+        ]
+        output[node_name] = {"cluster": filtered_pkgs}
+
+    # Build slurms_custom cluster from common packages (dedup, keep deterministic order)
+    common_pkg_dicts: List[Dict[str, str]] = []
+    for k, pkg in key_to_pkg.items():
+        if k in common_keys:
+            common_pkg_dicts.append(_package_to_dict(pkg))
+
+    output["slurms_custom"] = {"cluster": common_pkg_dicts}
+
+    return output
+
+
+# -------------------------- Infrastructure splitting --------------------------
+
+
+def build_infra_configs(infra: FeatureList) -> Dict[str, Dict]:
+    """Split infrastructure FeatureList into separate config-style JSON structures.
+
+    Returns a mapping of filename -> JSON dict. Filenames and top-level keys are
+    derived from the feature names, with a special case for CSI to match the
+    existing csi_driver_powerscale.json pattern.
+    """
+    configs: Dict[str, Dict] = {}
+
+    for feature_name, feature in infra.features.items():
+        name_snake = _snake_case(feature_name)
+
+        if feature_name.lower() == "csi":
+            file_name = "csi_driver_powerscale.json"
+            top_key = "csi_driver_powerscale"
+        else:
+            file_name = f"{name_snake}.json"
+            top_key = name_snake
+
+        cluster = [_package_to_dict(pkg) for pkg in feature.packages]
+        configs[file_name] = {top_key: {"cluster": cluster}}
+
+    return configs
+
+
+# -------------------------- Utility: write configs to disk --------------------------
+
+
+def write_config_files(configs: Dict[str, Dict], output_dir: str) -> None:
+    """Write multiple config JSONs into an output directory.
+
+    - configs: mapping of filename -> JSON-serializable dict
+    - output_dir: directory under which files will be written
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    for filename, data in configs.items():
+        path = os.path.join(output_dir, filename)
+        with open(path, "w") as f:
+            # Expect shape: { top_key: { "cluster": [pkg_dicts...] } }
+            f.write("{\n")
+
+            items = list(data.items())
+            for i, (top_key, body) in enumerate(items):
+                f.write(f"  {json.dumps(top_key)}: {{\n")
+                f.write("    \"cluster\": [\n")
+
+                pkgs = body.get("cluster", [])
+                for j, pkg in enumerate(pkgs):
+                    line = "      " + json.dumps(pkg, separators=(", ", ": "))
+                    if j < len(pkgs) - 1:
+                        line += ","
+                    f.write(line + "\n")
+
+                f.write("    ]\n")
+                f.write("  }")
+                if i < len(items) - 1:
+                    f.write(",\n")
+                else:
+                    f.write("\n")
+
+            f.write("}\n")
+
+
+def _filter_featurelist_for_arch(feature_list: FeatureList, arch: str) -> FeatureList:
+    filtered_features: Dict[str, Feature] = {}
+    for name, feature in feature_list.features.items():
+        narrowed_pkgs: List[Package] = []
+        for p in feature.packages:
+            if arch in getattr(p, "architecture", []):
+                # Derive repo_name and uri from the catalog Sources metadata, if
+                # present, for this specific architecture.
+                repo_name = ""
+                uri = getattr(p, "uri", "")
+                if getattr(p, "sources", None):
+                    for src in p.sources:
+                        if src.get("Architecture") == arch:
+                            if "RepoName" in src:
+                                repo_name = src["RepoName"]
+                            if "Uri" in src:
+                                uri = src["Uri"]
+                            break
+
+                narrowed_pkgs.append(
+                    Package(
+                        package=p.package,
+                        type=p.type,
+                        repo_name=repo_name,
+                        architecture=[arch],
+                        uri=uri,
+                        tag=p.tag,
+                        sources=p.sources,
+                    )
+                )
+        filtered_features[name] = Feature(feature_name=name, packages=narrowed_pkgs)
+    return FeatureList(features=filtered_features)
+
+
+def _discover_arch_os_version_from_catalog(catalog: Catalog) -> List[Tuple[str, str, str]]:
+    """Discover distinct (arch, os_name, version) combinations in the Catalog.
+
+    os_name is returned in lowercase (e.g. "rhel"), version as-is.
+    """
+
+    combos: set[Tuple[str, str, str]] = set()
+
+    def _add_from_packages(packages):
+        for pkg in packages:
+            for os_entry in pkg.supported_os:
+                parts = os_entry.split(" ", 1)
+                if len(parts) == 2:
+                    os_name_raw, os_ver = parts
+                else:
+                    os_name_raw, os_ver = os_entry, ""
+                os_name = os_name_raw.lower()
+
+                for arch in pkg.architecture:
+                    combos.add((arch, os_name, os_ver))
+
+    _add_from_packages(catalog.functional_packages)
+    _add_from_packages(catalog.os_packages)
+
+    return sorted(combos)
+
+
+def generate_all_configs(
+    functional: FeatureList,
+    infra: FeatureList,
+    base_os: FeatureList,
+    misc: FeatureList,
+    catalog: Catalog,
+    output_root: str,
+) -> None:
+    """Driver that builds and writes all config-style JSONs.
+
+    For each (arch, os_name, version) combination present in the Catalog's
+    FunctionalPackages/OSPackages, this writes a full set of config-style
+    JSONs under:
+
+        output_root/<arch>/<os_name>/<version>
+
+    Files written (if data available):
+      - default_packages.json
+      - nfs.json
+      - openldap.json
+      - openmpi.json
+      - service_k8s.json
+      - slurm_custom.json
+      - one file per infrastructure feature (e.g. csi_driver_powerscale.json)
+    """
+
+    combos = _discover_arch_os_version_from_catalog(catalog)
+    for arch, os_name, version in combos:
+        functional_arch = _filter_featurelist_for_arch(functional, arch)
+        base_os_arch = _filter_featurelist_for_arch(base_os, arch)
+        infra_arch = _filter_featurelist_for_arch(infra, arch)
+        misc_arch = _filter_featurelist_for_arch(misc, arch)
+
+        configs: Dict[str, Dict] = {}
+
+        configs["default_packages.json"] = build_default_packages_config(base_os_arch)
+
+        for filename, builder in (
+            ("nfs.json", build_nfs_config),
+            ("openldap.json", build_openldap_config),
+            ("openmpi.json", build_openmpi_config),
+        ):
+            cfg = builder(base_os_arch)
+            if cfg:
+                configs[filename] = cfg
+
+        configs["service_k8s.json"] = build_service_k8s_config(functional_arch)
+        configs["slurm_custom.json"] = build_slurm_custom_config(functional_arch)
+
+        misc_feature: Feature | None = misc_arch.features.get("Miscellaneous")
+        if misc_feature is not None and misc_feature.packages:
+            configs["miscellaneous.json"] = {
+                "miscellaneous": {
+                    "cluster": [_package_to_dict(p) for p in misc_feature.packages]
+                }
+            }
+
+        infra_configs = build_infra_configs(infra_arch)
+        configs.update(infra_configs)
+
+        output_dir = os.path.join(output_root, arch, os_name, version)
+        write_config_files(configs, output_dir)
+
+
+if __name__ == "__main__":
+    # Example client: build configs from the sample catalog into out/config/x86_64/rhel/10.0
+    parser = argparse.ArgumentParser(description='Generate adapter configs')
+    parser.add_argument('--catalog', required=True, help='Path to input catalog JSON file')
+    parser.add_argument('--schema', required=False, default='resources/CatalogSchema.json',
+                        help='Path to catalog schema JSON file')
+    args = parser.parse_args()
+
+    catalog = ParseCatalog(args.catalog, args.schema)
+
+    functional_layer_json = generate_functional_layer_json(catalog)
+    infrastructure_json = generate_infrastructure_json(catalog)
+    base_os_json = generate_base_os_json(catalog)
+    miscellaneous_json = generate_miscellaneous_json(catalog)
+
+    generate_all_configs(
+        functional=functional_layer_json,
+        infra=infrastructure_json,
+        base_os=base_os_json,
+        misc=miscellaneous_json,
+        catalog=catalog,
+        output_root="out/adapter/input/config",
+    )
