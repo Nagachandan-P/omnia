@@ -13,16 +13,20 @@
 # limitations under the License.
 
 import json
+import logging
 from jsonschema import validate
 from models import Catalog, FunctionalPackage, OsPackage, InfrastructurePackage, Driver
 
+logger = logging.getLogger(__name__)
 
 def ParseCatalog(file_path: str, schema_path: str = "resources/CatalogSchema.json") -> Catalog:
+    logger.info("Parsing catalog from %s using schema %s", file_path, schema_path)
     with open(schema_path) as f:
         schema = json.load(f)
     with open(file_path) as f:
         catalog_json = json.load(f)
 
+    logger.debug("Validating catalog JSON against schema")
     validate(instance=catalog_json, schema=schema)
     data = catalog_json["Catalog"]
 
@@ -97,6 +101,16 @@ def ParseCatalog(file_path: str, schema_path: str = "resources/CatalogSchema.jso
         os_packages=os_packages,
         infrastructure_packages=infrastructure_packages,
         miscellaneous=data.get("Miscellaneous", []),
+    )
+
+    logger.info(
+        "Parsed catalog %s v%s: %d functional, %d OS, %d infrastructure, %d drivers",
+        catalog.name,
+        catalog.version,
+        len(functional_packages),
+        len(os_packages),
+        len(infrastructure_packages),
+        len(drivers),
     )
 
     return catalog

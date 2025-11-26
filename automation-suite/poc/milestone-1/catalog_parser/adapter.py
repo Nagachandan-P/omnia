@@ -18,6 +18,7 @@ from collections import Counter
 from dataclasses import asdict
 from typing import Dict, Iterable, List, Tuple
 import argparse
+import logging
 
 from parser import ParseCatalog
 from models import Catalog
@@ -31,6 +32,9 @@ from generator import (
     generate_miscellaneous_json,
     _package_common_dict,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def _snake_case(name: str) -> str:
@@ -64,6 +68,7 @@ def build_default_packages_config(base_os: FeatureList) -> Dict:
         raise ValueError("Base OS feature not found in base_os FeatureList")
 
     cluster = [_package_to_dict(pkg) for pkg in feature.packages]
+    logger.info("Built default_packages config with %d package(s)", len(cluster))
     return {"default_packages": {"cluster": cluster}}
 
 
@@ -86,9 +91,11 @@ def _build_subconfig_from_base_os(
         if any(sub in pkg.package.lower() for sub in lowered)
     ]
     if not selected:
+        logger.info("No %s packages found in Base OS for substrings %s", name, list(substrings))
         return None
 
     cluster = [_package_to_dict(pkg) for pkg in selected]
+    logger.info("Built %s config with %d package(s)", name, len(cluster))
     return {name: {"cluster": cluster}}
 
 
@@ -138,6 +145,13 @@ def build_service_k8s_config(functional: FeatureList) -> Dict:
         if k in common_keys and k not in seen_common:
             seen_common.add(k)
             common_pkgs.append(pkg)
+
+    logger.info(
+        "Built service_k8s config: %d controller pkg(s), %d worker pkg(s), %d common pkg(s)",
+        len(ctrl_pkgs),
+        len(node_pkgs),
+        len(common_pkgs),
+    )
 
     return {
         "service_kube_control_plane": {
@@ -213,6 +227,12 @@ def build_slurm_custom_config(functional: FeatureList) -> Dict:
 
     output["slurms_custom"] = {"cluster": common_pkg_dicts}
 
+    logger.info(
+        "Built slurm_custom config with %d node cluster(s) and %d common package(s)",
+        len(node_features),
+        len(common_pkg_dicts),
+    )
+
     return output
 
 
@@ -241,6 +261,8 @@ def build_infra_configs(infra: FeatureList) -> Dict[str, Dict]:
         cluster = [_package_to_dict(pkg) for pkg in feature.packages]
         configs[file_name] = {top_key: {"cluster": cluster}}
 
+    logger.info("Built %d infrastructure config file(s)", len(configs))
+
     return configs
 
 
@@ -254,8 +276,10 @@ def write_config_files(configs: Dict[str, Dict], output_dir: str) -> None:
     - output_dir: directory under which files will be written
     """
     os.makedirs(output_dir, exist_ok=True)
+    logger.info("Writing %d config file(s) to %s", len(configs), output_dir)
     for filename, data in configs.items():
         path = os.path.join(output_dir, filename)
+        logger.debug("Writing config file %s", path)
         with open(path, "w") as f:
             # Expect shape: { top_key: { "cluster": [pkg_dicts...] } }
             f.write("{\n")
@@ -340,7 +364,13 @@ def _discover_arch_os_version_from_catalog(catalog: Catalog) -> List[Tuple[str, 
     _add_from_packages(catalog.functional_packages)
     _add_from_packages(catalog.os_packages)
 
-    return sorted(combos)
+    combos_sorted = sorted(combos)
+    logger.debug(
+        "Discovered %d (arch, os, version) combinations in catalog %s (adapter)",
+        len(combos_sorted),
+        getattr(catalog, "name", "<unknown>"),
+    )
+    return combos_sorted
 
 
 def generate_all_configs(
@@ -370,11 +400,16 @@ def generate_all_configs(
     """
 
     combos = _discover_arch_os_version_from_catalog(catalog)
+    logger.info("Generating adapter configs for %d combination(s)", len(combos))
     for arch, os_name, version in combos:
         functional_arch = _filter_featurelist_for_arch(functional, arch)
         base_os_arch = _filter_featurelist_for_arch(base_os, arch)
         infra_arch = _filter_featurelist_for_arch(infra, arch)
         misc_arch = _filter_featurelist_for_arch(misc, arch)
+
+        logger.info(
+            "Building configs for arch=%s os=%s version=%s", arch, os_name, version
+        )
 
         configs: Dict[str, Dict] = {}
 
@@ -413,7 +448,25 @@ if __name__ == "__main__":
     parser.add_argument('--catalog', required=True, help='Path to input catalog JSON file')
     parser.add_argument('--schema', required=False, default='resources/CatalogSchema.json',
                         help='Path to catalog schema JSON file')
+    parser.add_argument('--log-file', required=False, default=None, help='Path to log file; if not set, logs go to stderr')
     args = parser.parse_args()
+
+    if args.log_file:
+        log_dir = os.path.dirname(args.log_file)
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            filename=args.log_file,
+        )
+    else:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
+
+    logger.info("Adapter config generation started for %s", args.catalog)
 
     catalog = ParseCatalog(args.catalog, args.schema)
 
@@ -430,3 +483,5 @@ if __name__ == "__main__":
         catalog=catalog,
         output_root="out/adapter/input/config",
     )
+
+    logger.info("Adapter config generation completed for %s", args.catalog)

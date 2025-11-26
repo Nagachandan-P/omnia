@@ -15,9 +15,12 @@
 import json
 import os
 import argparse
+import logging
 from models import Catalog
 from dataclasses import dataclass
 from typing import List, Dict, Tuple, Optional
+
+logger = logging.getLogger(__name__)
 
 # This code generates JSON files
 # i.e baseos.json, infrastructure.json, functional_layer.json, miscellaneous.json
@@ -116,7 +119,13 @@ def _discover_arch_os_version_from_catalog(catalog: Catalog) -> List[Tuple[str, 
     _add_from_packages(catalog.functional_packages)
     _add_from_packages(catalog.os_packages)
 
-    return sorted(combos)
+    combos_sorted = sorted(combos)
+    logger.debug(
+        "Discovered %d (arch, os, version) combinations in catalog %s",
+        len(combos_sorted),
+        getattr(catalog, "name", "<unknown>"),
+    )
+    return combos_sorted
 
 def generate_functional_layer_json(catalog: Catalog) -> FeatureList:
     """
@@ -379,6 +388,11 @@ def serialize_json(feature_list: FeatureList, output_path: str):
     # Custom pretty-printer so that:
     #   - Overall JSON is nicely indented
     #   - Each package entry inside "packages" is a single-line JSON object
+    logger.info(
+        "Writing FeatureList with %d feature(s) to %s",
+        len(feature_list.features),
+        output_path,
+    )
     with open(output_path, "w") as f:
         f.write("{\n")
 
@@ -418,6 +432,8 @@ def deserialize_json(input_path: str) -> FeatureList:
     """
     with open(input_path, "r") as f:
         json_data = json.load(f)
+
+    logger.debug("Deserializing FeatureList from %s", input_path)
     
     feature_list = FeatureList(
         features={
@@ -432,19 +448,38 @@ def deserialize_json(input_path: str) -> FeatureList:
         }
     )
     
+    logger.info("Deserialized FeatureList with %d feature(s) from %s", len(feature_list.features), input_path)
+
     return feature_list
+
 
 if __name__ == "__main__":
     # Example usage: generate per-arch/OS/version FeatureList JSONs under
     # out/<arch>/<os_name>/<version>/
     from parser import ParseCatalog
 
-
-
     parser = argparse.ArgumentParser(description='Catalog Parser CLI')
     parser.add_argument('--catalog', required=True, help='Path to input catalog JSON file')
     parser.add_argument('--schema', required=False, default='resources/CatalogSchema.json', help='Path to catalog schema JSON file')
+    parser.add_argument('--log-file', required=False, default=None, help='Path to log file; if not set, logs go to stderr')
     args = parser.parse_args()
+
+    if args.log_file:
+        log_dir = os.path.dirname(args.log_file)
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            filename=args.log_file,
+        )
+    else:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
+
+    logger.info("Catalog Parser CLI started for %s", args.catalog)
 
     catalog = ParseCatalog(args.catalog, args.schema)
 
@@ -455,9 +490,19 @@ if __name__ == "__main__":
     miscellaneous_json = generate_miscellaneous_json(catalog)
 
     combos = _discover_arch_os_version_from_catalog(catalog)
+    logger.info("Discovered %d combination(s) for feature-list generation", len(combos))
+
     for arch, os_name, version in combos:
-        base_dir = os.path.join('out',"main", arch, os_name, version)
+        base_dir = os.path.join('out', "main", arch, os_name, version)
         os.makedirs(base_dir, exist_ok=True)
+
+        logger.info(
+            "Generating feature-list JSONs for arch=%s os=%s version=%s into %s",
+            arch,
+            os_name,
+            version,
+            base_dir,
+        )
 
         func_arch = _filter_featurelist_for_arch(functional_layer_json, arch)
         infra_arch = _filter_featurelist_for_arch(infrastructure_json, arch)
@@ -470,3 +515,5 @@ if __name__ == "__main__":
         serialize_json(drivers_arch, os.path.join(base_dir, 'drivers.json'))
         serialize_json(base_os_arch, os.path.join(base_dir, 'base_os.json'))
         serialize_json(misc_arch, os.path.join(base_dir, 'miscellaneous.json'))
+
+    logger.info("Catalog Parser CLI completed for %s", args.catalog)
