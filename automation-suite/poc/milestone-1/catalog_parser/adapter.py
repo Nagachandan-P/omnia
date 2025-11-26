@@ -16,7 +16,7 @@ import json
 import os
 from collections import Counter
 from dataclasses import asdict
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, Iterable, List, Tuple, Optional
 import argparse
 import logging
 import sys
@@ -32,6 +32,8 @@ from generator import (
     generate_base_os_json,
     generate_miscellaneous_json,
     _package_common_dict,
+    _configure_logging,
+    _validate_catalog_and_schema_paths,
 )
 
 
@@ -446,8 +448,46 @@ def generate_all_configs(
         write_config_files(configs, output_dir)
 
 
+def generate_omnia_json_from_catalog(
+    catalog_path: str,
+    schema_path: str = "resources/CatalogSchema.json",
+    output_root: str = "out/adapter/input/config",
+    *,
+    log_file: Optional[str] = None,
+    configure_logging: bool = False,
+    log_level: int = logging.INFO,
+) -> None:
+    """Generate adapter configuration JSONs for a catalog file.
+
+    - If configure_logging is True, logging is configured using _configure_logging,
+      optionally writing to log_file.
+    - On missing files, FileNotFoundError is raised after logging an error.
+    - No sys.exit is called; callers are expected to handle exceptions.
+    """
+
+    if configure_logging:
+        _configure_logging(log_file=log_file, log_level=log_level)
+
+    _validate_catalog_and_schema_paths(catalog_path, schema_path)
+
+    catalog = ParseCatalog(catalog_path, schema_path)
+
+    functional_layer_json = generate_functional_layer_json(catalog)
+    infrastructure_json = generate_infrastructure_json(catalog)
+    base_os_json = generate_base_os_json(catalog)
+    miscellaneous_json = generate_miscellaneous_json(catalog)
+
+    generate_all_configs(
+        functional=functional_layer_json,
+        infra=infrastructure_json,
+        base_os=base_os_json,
+        misc=miscellaneous_json,
+        catalog=catalog,
+        output_root=output_root,
+    )
+
+
 if __name__ == "__main__":
-    # Example client: build configs from the sample catalog into out/config/x86_64/rhel/10.0
     parser = argparse.ArgumentParser(description='Generate adapter configs')
     parser.add_argument('--catalog', required=True, help='Path to input catalog JSON file')
     parser.add_argument('--schema', required=False, default='resources/CatalogSchema.json',
@@ -455,45 +495,14 @@ if __name__ == "__main__":
     parser.add_argument('--log-file', required=False, default=None, help='Path to log file; if not set, logs go to stderr')
     args = parser.parse_args()
 
-    if args.log_file:
-        log_dir = os.path.dirname(args.log_file)
-        if log_dir:
-            os.makedirs(log_dir, exist_ok=True)
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            filename=args.log_file,
-        )
-    else:
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        )
-
-    # Basic input validation for catalog and schema paths
-    if not os.path.isfile(args.catalog):
-        logger.error("Catalog file not found: %s", args.catalog)
-        sys.exit(ERROR_CODE_INPUT_NOT_FOUND)
-    if args.schema and not os.path.isfile(args.schema):
-        logger.error("Schema file not found: %s", args.schema)
-        sys.exit(ERROR_CODE_INPUT_NOT_FOUND)
+    _configure_logging(log_file=args.log_file, log_level=logging.INFO)
 
     logger.info("Adapter config generation started for %s", args.catalog)
 
     try:
-        catalog = ParseCatalog(args.catalog, args.schema)
-
-        functional_layer_json = generate_functional_layer_json(catalog)
-        infrastructure_json = generate_infrastructure_json(catalog)
-        base_os_json = generate_base_os_json(catalog)
-        miscellaneous_json = generate_miscellaneous_json(catalog)
-
-        generate_all_configs(
-            functional=functional_layer_json,
-            infra=infrastructure_json,
-            base_os=base_os_json,
-            misc=miscellaneous_json,
-            catalog=catalog,
+        generate_omnia_json_from_catalog(
+            catalog_path=args.catalog,
+            schema_path=args.schema,
             output_root="out/adapter/input/config",
         )
 

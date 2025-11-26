@@ -57,3 +57,35 @@ out/adapter/input/config/<arch>/<os_name>/<version>/
   slurm_custom.json
   <infra-feature>.json ...
 ```
+
+### Programmatic usage
+
+You can also call both components directly from Python without going through the CLI.
+
+#### Catalog Parser API (`generator.py`)
+
+Programmatic entry point:
+
+- `generate_root_json_from_catalog(catalog_path, schema_path="resources/CatalogSchema.json", output_root="out/generator", *, log_file=None, configure_logging=False, log_level=logging.INFO)`
+
+Behavior:
+
+- Optionally configures logging when `configure_logging=True` (and will create the log directory if needed).
+- Writes per-arch/OS/version feature-list JSONs under `output_root/<arch>/<os>/<version>/`.
+
+#### Adapter Config API (`adapter.py`)
+
+Programmatic entry point:
+
+- `generate_omnia_json_from_catalog(catalog_path, schema_path="resources/CatalogSchema.json", output_root="out/adapter/input/config", *, log_file=None, configure_logging=False, log_level=logging.INFO)`
+
+Behavior:
+
+- Optionally configures logging when `configure_logging=True` (and will create the log directory if needed).
+- Writes adapter-style config JSONs under `output_root/<arch>/<os>/<version>/`.
+
+#### Sample code
+
+Example Python code showing how to call these APIs programmatically is available in:
+
+- `tests/sample.py`

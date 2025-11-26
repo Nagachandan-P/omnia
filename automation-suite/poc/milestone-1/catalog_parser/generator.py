@@ -18,6 +18,7 @@ import argparse
 import logging
 import sys
 from models import Catalog
+from parser import ParseCatalog
 
 from dataclasses import dataclass
 from typing import List, Dict, Tuple, Optional
@@ -26,6 +27,45 @@ logger = logging.getLogger(__name__)
 
 ERROR_CODE_INPUT_NOT_FOUND = 2
 ERROR_CODE_PROCESSING_ERROR = 3
+
+def _configure_logging(log_file: Optional[str] = None, log_level: int = logging.INFO) -> None:
+    """Configure root logging for the catalog generator.
+
+    If log_file is provided, logs are written to that file and the directory is
+    created if needed; otherwise logs go to stderr.
+    """
+
+    if log_file:
+        log_dir = os.path.dirname(log_file)
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+        logging.basicConfig(
+            level=log_level,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            filename=log_file,
+        )
+    else:
+        logging.basicConfig(
+            level=log_level,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
+
+
+def _validate_catalog_and_schema_paths(catalog_path: str, schema_path: Optional[str]) -> None:
+    """Validate that the catalog and schema paths (if provided) exist.
+
+    Raises FileNotFoundError if any required file is missing. Logging is
+    performed here so both CLI and API callers get consistent messages.
+    """
+
+    if not os.path.isfile(catalog_path):
+        logger.error("Catalog file not found: %s", catalog_path)
+        raise FileNotFoundError(catalog_path)
+
+    if schema_path and not os.path.isfile(schema_path):
+        logger.error("Schema file not found: %s", schema_path)
+        raise FileNotFoundError(schema_path)
+
 
 # This code generates JSON files
 # i.e baseos.json, infrastructure.json, functional_layer.json, miscellaneous.json
@@ -458,10 +498,104 @@ def deserialize_json(input_path: str) -> FeatureList:
     return feature_list
 
 
+def _configure_logging(log_file: Optional[str] = None, log_level: int = logging.INFO) -> None:
+    """Configure logging for the catalog parser.
+
+    If log_file is set, logs are written to that file; otherwise, logs go to stderr.
+    """
+    if log_file:
+        log_dir = os.path.dirname(log_file)
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+        logging.basicConfig(
+            level=log_level,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            filename=log_file,
+        )
+    else:
+        logging.basicConfig(
+            level=log_level,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
+
+
+def _validate_catalog_and_schema_paths(catalog_path: str, schema_path: str) -> None:
+    """Validate that the catalog and schema paths exist.
+
+    Raises FileNotFoundError if either path does not exist.
+    """
+    if not os.path.isfile(catalog_path):
+        logger.error("Catalog file not found: %s", catalog_path)
+        raise FileNotFoundError(catalog_path)
+    if not os.path.isfile(schema_path):
+        logger.error("Schema file not found: %s", schema_path)
+        raise FileNotFoundError(schema_path)
+
+
+def generate_root_json_from_catalog(
+    catalog_path: str,
+    schema_path: str = "resources/CatalogSchema.json",
+    output_root: str = "out/generator",
+    *,
+    log_file: Optional[str] = None,
+    configure_logging: bool = False,
+    log_level: int = logging.INFO,
+) -> None:
+    """Generate per-arch/OS/version FeatureList JSONs for a catalog file.
+
+    - If configure_logging is True, logging is configured using _configure_logging,
+      optionally writing to log_file.
+    - On missing files, FileNotFoundError is raised after logging an error.
+    - No sys.exit is called; callers are expected to handle exceptions.
+    """
+    # Optional logging configuration for library callers
+    if configure_logging:
+        _configure_logging(log_file=log_file, log_level=log_level)
+
+    # Shared input validation
+    _validate_catalog_and_schema_paths(catalog_path, schema_path)
+
+    catalog = ParseCatalog(catalog_path, schema_path)
+
+    functional_layer_json = generate_functional_layer_json(catalog)
+    infrastructure_json = generate_infrastructure_json(catalog)
+    drivers_json = generate_drivers_json(catalog)
+    base_os_json = generate_base_os_json(catalog)
+    miscellaneous_json = generate_miscellaneous_json(catalog)
+
+    combos = _discover_arch_os_version_from_catalog(catalog)
+    logger.info(
+        "Discovered %d combination(s) for feature-list generation", len(combos)
+    )
+
+    for arch, os_name, version in combos:
+        base_dir = os.path.join(output_root, arch, os_name, version)
+        os.makedirs(base_dir, exist_ok=True)
+
+        logger.info(
+            "Generating feature-list JSONs for arch=%s os=%s version=%s into %s",
+            arch,
+            os_name,
+            version,
+            base_dir,
+        )
+
+        func_arch = _filter_featurelist_for_arch(functional_layer_json, arch)
+        infra_arch = _filter_featurelist_for_arch(infrastructure_json, arch)
+        drivers_arch = _filter_featurelist_for_arch(drivers_json, arch)
+        base_os_arch = _filter_featurelist_for_arch(base_os_json, arch)
+        misc_arch = _filter_featurelist_for_arch(miscellaneous_json, arch)
+
+        serialize_json(func_arch, os.path.join(base_dir, 'functional_layer.json'))
+        serialize_json(infra_arch, os.path.join(base_dir, 'infrastructure.json'))
+        serialize_json(drivers_arch, os.path.join(base_dir, 'drivers.json'))
+        serialize_json(base_os_arch, os.path.join(base_dir, 'base_os.json'))
+        serialize_json(misc_arch, os.path.join(base_dir, 'miscellaneous.json'))
+
+
 if __name__ == "__main__":
     # Example usage: generate per-arch/OS/version FeatureList JSONs under
     # out/<arch>/<os_name>/<version>/
-    from parser import ParseCatalog
 
     parser = argparse.ArgumentParser(description='Catalog Parser CLI')
     parser.add_argument('--catalog', required=True, help='Path to input catalog JSON file')
@@ -469,68 +603,21 @@ if __name__ == "__main__":
     parser.add_argument('--log-file', required=False, default=None, help='Path to log file; if not set, logs go to stderr')
     args = parser.parse_args()
 
-    if args.log_file:
-        log_dir = os.path.dirname(args.log_file)
-        if log_dir:
-            os.makedirs(log_dir, exist_ok=True)
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            filename=args.log_file,
-        )
-    else:
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        )
-
-    # Basic input validation for catalog and schema paths
-    if not os.path.isfile(args.catalog):
-        logger.error("Catalog file not found: %s", args.catalog)
-        sys.exit(ERROR_CODE_INPUT_NOT_FOUND)
-    if args.schema and not os.path.isfile(args.schema):
-        logger.error("Schema file not found: %s", args.schema)
-        sys.exit(ERROR_CODE_INPUT_NOT_FOUND)
+    # Configure logging once for the CLI
+    _configure_logging(log_file=args.log_file, log_level=logging.INFO)
 
     logger.info("Catalog Parser CLI started for %s", args.catalog)
 
     try:
-        catalog = ParseCatalog(args.catalog, args.schema)
-
-        functional_layer_json = generate_functional_layer_json(catalog)
-        infrastructure_json = generate_infrastructure_json(catalog)
-        drivers_json = generate_drivers_json(catalog)
-        base_os_json = generate_base_os_json(catalog)
-        miscellaneous_json = generate_miscellaneous_json(catalog)
-
-        combos = _discover_arch_os_version_from_catalog(catalog)
-        logger.info("Discovered %d combination(s) for feature-list generation", len(combos))
-
-        for arch, os_name, version in combos:
-            base_dir = os.path.join('out', "main", arch, os_name, version)
-            os.makedirs(base_dir, exist_ok=True)
-
-            logger.info(
-                "Generating feature-list JSONs for arch=%s os=%s version=%s into %s",
-                arch,
-                os_name,
-                version,
-                base_dir,
-            )
-
-            func_arch = _filter_featurelist_for_arch(functional_layer_json, arch)
-            infra_arch = _filter_featurelist_for_arch(infrastructure_json, arch)
-            drivers_arch = _filter_featurelist_for_arch(drivers_json, arch)
-            base_os_arch = _filter_featurelist_for_arch(base_os_json, arch)
-            misc_arch = _filter_featurelist_for_arch(miscellaneous_json, arch)
-
-            serialize_json(func_arch, os.path.join(base_dir, 'functional_layer.json'))
-            serialize_json(infra_arch, os.path.join(base_dir, 'infrastructure.json'))
-            serialize_json(drivers_arch, os.path.join(base_dir, 'drivers.json'))
-            serialize_json(base_os_arch, os.path.join(base_dir, 'base_os.json'))
-            serialize_json(misc_arch, os.path.join(base_dir, 'miscellaneous.json'))
+        # Reuse the programmatic API to generate all FeatureList JSONs.
+        generate_root_json_from_catalog(
+            catalog_path=args.catalog,
+            schema_path=args.schema,
+            output_root=os.path.join('out', 'main'),
+        )
 
         logger.info("Catalog Parser CLI completed for %s", args.catalog)
+
     except FileNotFoundError as exc:
         logger.error(
             "File not found during processing: %s",
