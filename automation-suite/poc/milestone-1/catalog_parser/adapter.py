@@ -19,6 +19,7 @@ from dataclasses import asdict
 from typing import Dict, Iterable, List, Tuple
 import argparse
 import logging
+import sys
 
 from parser import ParseCatalog
 from models import Catalog
@@ -35,6 +36,9 @@ from generator import (
 
 
 logger = logging.getLogger(__name__)
+
+ERROR_CODE_INPUT_NOT_FOUND = 2
+ERROR_CODE_PROCESSING_ERROR = 3
 
 
 def _snake_case(name: str) -> str:
@@ -466,22 +470,40 @@ if __name__ == "__main__":
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
 
+    # Basic input validation for catalog and schema paths
+    if not os.path.isfile(args.catalog):
+        logger.error("Catalog file not found: %s", args.catalog)
+        sys.exit(ERROR_CODE_INPUT_NOT_FOUND)
+    if args.schema and not os.path.isfile(args.schema):
+        logger.error("Schema file not found: %s", args.schema)
+        sys.exit(ERROR_CODE_INPUT_NOT_FOUND)
+
     logger.info("Adapter config generation started for %s", args.catalog)
 
-    catalog = ParseCatalog(args.catalog, args.schema)
+    try:
+        catalog = ParseCatalog(args.catalog, args.schema)
 
-    functional_layer_json = generate_functional_layer_json(catalog)
-    infrastructure_json = generate_infrastructure_json(catalog)
-    base_os_json = generate_base_os_json(catalog)
-    miscellaneous_json = generate_miscellaneous_json(catalog)
+        functional_layer_json = generate_functional_layer_json(catalog)
+        infrastructure_json = generate_infrastructure_json(catalog)
+        base_os_json = generate_base_os_json(catalog)
+        miscellaneous_json = generate_miscellaneous_json(catalog)
 
-    generate_all_configs(
-        functional=functional_layer_json,
-        infra=infrastructure_json,
-        base_os=base_os_json,
-        misc=miscellaneous_json,
-        catalog=catalog,
-        output_root="out/adapter/input/config",
-    )
+        generate_all_configs(
+            functional=functional_layer_json,
+            infra=infrastructure_json,
+            base_os=base_os_json,
+            misc=miscellaneous_json,
+            catalog=catalog,
+            output_root="out/adapter/input/config",
+        )
 
-    logger.info("Adapter config generation completed for %s", args.catalog)
+        logger.info("Adapter config generation completed for %s", args.catalog)
+    except FileNotFoundError as exc:
+        logger.error(
+            "File not found during processing: %s",
+            getattr(exc, "filename", str(exc)),
+        )
+        sys.exit(ERROR_CODE_INPUT_NOT_FOUND)
+    except Exception:
+        logger.exception("Unexpected error while generating adapter configs")
+        sys.exit(ERROR_CODE_PROCESSING_ERROR)

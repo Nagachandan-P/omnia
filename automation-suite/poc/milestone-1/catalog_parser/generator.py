@@ -16,11 +16,16 @@ import json
 import os
 import argparse
 import logging
+import sys
 from models import Catalog
+
 from dataclasses import dataclass
 from typing import List, Dict, Tuple, Optional
 
 logger = logging.getLogger(__name__)
+
+ERROR_CODE_INPUT_NOT_FOUND = 2
+ERROR_CODE_PROCESSING_ERROR = 3
 
 # This code generates JSON files
 # i.e baseos.json, infrastructure.json, functional_layer.json, miscellaneous.json
@@ -479,41 +484,59 @@ if __name__ == "__main__":
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
 
+    # Basic input validation for catalog and schema paths
+    if not os.path.isfile(args.catalog):
+        logger.error("Catalog file not found: %s", args.catalog)
+        sys.exit(ERROR_CODE_INPUT_NOT_FOUND)
+    if args.schema and not os.path.isfile(args.schema):
+        logger.error("Schema file not found: %s", args.schema)
+        sys.exit(ERROR_CODE_INPUT_NOT_FOUND)
+
     logger.info("Catalog Parser CLI started for %s", args.catalog)
 
-    catalog = ParseCatalog(args.catalog, args.schema)
+    try:
+        catalog = ParseCatalog(args.catalog, args.schema)
 
-    functional_layer_json = generate_functional_layer_json(catalog)
-    infrastructure_json = generate_infrastructure_json(catalog)
-    drivers_json = generate_drivers_json(catalog)
-    base_os_json = generate_base_os_json(catalog)
-    miscellaneous_json = generate_miscellaneous_json(catalog)
+        functional_layer_json = generate_functional_layer_json(catalog)
+        infrastructure_json = generate_infrastructure_json(catalog)
+        drivers_json = generate_drivers_json(catalog)
+        base_os_json = generate_base_os_json(catalog)
+        miscellaneous_json = generate_miscellaneous_json(catalog)
 
-    combos = _discover_arch_os_version_from_catalog(catalog)
-    logger.info("Discovered %d combination(s) for feature-list generation", len(combos))
+        combos = _discover_arch_os_version_from_catalog(catalog)
+        logger.info("Discovered %d combination(s) for feature-list generation", len(combos))
 
-    for arch, os_name, version in combos:
-        base_dir = os.path.join('out', "main", arch, os_name, version)
-        os.makedirs(base_dir, exist_ok=True)
+        for arch, os_name, version in combos:
+            base_dir = os.path.join('out', "main", arch, os_name, version)
+            os.makedirs(base_dir, exist_ok=True)
 
-        logger.info(
-            "Generating feature-list JSONs for arch=%s os=%s version=%s into %s",
-            arch,
-            os_name,
-            version,
-            base_dir,
+            logger.info(
+                "Generating feature-list JSONs for arch=%s os=%s version=%s into %s",
+                arch,
+                os_name,
+                version,
+                base_dir,
+            )
+
+            func_arch = _filter_featurelist_for_arch(functional_layer_json, arch)
+            infra_arch = _filter_featurelist_for_arch(infrastructure_json, arch)
+            drivers_arch = _filter_featurelist_for_arch(drivers_json, arch)
+            base_os_arch = _filter_featurelist_for_arch(base_os_json, arch)
+            misc_arch = _filter_featurelist_for_arch(miscellaneous_json, arch)
+
+            serialize_json(func_arch, os.path.join(base_dir, 'functional_layer.json'))
+            serialize_json(infra_arch, os.path.join(base_dir, 'infrastructure.json'))
+            serialize_json(drivers_arch, os.path.join(base_dir, 'drivers.json'))
+            serialize_json(base_os_arch, os.path.join(base_dir, 'base_os.json'))
+            serialize_json(misc_arch, os.path.join(base_dir, 'miscellaneous.json'))
+
+        logger.info("Catalog Parser CLI completed for %s", args.catalog)
+    except FileNotFoundError as exc:
+        logger.error(
+            "File not found during processing: %s",
+            getattr(exc, "filename", str(exc)),
         )
-
-        func_arch = _filter_featurelist_for_arch(functional_layer_json, arch)
-        infra_arch = _filter_featurelist_for_arch(infrastructure_json, arch)
-        drivers_arch = _filter_featurelist_for_arch(drivers_json, arch)
-        base_os_arch = _filter_featurelist_for_arch(base_os_json, arch)
-        misc_arch = _filter_featurelist_for_arch(miscellaneous_json, arch)
-
-        serialize_json(func_arch, os.path.join(base_dir, 'functional_layer.json'))
-        serialize_json(infra_arch, os.path.join(base_dir, 'infrastructure.json'))
-        serialize_json(drivers_arch, os.path.join(base_dir, 'drivers.json'))
-        serialize_json(base_os_arch, os.path.join(base_dir, 'base_os.json'))
-        serialize_json(misc_arch, os.path.join(base_dir, 'miscellaneous.json'))
-
-    logger.info("Catalog Parser CLI completed for %s", args.catalog)
+        sys.exit(ERROR_CODE_INPUT_NOT_FOUND)
+    except Exception:
+        logger.exception("Unexpected error while generating feature-list JSONs")
+        sys.exit(ERROR_CODE_PROCESSING_ERROR)
