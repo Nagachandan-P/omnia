@@ -62,7 +62,7 @@ async def parse_catalog(file: UploadFile = File(...)) -> dict:
             return {"message": "Invalid JSON data. The data must be a dictionary."}
         
         # Write the JSON data to a local file
-        with open('input.json', 'w') as f:
+        with open('input.json', 'w', encoding='utf-8') as f:
             json.dump(json_data, f)
         
         # Run the generator_main.py script with the local file as input
@@ -75,9 +75,6 @@ async def parse_catalog(file: UploadFile = File(...)) -> dict:
     except subprocess.SubprocessError as e:
         # Return an error message if an exception occurs
         return {"message": str(e)}
-    except subprocess.CalledProcessError as e:
-        # Handle the exception, for example, return an error message
-        return {"message": f"Error: {e.cmd} failed with return code {e.returncode}"}
     
 @app.post("/GenerateInputFiles")
 async def generate_input_files(file: UploadFile = File(...)) -> dict:
@@ -106,7 +103,7 @@ async def generate_input_files(file: UploadFile = File(...)) -> dict:
             return {"message": "Invalid JSON data. The data must be a dictionary."}
         
         # Write the JSON data to a local file
-        with open('input.json', 'w') as f:
+        with open('input.json', 'w', encoding='utf-8') as f:
             json.dump(json_data, f)
         
         # Run the generator_main.py script with the local file as input
@@ -122,9 +119,6 @@ async def generate_input_files(file: UploadFile = File(...)) -> dict:
     except subprocess.SubprocessError as e:
         # Return an error message if an exception occurs
         return {"message": str(e)}
-    except subprocess.CalledProcessError as e:
-        # Handle the exception, for example, return an error message
-        return {"message": f"Error: {e.cmd} failed with return code {e.returncode}"}
 
 @app.post("/BuildImage")
 async def build_image():
