@@ -66,15 +66,18 @@ async def parse_catalog(file: UploadFile = File(...)) -> dict:
             json.dump(json_data, f)
         
         # Run the generator_main.py script with the local file as input
-        result = subprocess.run(["python", "catalog_parser/generator.py", "--catalog", "input.json", "--schema", "catalog_parser/resources/CatalogSchema.json"])
+        result = subprocess.run(["python", "catalog_parser/generator.py", "--catalog", "input.json", "--schema", "catalog_parser/resources/CatalogSchema.json"], check=True)
         if result.returncode != 0:
             return {"message": f"Failed to parse catalog. Return code: {result.returncode}"}
         
         # Return a success message
         return {"message": "Catalog parsed successfully"}
-    except Exception as e:
+    except subprocess.SubprocessError as e:
         # Return an error message if an exception occurs
         return {"message": str(e)}
+    except subprocess.CalledProcessError as e:
+        # Handle the exception, for example, return an error message
+        return {"message": f"Error: {e.cmd} failed with return code {e.returncode}"}
     
 @app.post("/GenerateInputFiles")
 async def generate_input_files(file: UploadFile = File(...)) -> dict:
@@ -107,7 +110,7 @@ async def generate_input_files(file: UploadFile = File(...)) -> dict:
             json.dump(json_data, f)
         
         # Run the generator_main.py script with the local file as input
-        result = subprocess.run(["python", "catalog_parser/adapter.py", "--catalog", "input.json", "--schema", "catalog_parser/resources/CatalogSchema.json"])
+        result = subprocess.run(["python", "catalog_parser/adapter.py", "--catalog", "input.json", "--schema", "catalog_parser/resources/CatalogSchema.json"], check=True)
         if result.returncode != 0:
             return {"message": f"Failed to generate input files. Return code: {result.returncode}"}
         
@@ -116,9 +119,12 @@ async def generate_input_files(file: UploadFile = File(...)) -> dict:
     except json.JSONDecodeError as e:
         # Return an error message if the JSON data is invalid
         return {"message": f"Invalid JSON data: {str(e)}"}
-    except Exception as e:
+    except subprocess.SubprocessError as e:
         # Return an error message if an exception occurs
         return {"message": str(e)}
+    except subprocess.CalledProcessError as e:
+        # Handle the exception, for example, return an error message
+        return {"message": f"Error: {e.cmd} failed with return code {e.returncode}"}
 
 @app.post("/BuildImage")
 async def build_image():
