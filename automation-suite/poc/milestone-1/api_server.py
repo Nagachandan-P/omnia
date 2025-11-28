@@ -102,8 +102,17 @@ async def generate_input_files(file: UploadFile = File(...)) -> dict:
     except Exception as e:
         # Return an error message if an exception occurs
         return {"message": str(e)}
+
 @app.post("/BuildImage")
 async def build_image():
+    """
+    Triggers the build image process by executing the build_image_x86_64.yml playbook
+    on the omnia_core container using SSH.
+
+    Returns:
+        dict: A dictionary containing a success message.
+    """
+
     # Define the SSH command to execute on the omnia_core container
     cmd = f"ssh root@omnia_core 'ansible-playbook build_image_x86_64/build_image_x86_64.yml'"
 

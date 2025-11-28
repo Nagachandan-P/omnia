@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-#!/bin/bash
+# --------------------------------------------------------------------------------------------------
+# Script: setup_omniaapi_service.sh
+# Purpose: Sets up and configures the OmniaAPI service
+# --------------------------------------------------------------------------------------------------
+# Variables:
+#   SERVICE_NAME: The name of the service (omniaapi)
+#   SCRIPT_PATH: The path to the service script (/usr/local/bin/omniaapi.sh)
+#   SERVICE_FILE: The path to the systemd service file (/etc/systemd/system/omniaapi.service)
+#   ENV_FILE: The path to the environment file (/etc/omniaapi.env)
+#   LOG_FILE: The path to the setup log file (/var/log/omniaapi_setup.log)
+#   SERVICE_LOG: The path to the service log file (/var/log/omniaapi.log)
+#   CWD: The current working directory
+#   PORT: The port number to use (80)
+#
+# Usage:
+#   This script is designed to be run as root. It sets up and configures the OmniaAPI service,
+#   including creating the necessary files and directories, and enabling and starting the service.
+# --------------------------------------------------------------------------------------------------
+#
 
 SERVICE_NAME="omniaapi"
 SCRIPT_PATH="/usr/local/bin/${SERVICE_NAME}.sh"

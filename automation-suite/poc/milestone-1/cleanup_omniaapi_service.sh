@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-#!/bin/bash
+# Purpose:
+# This script is used to clean up the Omnia API service, removing configuration files and stopping the service.
+
+# Usage:
+# The script can be run as root user with no arguments.
+
+# Variables:
+# SERVICE_NAME: The name of the service to clean up (omniaapi).
+# SCRIPT_PATH: The path to the service script (/usr/local/bin/omniaapi.sh).
+# SERVICE_FILE: The path to the service file (/etc/systemd/system/omniaapi.service).
+# ENV_FILE: The path to the environment file (/etc/omniaapi.env).
+# LOG_FILE: The path to the setup log file (/var/log/omniaapi_setup.log).
+# SERVICE_LOG: The path to the service log file (/var/log/omniaapi.log).
+# PORT: The port number used by the service (80).
+
+# Exit Codes:
+# 0: Successful execution.
+# 1: Error occurred during execution.
+
 
 SERVICE_NAME="omniaapi"
 SCRIPT_PATH="/usr/local/bin/${SERVICE_NAME}.sh"
