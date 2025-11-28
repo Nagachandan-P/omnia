@@ -12,10 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from fastapi import FastAPI, File, Response, UploadFile
+"""
+api_server.py
+
+Module responsible for defining the FastAPI application and its endpoints.
+
+This module serves as the main entry point for the Omnia API, providing a RESTful
+interface for clients to interact with the application.
+
+Endpoints Ex:
+    - /ParseCatalog: Accepts a catalog file and returns the parsed data.
+
+Usage:
+    - Run the application using `uvicorn api_server:app --host 0.0.0.0 --port 8000`
+    - Use a tool like curl to test the endpoints, for example:
+        - `curl -X POST -F 'file=@path/to/catalog/file' http://localhost:8000/ParseCatalog`
+"""
+
 import json
 import subprocess
 
+from fastapi import FastAPI, File, UploadFile
 app = FastAPI()
 
 @app.post("/ParseCatalog")
@@ -114,7 +131,7 @@ async def build_image():
     """
 
     # Define the SSH command to execute on the omnia_core container
-    cmd = f"ssh root@omnia_core 'ansible-playbook build_image_x86_64/build_image_x86_64.yml'"
+    cmd = "ssh root@omnia_core 'ansible-playbook build_image_x86_64/build_image_x86_64.yml'"
 
     # Execute the command in the background without waiting for completion
     subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
