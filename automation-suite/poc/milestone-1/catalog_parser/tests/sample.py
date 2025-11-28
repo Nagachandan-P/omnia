@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Example script showing programmatic usage of the generator and adapter APIs.
+
+This script runs the catalog feature-list generator and adapter config generator
+directly from Python, configuring logging and handling common errors.
+"""
+
 import logging
 
 from generator import generate_root_json_from_catalog

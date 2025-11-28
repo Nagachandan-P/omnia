@@ -183,13 +183,13 @@ def generate_functional_layer_json(catalog: Catalog) -> FeatureList:
     - FeatureList: The generated JSON data
     """
     output_json = FeatureList(features={})
-    
+
     for layer in catalog.functional_layer:
         feature_json = Feature(
             feature_name=layer["Name"],
-            packages=[]
+            packages=[],
         )
-        
+
         for pkg_id in layer["FunctionalPackages"]:
             pkg = next((pkg for pkg in catalog.functional_packages if pkg.id == pkg_id), None)
             if pkg:
@@ -204,9 +204,9 @@ def generate_functional_layer_json(catalog: Catalog) -> FeatureList:
                         sources=pkg.sources,
                     )
                 )
-        
+
         output_json.features[feature_json.feature_name] = feature_json
-    
+
     return output_json
 
 def generate_infrastructure_json(catalog: Catalog) -> FeatureList:
@@ -220,13 +220,13 @@ def generate_infrastructure_json(catalog: Catalog) -> FeatureList:
     - FeatureList: The generated JSON data
     """
     output_json = FeatureList(features={})
-    
+
     for infra in catalog.infrastructure:
         feature_json = Feature(
             feature_name=infra["Name"],
-            packages=[]
+            packages=[],
         )
-        
+
         for pkg_id in infra["InfrastructurePackages"]:
             pkg = next((pkg for pkg in catalog.infrastructure_packages if pkg.id == pkg_id), None)
             if pkg:
@@ -241,9 +241,9 @@ def generate_infrastructure_json(catalog: Catalog) -> FeatureList:
                         sources=pkg.sources,
                     )
                 )
-        
+
         output_json.features[feature_json.feature_name] = feature_json
-    
+
     return output_json
 
 def generate_drivers_json(catalog: Catalog) -> FeatureList:
@@ -327,12 +327,12 @@ def generate_base_os_json(catalog: Catalog) -> FeatureList:
     - FeatureList: The generated JSON data
     """
     output_json = FeatureList(features={})
-    
+
     feature_json = Feature(
         feature_name="Base OS",
         packages=[]
     )
-    
+
     for entry in catalog.base_os:
         for pkg_id in entry["osPackages"]:
             pkg = next((pkg for pkg in catalog.os_packages if pkg.id == pkg_id), None)
@@ -348,9 +348,9 @@ def generate_base_os_json(catalog: Catalog) -> FeatureList:
                         sources=pkg.sources,
                     )
                 )
-    
+
     output_json.features[feature_json.feature_name] = feature_json
-    
+
     return output_json
 
 def generate_miscellaneous_json(catalog: Catalog) -> FeatureList:
@@ -479,7 +479,7 @@ def deserialize_json(input_path: str) -> FeatureList:
         json_data = json.load(f)
 
     logger.debug("Deserializing FeatureList from %s", input_path)
-    
+
     feature_list = FeatureList(
         features={
             feature_name: Feature(
@@ -487,13 +487,17 @@ def deserialize_json(input_path: str) -> FeatureList:
                 packages=[
                     _package_from_json_dict(pkg)
                     for pkg in feature_body.get("packages", [])
-                ]
+                ],
             )
             for feature_name, feature_body in json_data.items()
         }
     )
-    
-    logger.info("Deserialized FeatureList with %d feature(s) from %s", len(feature_list.features), input_path)
+
+    logger.info(
+        "Deserialized FeatureList with %d feature(s) from %s",
+        len(feature_list.features),
+        input_path,
+    )
 
     return feature_list
 
@@ -597,10 +601,25 @@ if __name__ == "__main__":
     # Example usage: generate per-arch/OS/version FeatureList JSONs under
     # out/<arch>/<os_name>/<version>/
 
-    parser = argparse.ArgumentParser(description='Catalog Parser CLI')
-    parser.add_argument('--catalog', required=True, help='Path to input catalog JSON file')
-    parser.add_argument('--schema', required=False, default='resources/CatalogSchema.json', help='Path to catalog schema JSON file')
-    parser.add_argument('--log-file', required=False, default=None, help='Path to log file; if not set, logs go to stderr')
+    parser = argparse.ArgumentParser(description="Catalog Parser CLI")
+    parser.add_argument(
+        "--catalog",
+        required=True,
+        help="Path to input catalog JSON file",
+    )
+    parser.add_argument(
+        "--schema",
+        required=False,
+        default="resources/CatalogSchema.json",
+        help="Path to catalog schema JSON file",
+    )
+    parser.add_argument(
+        "--log-file",
+        required=False,
+        default=None,
+        help="Path to log file; if not set, logs go to stderr",
+    )
+
     args = parser.parse_args()
 
     # Configure logging once for the CLI

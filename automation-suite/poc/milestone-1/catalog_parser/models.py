@@ -17,6 +17,12 @@ from typing import List, Optional
 
 @dataclass
 class Package:
+    """Generic package entry from the catalog.
+
+    Represents a single software package with name, version, supported OS list,
+    architecture list, and optional source metadata.
+    """
+
     id: str
     name: str
     version: str
@@ -29,14 +35,20 @@ class Package:
 
 @dataclass
 class FunctionalPackage(Package):
+    """Package that belongs to the functional layer of the catalog."""
+
     pass
 
 @dataclass
 class OsPackage(Package):
+    """Package that belongs to the base OS layer of the catalog."""
+
     pass
 
 @dataclass
 class InfrastructurePackage:
+    """Infrastructure package as described in the catalog."""
+
     def __init__(self, id, name, version, uri, architecture, config, type, sources=None, tag=""):
         self.id = id
         self.name = name
@@ -50,6 +62,8 @@ class InfrastructurePackage:
 
 @dataclass
 class Driver:
+    """Driver package entry used by the drivers layer of the catalog."""
+
     def __init__(self, id, name, version, uri, architecture, config, type):
         self.id = id
         self.name = name
@@ -61,6 +75,12 @@ class Driver:
 
 @dataclass
 class Catalog:
+    """Top-level in-memory representation of the catalog JSON.
+
+    Holds raw layer sections and the resolved package objects used by
+    generator and adapter components.
+    """
+
     name: str
     version: str
     functional_layer: List[dict]

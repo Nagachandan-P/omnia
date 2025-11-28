@@ -20,6 +20,16 @@ from models import Catalog, FunctionalPackage, OsPackage, InfrastructurePackage,
 logger = logging.getLogger(__name__)
 
 def ParseCatalog(file_path: str, schema_path: str = "resources/CatalogSchema.json") -> Catalog:
+    """Parse a catalog JSON file and validate it against the JSON schema.
+
+    Args:
+        file_path: Path to the catalog JSON file.
+        schema_path: Path to the JSON schema used for validation.
+
+    Returns:
+        A populated Catalog instance built from the validated JSON data.
+    """
+
     logger.info("Parsing catalog from %s using schema %s", file_path, schema_path)
     with open(schema_path) as f:
         schema = json.load(f)
