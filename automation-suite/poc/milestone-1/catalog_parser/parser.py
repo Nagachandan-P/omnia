@@ -14,7 +14,7 @@
 
 import json
 import logging
-from jsonschema import validate
+from jsonschema import validate, ValidationError
 from models import Catalog, FunctionalPackage, OsPackage, InfrastructurePackage, Driver
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,17 @@ def ParseCatalog(file_path: str, schema_path: str = "resources/CatalogSchema.jso
         catalog_json = json.load(f)
 
     logger.debug("Validating catalog JSON against schema")
-    validate(instance=catalog_json, schema=schema)
+    try:
+        validate(instance=catalog_json, schema=schema)
+    except ValidationError as exc:
+        path = ".".join(str(p) for p in exc.path) or "<root>"
+        logger.error(
+            "Catalog validation failed for %s at %s: %s",
+            file_path,
+            path,
+            exc.message,
+        )
+        raise
     data = catalog_json["Catalog"]
 
     functional_packages = [

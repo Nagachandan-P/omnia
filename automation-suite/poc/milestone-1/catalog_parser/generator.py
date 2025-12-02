@@ -17,6 +17,7 @@ import os
 import argparse
 import logging
 import sys
+from jsonschema import ValidationError
 from models import Catalog
 from parser import ParseCatalog
 
@@ -643,6 +644,8 @@ if __name__ == "__main__":
             getattr(exc, "filename", str(exc)),
         )
         sys.exit(ERROR_CODE_INPUT_NOT_FOUND)
+    except ValidationError:
+        sys.exit(ERROR_CODE_PROCESSING_ERROR)
     except Exception:
         logger.exception("Unexpected error while generating feature-list JSONs")
         sys.exit(ERROR_CODE_PROCESSING_ERROR)

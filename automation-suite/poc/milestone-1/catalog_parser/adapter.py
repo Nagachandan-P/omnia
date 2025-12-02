@@ -20,6 +20,7 @@ from typing import Dict, Iterable, List, Tuple, Optional
 import argparse
 import logging
 import sys
+from jsonschema import ValidationError
 
 from parser import ParseCatalog
 from models import Catalog
@@ -513,6 +514,8 @@ if __name__ == "__main__":
             getattr(exc, "filename", str(exc)),
         )
         sys.exit(ERROR_CODE_INPUT_NOT_FOUND)
+    except ValidationError:
+        sys.exit(ERROR_CODE_PROCESSING_ERROR)
     except Exception:
         logger.exception("Unexpected error while generating adapter configs")
         sys.exit(ERROR_CODE_PROCESSING_ERROR)
