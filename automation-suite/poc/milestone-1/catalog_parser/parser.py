@@ -14,12 +14,16 @@
 
 import json
 import logging
+import os
 from jsonschema import validate, ValidationError
-from models import Catalog, FunctionalPackage, OsPackage, InfrastructurePackage, Driver
+from .models import Catalog, FunctionalPackage, OsPackage, InfrastructurePackage, Driver
 
 logger = logging.getLogger(__name__)
 
-def ParseCatalog(file_path: str, schema_path: str = "resources/CatalogSchema.json") -> Catalog:
+_BASE_DIR = os.path.dirname(__file__)
+_DEFAULT_SCHEMA_PATH = os.path.join(_BASE_DIR, "resources", "CatalogSchema.json")
+
+def ParseCatalog(file_path: str, schema_path: str = _DEFAULT_SCHEMA_PATH) -> Catalog:
     """Parse a catalog JSON file and validate it against the JSON schema.
 
     Args:

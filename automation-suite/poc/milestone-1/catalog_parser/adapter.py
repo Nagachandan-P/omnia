@@ -22,9 +22,9 @@ import logging
 import sys
 from jsonschema import ValidationError
 
-from parser import ParseCatalog
-from models import Catalog
-from generator import (
+from .parser import ParseCatalog
+from .models import Catalog
+from .generator import (
     FeatureList,
     Feature,
     Package,
@@ -39,6 +39,9 @@ from generator import (
 
 
 logger = logging.getLogger(__name__)
+
+_BASE_DIR = os.path.dirname(__file__)
+_DEFAULT_SCHEMA_PATH = os.path.join(_BASE_DIR, "resources", "CatalogSchema.json")
 
 ERROR_CODE_INPUT_NOT_FOUND = 2
 ERROR_CODE_PROCESSING_ERROR = 3
@@ -451,7 +454,7 @@ def generate_all_configs(
 
 def generate_omnia_json_from_catalog(
     catalog_path: str,
-    schema_path: str = "resources/CatalogSchema.json",
+    schema_path: str = _DEFAULT_SCHEMA_PATH,
     output_root: str = "out/adapter/input/config",
     *,
     log_file: Optional[str] = None,
@@ -491,7 +494,7 @@ def generate_omnia_json_from_catalog(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate adapter configs')
     parser.add_argument('--catalog', required=True, help='Path to input catalog JSON file')
-    parser.add_argument('--schema', required=False, default='resources/CatalogSchema.json',
+    parser.add_argument('--schema', required=False, default=_DEFAULT_SCHEMA_PATH,
                         help='Path to catalog schema JSON file')
     parser.add_argument('--log-file', required=False, default=None, help='Path to log file; if not set, logs go to stderr')
     args = parser.parse_args()

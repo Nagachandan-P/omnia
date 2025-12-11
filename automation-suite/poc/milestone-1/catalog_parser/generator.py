@@ -18,13 +18,16 @@ import argparse
 import logging
 import sys
 from jsonschema import ValidationError
-from models import Catalog
-from parser import ParseCatalog
+from .models import Catalog
+from .parser import ParseCatalog
 
 from dataclasses import dataclass
 from typing import List, Dict, Tuple, Optional
 
 logger = logging.getLogger(__name__)
+
+_BASE_DIR = os.path.dirname(__file__)
+_DEFAULT_SCHEMA_PATH = os.path.join(_BASE_DIR, "resources", "CatalogSchema.json")
 
 ERROR_CODE_INPUT_NOT_FOUND = 2
 ERROR_CODE_PROCESSING_ERROR = 3
@@ -52,18 +55,16 @@ def _configure_logging(log_file: Optional[str] = None, log_level: int = logging.
         )
 
 
-def _validate_catalog_and_schema_paths(catalog_path: str, schema_path: Optional[str]) -> None:
-    """Validate that the catalog and schema paths (if provided) exist.
+def _validate_catalog_and_schema_paths(catalog_path: str, schema_path: str) -> None:
+    """Validate that the catalog and schema paths exist.
 
-    Raises FileNotFoundError if any required file is missing. Logging is
-    performed here so both CLI and API callers get consistent messages.
+    Raises FileNotFoundError if either path does not exist.
     """
 
     if not os.path.isfile(catalog_path):
         logger.error("Catalog file not found: %s", catalog_path)
         raise FileNotFoundError(catalog_path)
-
-    if schema_path and not os.path.isfile(schema_path):
+    if not os.path.isfile(schema_path):
         logger.error("Schema file not found: %s", schema_path)
         raise FileNotFoundError(schema_path)
 
@@ -503,6 +504,11 @@ def deserialize_json(input_path: str) -> FeatureList:
     return feature_list
 
 
+def get_functional_layer_roles_from_file(functional_layer_json_path: str) -> List[str]:
+    feature_list = deserialize_json(functional_layer_json_path)
+    return list(feature_list.features.keys())
+
+
 def _configure_logging(log_file: Optional[str] = None, log_level: int = logging.INFO) -> None:
     """Configure logging for the catalog parser.
 
@@ -539,7 +545,7 @@ def _validate_catalog_and_schema_paths(catalog_path: str, schema_path: str) -> N
 
 def generate_root_json_from_catalog(
     catalog_path: str,
-    schema_path: str = "resources/CatalogSchema.json",
+    schema_path: str = _DEFAULT_SCHEMA_PATH,
     output_root: str = "out/generator",
     *,
     log_file: Optional[str] = None,
@@ -611,7 +617,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--schema",
         required=False,
-        default="resources/CatalogSchema.json",
+        default=_DEFAULT_SCHEMA_PATH,
         help="Path to catalog schema JSON file",
     )
     parser.add_argument(
