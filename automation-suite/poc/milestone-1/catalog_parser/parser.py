@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Catalog parser.
+
+Loads and validates a catalog JSON file against CatalogSchema.json and
+materializes it into model objects.
+"""
+
 import json
 import logging
 import os
@@ -35,9 +41,9 @@ def ParseCatalog(file_path: str, schema_path: str = _DEFAULT_SCHEMA_PATH) -> Cat
     """
 
     logger.info("Parsing catalog from %s using schema %s", file_path, schema_path)
-    with open(schema_path) as f:
+    with open(schema_path, encoding="utf-8") as f:
         schema = json.load(f)
-    with open(file_path) as f:
+    with open(file_path, encoding="utf-8") as f:
         catalog_json = json.load(f)
 
     logger.debug("Validating catalog JSON against schema")
@@ -46,7 +52,11 @@ def ParseCatalog(file_path: str, schema_path: str = _DEFAULT_SCHEMA_PATH) -> Cat
     except ValidationError as exc:
         path = ".".join(str(p) for p in exc.path) or "<root>"
         logger.error(
-            "Catalog validation failed for %s at %s: %s",
+            "Catalog validation failed for %s",
+            file_path,
+        )
+        logger.debug(
+            "Catalog validation details for %s at %s: %s",
             file_path,
             path,
             exc.message,

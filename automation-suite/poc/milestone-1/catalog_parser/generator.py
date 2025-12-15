@@ -12,17 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-import os
+"""Catalog parser generator.
+
+Provides programmatic APIs and a CLI to generate feature-list JSON files from a
+catalog, and to load/validate feature-list JSONs.
+"""
+
 import argparse
+from dataclasses import dataclass
+import json
 import logging
+import os
 import sys
+from typing import Dict, List, Optional, Tuple
+
 from jsonschema import ValidationError, validate
+
 from .models import Catalog
 from .parser import ParseCatalog
-
-from dataclasses import dataclass
-from typing import List, Dict, Tuple, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +39,10 @@ _ROOT_LEVEL_SCHEMA_PATH = os.path.join(_BASE_DIR, "resources", "RootLevelSchema.
 
 ERROR_CODE_INPUT_NOT_FOUND = 2
 ERROR_CODE_PROCESSING_ERROR = 3
+
+# This code generates JSON files
+# i.e baseos.json, infrastructure.json, functional_layer.json, miscellaneous.json
+# for a given catalog
 
 def _configure_logging(log_file: Optional[str] = None, log_level: int = logging.INFO) -> None:
     """Configure root logging for the catalog generator.
@@ -48,6 +59,7 @@ def _configure_logging(log_file: Optional[str] = None, log_level: int = logging.
             level=log_level,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             filename=log_file,
+            encoding="utf-8",
         )
     else:
         logging.basicConfig(
@@ -70,10 +82,6 @@ def _validate_catalog_and_schema_paths(catalog_path: str, schema_path: str) -> N
         raise FileNotFoundError(schema_path)
 
 
-# This code generates JSON files
-# i.e baseos.json, infrastructure.json, functional_layer.json, miscellaneous.json
-# for a given catalog
-
 def _arch_suffix(architecture) -> str:
     """Return a single-arch suffix from a catalog Package.architecture field.
 
@@ -87,8 +95,11 @@ def _arch_suffix(architecture) -> str:
         arch = architecture
     return str(arch)
 
+
 @dataclass
 class Package:
+    """Represents a package entry inside a generated FeatureList JSON."""
+
     package: str
     type: str
     repo_name: str
@@ -97,14 +108,21 @@ class Package:
     tag: Optional[str] = None
     sources: Optional[List[dict]] = None
 
+
 @dataclass
 class Feature:
+    """Represents a single feature/role entry containing a list of packages."""
+
     feature_name: str
     packages: List[Package]
 
+
 @dataclass
 class FeatureList:
+    """Collection of features keyed by feature/role name."""
+
     features: Dict[str, Feature]
+
 
 def _filter_featurelist_for_arch(feature_list: FeatureList, arch: str) -> FeatureList:
     """Return a FeatureList containing only packages for the given arch.
@@ -143,6 +161,7 @@ def _filter_featurelist_for_arch(feature_list: FeatureList, arch: str) -> Featur
         filtered_features[name] = Feature(feature_name=name, packages=narrowed_pkgs)
     return FeatureList(features=filtered_features)
 
+
 def _discover_arch_os_version_from_catalog(catalog: Catalog) -> List[Tuple[str, str, str]]:
     """Discover distinct (arch, os_name, version) combinations in the Catalog.
 
@@ -174,6 +193,7 @@ def _discover_arch_os_version_from_catalog(catalog: Catalog) -> List[Tuple[str, 
         getattr(catalog, "name", "<unknown>"),
     )
     return combos_sorted
+
 
 def generate_functional_layer_json(catalog: Catalog) -> FeatureList:
     """
@@ -212,6 +232,7 @@ def generate_functional_layer_json(catalog: Catalog) -> FeatureList:
 
     return output_json
 
+
 def generate_infrastructure_json(catalog: Catalog) -> FeatureList:
     """
     Generates a JSON file containing the infrastructure from a given catalog object.
@@ -248,6 +269,7 @@ def generate_infrastructure_json(catalog: Catalog) -> FeatureList:
         output_json.features[feature_json.feature_name] = feature_json
 
     return output_json
+
 
 def generate_drivers_json(catalog: Catalog) -> FeatureList:
     """
@@ -319,6 +341,7 @@ def generate_drivers_json(catalog: Catalog) -> FeatureList:
 
     return output_json
 
+
 def generate_base_os_json(catalog: Catalog) -> FeatureList:
     """
     Generates a JSON file containing the base OS from a given catalog object.
@@ -356,6 +379,7 @@ def generate_base_os_json(catalog: Catalog) -> FeatureList:
 
     return output_json
 
+
 def generate_miscellaneous_json(catalog: Catalog) -> FeatureList:
     """Generate a FeatureList for the Miscellaneous group, if present.
 
@@ -391,6 +415,7 @@ def generate_miscellaneous_json(catalog: Catalog) -> FeatureList:
     output_json.features[feature_json.feature_name] = feature_json
 
     return output_json
+
 
 def _package_common_dict(pkg: Package) -> Dict:
     """Common dict representation for a Package (no architecture).
@@ -441,7 +466,7 @@ def serialize_json(feature_list: FeatureList, output_path: str):
         len(feature_list.features),
         output_path,
     )
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         f.write("{\n")
 
         items = list(feature_list.features.items())
@@ -478,7 +503,7 @@ def deserialize_json(input_path: str) -> FeatureList:
     Returns:
     - FeatureList: The deserialized JSON data
     """
-    with open(input_path, "r") as f:
+    with open(input_path, "r", encoding="utf-8") as f:
         json_data = json.load(f)
 
     logger.debug("Deserializing FeatureList from %s", input_path)
@@ -512,23 +537,32 @@ def get_functional_layer_roles_from_file(
     log_file: Optional[str] = None,
     log_level: int = logging.INFO,
 ) -> List[str]:
+    """Return role names (top-level keys) from a functional_layer.json file.
+
+    The input JSON is validated against RootLevelSchema.json before it is
+    deserialized.
+    """
     if configure_logging:
         _configure_logging(log_file=log_file, log_level=log_level)
 
     logger.info("get_functional_layer_roles_from_file started for %s", functional_layer_json_path)
     logger.debug("Loading root-level schema from %s", _ROOT_LEVEL_SCHEMA_PATH)
-    with open(_ROOT_LEVEL_SCHEMA_PATH, "r") as f:
+    with open(_ROOT_LEVEL_SCHEMA_PATH, "r", encoding="utf-8") as f:
         schema = json.load(f)
 
     logger.debug("Validating JSON")
-    with open(functional_layer_json_path, "r") as f:
+    with open(functional_layer_json_path, "r", encoding="utf-8") as f:
         json_data = json.load(f)
 
     try:
         validate(instance=json_data, schema=schema)
     except ValidationError as exc:
         logger.error(
-            "Functional layer JSON validation failed for %s: %s",
+            "JSON validation failed for %s",
+            functional_layer_json_path,
+        )
+        logger.debug(
+            "JSON validation details for %s: %s",
             functional_layer_json_path,
             exc.message,
         )
@@ -544,40 +578,6 @@ def get_functional_layer_roles_from_file(
         len(roles),
     )
     return roles
-
-
-def _configure_logging(log_file: Optional[str] = None, log_level: int = logging.INFO) -> None:
-    """Configure logging for the catalog parser.
-
-    If log_file is set, logs are written to that file; otherwise, logs go to stderr.
-    """
-    if log_file:
-        log_dir = os.path.dirname(log_file)
-        if log_dir:
-            os.makedirs(log_dir, exist_ok=True)
-        logging.basicConfig(
-            level=log_level,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            filename=log_file,
-        )
-    else:
-        logging.basicConfig(
-            level=log_level,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        )
-
-
-def _validate_catalog_and_schema_paths(catalog_path: str, schema_path: str) -> None:
-    """Validate that the catalog and schema paths exist.
-
-    Raises FileNotFoundError if either path does not exist.
-    """
-    if not os.path.isfile(catalog_path):
-        logger.error("Catalog file not found: %s", catalog_path)
-        raise FileNotFoundError(catalog_path)
-    if not os.path.isfile(schema_path):
-        logger.error("Schema file not found: %s", schema_path)
-        raise FileNotFoundError(schema_path)
 
 
 def generate_root_json_from_catalog(
@@ -676,13 +676,14 @@ if __name__ == "__main__":
         generate_root_json_from_catalog(
             catalog_path=args.catalog,
             schema_path=args.schema,
-            output_root=os.path.join('out', 'main'),
+            output_root=os.path.join("out", "main"),
         )
 
         logger.info("Catalog Parser CLI completed for %s", args.catalog)
 
     except FileNotFoundError as exc:
-        logger.error(
+        logger.error("File not found during processing")
+        logger.debug(
             "File not found during processing: %s",
             getattr(exc, "filename", str(exc)),
         )

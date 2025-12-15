@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Catalog parser models.
+
+Contains the dataclass-based in-memory representations of catalog components.
+"""
+
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -37,13 +42,9 @@ class Package:
 class FunctionalPackage(Package):
     """Package that belongs to the functional layer of the catalog."""
 
-    pass
-
 @dataclass
 class OsPackage(Package):
     """Package that belongs to the base OS layer of the catalog."""
-
-    pass
 
 @dataclass
 class InfrastructurePackage:

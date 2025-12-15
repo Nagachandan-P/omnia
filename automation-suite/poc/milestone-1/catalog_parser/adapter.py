@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Catalog parser adapter.
+
+Transforms generated feature-list JSONs into omnia configuration JSONs.
+"""
+
 import json
 import os
 from collections import Counter
-from dataclasses import asdict
 from typing import Dict, Iterable, List, Tuple, Optional
 import argparse
 import logging
@@ -32,6 +36,8 @@ from .generator import (
     generate_infrastructure_json,
     generate_base_os_json,
     generate_miscellaneous_json,
+    _filter_featurelist_for_arch,
+    _discover_arch_os_version_from_catalog,
     _package_common_dict,
     _configure_logging,
     _validate_catalog_and_schema_paths,
@@ -110,14 +116,17 @@ def _build_subconfig_from_base_os(
 
 
 def build_nfs_config(base_os: FeatureList) -> Dict | None:
+    """Build nfs config from Base OS FeatureList."""
     return _build_subconfig_from_base_os(base_os, "nfs", ["nfs"])
 
 
 def build_openldap_config(base_os: FeatureList) -> Dict | None:
+    """Build openldap config from Base OS FeatureList."""
     return _build_subconfig_from_base_os(base_os, "openldap", ["ldap"])
 
 
 def build_openmpi_config(base_os: FeatureList) -> Dict | None:
+    """Build openmpi config from Base OS FeatureList."""
     return _build_subconfig_from_base_os(base_os, "openmpi", ["openmpi"])
 
 
@@ -290,7 +299,7 @@ def write_config_files(configs: Dict[str, Dict], output_dir: str) -> None:
     for filename, data in configs.items():
         path = os.path.join(output_dir, filename)
         logger.debug("Writing config file %s", path)
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             # Expect shape: { top_key: { "cluster": [pkg_dicts...] } }
             f.write("{\n")
 
@@ -314,73 +323,6 @@ def write_config_files(configs: Dict[str, Dict], output_dir: str) -> None:
                     f.write("\n")
 
             f.write("}\n")
-
-
-def _filter_featurelist_for_arch(feature_list: FeatureList, arch: str) -> FeatureList:
-    filtered_features: Dict[str, Feature] = {}
-    for name, feature in feature_list.features.items():
-        narrowed_pkgs: List[Package] = []
-        for p in feature.packages:
-            if arch in getattr(p, "architecture", []):
-                # Derive repo_name and uri from the catalog Sources metadata, if
-                # present, for this specific architecture.
-                repo_name = ""
-                uri = getattr(p, "uri", "")
-                if getattr(p, "sources", None):
-                    for src in p.sources:
-                        if src.get("Architecture") == arch:
-                            if "RepoName" in src:
-                                repo_name = src["RepoName"]
-                            if "Uri" in src:
-                                uri = src["Uri"]
-                            break
-
-                narrowed_pkgs.append(
-                    Package(
-                        package=p.package,
-                        type=p.type,
-                        repo_name=repo_name,
-                        architecture=[arch],
-                        uri=uri,
-                        tag=p.tag,
-                        sources=p.sources,
-                    )
-                )
-        filtered_features[name] = Feature(feature_name=name, packages=narrowed_pkgs)
-    return FeatureList(features=filtered_features)
-
-
-def _discover_arch_os_version_from_catalog(catalog: Catalog) -> List[Tuple[str, str, str]]:
-    """Discover distinct (arch, os_name, version) combinations in the Catalog.
-
-    os_name is returned in lowercase (e.g. "rhel"), version as-is.
-    """
-
-    combos: set[Tuple[str, str, str]] = set()
-
-    def _add_from_packages(packages):
-        for pkg in packages:
-            for os_entry in pkg.supported_os:
-                parts = os_entry.split(" ", 1)
-                if len(parts) == 2:
-                    os_name_raw, os_ver = parts
-                else:
-                    os_name_raw, os_ver = os_entry, ""
-                os_name = os_name_raw.lower()
-
-                for arch in pkg.architecture:
-                    combos.add((arch, os_name, os_ver))
-
-    _add_from_packages(catalog.functional_packages)
-    _add_from_packages(catalog.os_packages)
-
-    combos_sorted = sorted(combos)
-    logger.debug(
-        "Discovered %d (arch, os, version) combinations in catalog %s (adapter)",
-        len(combos_sorted),
-        getattr(catalog, "name", "<unknown>"),
-    )
-    return combos_sorted
 
 
 def generate_all_configs(
@@ -512,7 +454,8 @@ if __name__ == "__main__":
 
         logger.info("Adapter config generation completed for %s", args.catalog)
     except FileNotFoundError as exc:
-        logger.error(
+        logger.error("File not found during processing")
+        logger.debug(
             "File not found during processing: %s",
             getattr(exc, "filename", str(exc)),
         )
