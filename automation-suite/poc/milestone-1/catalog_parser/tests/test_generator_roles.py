@@ -2,6 +2,7 @@ import os
 import sys
 import tempfile
 import unittest
+from jsonschema import ValidationError
 
 HERE = os.path.dirname(__file__)
 CATALOG_PARSER_DIR = os.path.dirname(HERE)
@@ -46,6 +47,29 @@ class TestGetFunctionalLayerRolesFromFile(unittest.TestCase):
             roles = get_functional_layer_roles_from_file(json_path)
 
             self.assertEqual(roles, [])
+
+    def test_invalid_functional_layer_json_fails_schema_validation(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # Missing required 'architecture' field for a package item
+            invalid_json = {
+                "SomeRole": {
+                    "packages": [
+                        {
+                            "package": "firewalld",
+                            "type": "rpm",
+                            "repo_name": "x86_64_baseos",
+                        }
+                    ]
+                }
+            }
+            json_path = os.path.join(tmp_dir, "functional_layer_invalid.json")
+            with open(json_path, "w") as f:
+                import json
+
+                json.dump(invalid_json, f)
+
+            with self.assertRaises(ValidationError):
+                get_functional_layer_roles_from_file(json_path)
 
 
 if __name__ == "__main__":

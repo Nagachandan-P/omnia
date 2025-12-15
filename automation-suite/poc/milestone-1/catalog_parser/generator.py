@@ -17,7 +17,7 @@ import os
 import argparse
 import logging
 import sys
-from jsonschema import ValidationError
+from jsonschema import ValidationError, validate
 from .models import Catalog
 from .parser import ParseCatalog
 
@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 _BASE_DIR = os.path.dirname(__file__)
 _DEFAULT_SCHEMA_PATH = os.path.join(_BASE_DIR, "resources", "CatalogSchema.json")
+_ROOT_LEVEL_SCHEMA_PATH = os.path.join(_BASE_DIR, "resources", "RootLevelSchema.json")
 
 ERROR_CODE_INPUT_NOT_FOUND = 2
 ERROR_CODE_PROCESSING_ERROR = 3
@@ -504,9 +505,45 @@ def deserialize_json(input_path: str) -> FeatureList:
     return feature_list
 
 
-def get_functional_layer_roles_from_file(functional_layer_json_path: str) -> List[str]:
+def get_functional_layer_roles_from_file(
+    functional_layer_json_path: str,
+    *,
+    configure_logging: bool = False,
+    log_file: Optional[str] = None,
+    log_level: int = logging.INFO,
+) -> List[str]:
+    if configure_logging:
+        _configure_logging(log_file=log_file, log_level=log_level)
+
+    logger.info("get_functional_layer_roles_from_file started for %s", functional_layer_json_path)
+    logger.debug("Loading root-level schema from %s", _ROOT_LEVEL_SCHEMA_PATH)
+    with open(_ROOT_LEVEL_SCHEMA_PATH, "r") as f:
+        schema = json.load(f)
+
+    logger.debug("Validating JSON")
+    with open(functional_layer_json_path, "r") as f:
+        json_data = json.load(f)
+
+    try:
+        validate(instance=json_data, schema=schema)
+    except ValidationError as exc:
+        logger.error(
+            "Functional layer JSON validation failed for %s: %s",
+            functional_layer_json_path,
+            exc.message,
+        )
+        raise
+    logger.info("JSON validation succeeded")
+
     feature_list = deserialize_json(functional_layer_json_path)
-    return list(feature_list.features.keys())
+    logger.debug("Populating roles info")
+    roles = list(feature_list.features.keys())
+    logger.info(
+        "get_functional_layer_roles_from_file completed for %s (roles=%d)",
+        functional_layer_json_path,
+        len(roles),
+    )
+    return roles
 
 
 def _configure_logging(log_file: Optional[str] = None, log_level: int = logging.INFO) -> None:
