@@ -99,11 +99,11 @@ def ParseCatalog(file_path: str, schema_path: str = _DEFAULT_SCHEMA_PATH) -> Cat
             id=key,
             name=pkg["Name"],
             version=pkg["Version"],
-            uri="",
-            architecture=[],
+            uri=pkg.get("Uri", ""),
+            architecture=pkg.get("Architecture", []),
             config=pkg["SupportedFunctions"],
             type=pkg["Type"],
-            sources=[],
+            sources=pkg.get("Sources", []),
             tag=pkg.get("Tag", ""),
         )
         for key, pkg in data["InfrastructurePackages"].items()
