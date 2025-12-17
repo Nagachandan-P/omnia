@@ -21,7 +21,7 @@ directly from Python, configuring logging and handling common errors.
 import logging
 import os
 
-from catalog_parser.generator import generate_root_json_from_catalog, get_functional_layer_roles_from_file
+from catalog_parser.generator import generate_root_json_from_catalog, get_functional_layer_roles_from_file, get_package_list
 from catalog_parser.adapter import generate_omnia_json_from_catalog
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -51,6 +51,16 @@ try:
 
     roles = get_functional_layer_roles_from_file(FUNCTIONAL_LAYER_PATH)
     print(f"Functional layer roles: {roles}")
+
+
+    # Get packages for a specific role
+    result = get_package_list(FUNCTIONAL_LAYER_PATH, role="K8S Controller")
+    print(f"Packages for role 'K8S Controller': {result}")
+
+    # Get packages for all roles
+    result = get_package_list(FUNCTIONAL_LAYER_PATH)
+    print(f"Packages for all roles: {result}")
+
 except FileNotFoundError as e:
     # handle missing catalog/schema
     print(f"Missing file: {e}")
