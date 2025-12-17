@@ -12,14 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Catalog parser.
+
+Loads and validates a catalog JSON file against CatalogSchema.json and
+materializes it into model objects.
+"""
+
 import json
 import logging
-from jsonschema import validate
-from models import Catalog, FunctionalPackage, OsPackage, InfrastructurePackage, Driver
+import os
+from jsonschema import validate, ValidationError
+from .models import Catalog, FunctionalPackage, OsPackage, InfrastructurePackage, Driver
+from .utils import load_json_file
 
 logger = logging.getLogger(__name__)
 
-def ParseCatalog(file_path: str, schema_path: str = "resources/CatalogSchema.json") -> Catalog:
+_BASE_DIR = os.path.dirname(__file__)
+_DEFAULT_SCHEMA_PATH = os.path.join(_BASE_DIR, "resources", "CatalogSchema.json")
+
+def ParseCatalog(file_path: str, schema_path: str = _DEFAULT_SCHEMA_PATH) -> Catalog:
     """Parse a catalog JSON file and validate it against the JSON schema.
 
     Args:
@@ -31,13 +42,25 @@ def ParseCatalog(file_path: str, schema_path: str = "resources/CatalogSchema.jso
     """
 
     logger.info("Parsing catalog from %s using schema %s", file_path, schema_path)
-    with open(schema_path) as f:
-        schema = json.load(f)
-    with open(file_path) as f:
-        catalog_json = json.load(f)
+    schema = load_json_file(schema_path)
+    catalog_json = load_json_file(file_path)
 
     logger.debug("Validating catalog JSON against schema")
-    validate(instance=catalog_json, schema=schema)
+    try:
+        validate(instance=catalog_json, schema=schema)
+    except ValidationError as exc:
+        path = ".".join(str(p) for p in exc.path) or "<root>"
+        logger.error(
+            "Catalog validation failed for %s",
+            file_path,
+        )
+        logger.debug(
+            "Catalog validation details for %s at %s: %s",
+            file_path,
+            path,
+            exc.message,
+        )
+        raise
     data = catalog_json["Catalog"]
 
     functional_packages = [
@@ -75,11 +98,11 @@ def ParseCatalog(file_path: str, schema_path: str = "resources/CatalogSchema.jso
             id=key,
             name=pkg["Name"],
             version=pkg["Version"],
-            uri="",
-            architecture=[],
+            uri=pkg.get("Uri", ""),
+            architecture=pkg.get("Architecture", []),
             config=pkg["SupportedFunctions"],
             type=pkg["Type"],
-            sources=[],
+            sources=pkg.get("Sources", []),
             tag=pkg.get("Tag", ""),
         )
         for key, pkg in data["InfrastructurePackages"].items()

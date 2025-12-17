@@ -151,13 +151,6 @@
           "package_id_62",
           "package_id_64"
         ]
-      },
-      {
-        "Name": "service_etcd",
-        "FunctionalPackages": [
-          "package_id_20",
-          "package_id_45"
-        ]
       }
     ],
     "BaseOS": [
@@ -2517,6 +2510,9 @@
           {
             "Name": "csi"
           }
+        ],
+        "Architecture": [
+          "x86_64"
         ]
       },
       "infrastructure_package_id_2": {
@@ -2528,6 +2524,9 @@
           {
             "Name": "csi"
           }
+        ],
+        "Architecture": [
+          "x86_64"
         ]
       },
       "infrastructure_package_id_3": {
@@ -2538,6 +2537,9 @@
           {
             "Name": "csi"
           }
+        ],
+        "Architecture": [
+          "x86_64"
         ]
       },
       "infrastructure_package_id_4": {
@@ -2548,6 +2550,9 @@
           {
             "Name": "csi"
           }
+        ],
+        "Architecture": [
+          "x86_64"
         ]
       },
       "infrastructure_package_id_5": {
@@ -2559,6 +2564,9 @@
           {
             "Name": "csi"
           }
+        ],
+        "Architecture": [
+          "x86_64"
         ]
       },
       "infrastructure_package_id_6": {
@@ -2570,6 +2578,9 @@
           {
             "Name": "csi"
           }
+        ],
+        "Architecture": [
+          "x86_64"
         ]
       },
       "infrastructure_package_id_7": {
@@ -2581,6 +2592,9 @@
           {
             "Name": "csi"
           }
+        ],
+        "Architecture": [
+          "x86_64"
         ]
       },
       "infrastructure_package_id_8": {
@@ -2592,6 +2606,9 @@
           {
             "Name": "csi"
           }
+        ],
+        "Architecture": [
+          "x86_64"
         ]
       },
       "infrastructure_package_id_9": {
@@ -2603,6 +2620,9 @@
           {
             "Name": "csi"
           }
+        ],
+        "Architecture": [
+          "x86_64"
         ]
       },
       "infrastructure_package_id_10": {
@@ -2614,6 +2634,9 @@
           {
             "Name": "csi"
           }
+        ],
+        "Architecture": [
+          "x86_64"
         ]
       },
       "infrastructure_package_id_11": {
@@ -2625,6 +2648,9 @@
           {
             "Name": "csi"
           }
+        ],
+        "Architecture": [
+          "x86_64"
         ]
       },
       "infrastructure_package_id_12": {
@@ -2636,6 +2662,9 @@
           {
             "Name": "csi"
           }
+        ],
+        "Architecture": [
+          "x86_64"
         ]
       },
       "infrastructure_package_id_13": {
@@ -2647,6 +2676,9 @@
           {
             "Name": "csi"
           }
+        ],
+        "Architecture": [
+          "x86_64"
         ]
       },
       "infrastructure_package_id_14": {
@@ -2658,6 +2690,9 @@
           {
             "Name": "csi"
           }
+        ],
+        "Architecture": [
+          "x86_64"
         ]
       },
       "infrastructure_package_id_15": {
@@ -2669,6 +2704,9 @@
           {
             "Name": "csi"
           }
+        ],
+        "Architecture": [
+          "x86_64"
         ]
       },
       "infrastructure_package_id_16": {
@@ -2680,6 +2718,9 @@
           {
             "Name": "csi"
           }
+        ],
+        "Architecture": [
+          "x86_64"
         ]
       }
     }

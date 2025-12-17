@@ -19,14 +19,21 @@ directly from Python, configuring logging and handling common errors.
 """
 
 import logging
+import os
 
-from generator import generate_root_json_from_catalog
-from adapter import generate_omnia_json_from_catalog
+from catalog_parser.generator import generate_root_json_from_catalog, get_functional_layer_roles_from_file
+from catalog_parser.adapter import generate_omnia_json_from_catalog
+
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+CATALOG_PARSER_DIR = os.path.join(BASE_DIR, "")
+CATALOG_PATH = os.path.join(CATALOG_PARSER_DIR, "test_fixtures", "catalog_rhel.json")
+SCHEMA_PATH = os.path.join(CATALOG_PARSER_DIR, "resources", "CatalogSchema.json")
+FUNCTIONAL_LAYER_PATH = os.path.join(CATALOG_PARSER_DIR, "test_fixtures", "functional_layer.json")
 
 try:
     generate_root_json_from_catalog(
-        catalog_path="test_fixtures/catalog_rhel.json",
-        schema_path="resources/CatalogSchema.json",
+        catalog_path=CATALOG_PATH,
+        schema_path=SCHEMA_PATH,
         output_root="out/generator2",
         configure_logging=True,
         log_file="logs/generator.log",
@@ -34,13 +41,16 @@ try:
     )
 
     generate_omnia_json_from_catalog(
-        catalog_path="test_fixtures/catalog_rhel.json",
-        schema_path="resources/CatalogSchema.json",
+        catalog_path=CATALOG_PATH,
+        schema_path=SCHEMA_PATH,
         output_root="out/adapter/config2",
         configure_logging=True,
         log_file="logs/adapter.log",
         log_level=logging.INFO,
     )
+
+    roles = get_functional_layer_roles_from_file(FUNCTIONAL_LAYER_PATH)
+    print(f"Functional layer roles: {roles}")
 except FileNotFoundError as e:
     # handle missing catalog/schema
     print(f"Missing file: {e}")

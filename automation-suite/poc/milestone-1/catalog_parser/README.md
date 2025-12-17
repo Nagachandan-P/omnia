@@ -10,8 +10,10 @@
 
 Generates per-arch/OS/version feature-list JSONs (functional layer, infra, drivers, base OS, miscellaneous).
 
+From the `poc/milestone-1` directory, run the generator as a module:
+
 ```bash
-python generator.py \
+python -m catalog_parser.generator \
   --catalog <path-to-catalog.json> \
   [--schema <path-to-schema.json>] \
   [--log-file <path-to-log-file>]
@@ -36,8 +38,10 @@ out/main/<arch>/<os_name>/<version>/
 
 Generates adapter-style config JSONs from the catalog.
 
+From the `poc/milestone-1` directory, run the adapter as a module:
+
 ```bash
-python adapter.py \
+python -m catalog_parser.adapter \
   --catalog <path-to-catalog.json> \
   [--schema <path-to-schema.json>] \
   [--log-file <path-to-log-file>]
