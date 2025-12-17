@@ -56,3 +56,60 @@ systemctl status OmniaAPI
 
 ## Notes
 - If `firewalld` is not active, manually open port 80.
+
+## API Endpoints
+
+The OmniaAPI service exposes the following endpoints:
+
+### 1. Parse Catalog (`/ParseCatalog`)
+Parses a catalog JSON file and generates root JSON files.
+
+**Method:** POST
+
+```bash
+curl -X POST -F "file=@/path/to/catalog.json" http://localhost:80/ParseCatalog
+```
+
+**Example:**
+```bash
+curl -X POST -F "file=@catalog_parser/test_fixtures/catalog_rhel.json" http://localhost:80/ParseCatalog
+```
+
+**Response:**
+```json
+{"message": "Catalog parsed successfully"}
+```
+
+### 2. Generate Input Files (`/GenerateInputFiles`)
+Generates omnia configuration files from a catalog JSON file.
+
+**Method:** POST
+
+```bash
+curl -X POST -F "file=@/path/to/catalog.json" http://localhost:80/GenerateInputFiles
+```
+
+**Example:**
+```bash
+curl -X POST -F "file=@catalog_parser/test_fixtures/catalog_rhel.json" http://localhost:80/GenerateInputFiles
+```
+
+**Response:**
+```json
+{"message": "Input files generated successfully"}
+```
+
+### 3. Build Image (`/BuildImage`)
+Triggers the build image process by executing the build_image playbook.
+
+**Method:** POST
+
+```bash
+curl -X POST http://localhost:80/BuildImage
+```
+
+**Response:**
+```json
+{"message": "Invoked BuildImage Successfully"}
+```
+

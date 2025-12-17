@@ -29,9 +29,14 @@ Usage:
 """
 
 import json
+import os
 import subprocess
+import tempfile
 
 from fastapi import FastAPI, File, UploadFile
+
+from catalog_parser.generator import generate_root_json_from_catalog
+from catalog_parser.adapter import generate_omnia_json_from_catalog
 app = FastAPI()
 
 @app.post("/ParseCatalog")
@@ -60,28 +65,27 @@ async def parse_catalog(file: UploadFile = File(...)) -> dict:
         if not isinstance(json_data, dict):
             return {"message": "Invalid JSON data. The data must be a dictionary."}
        
-        # Write the JSON data to a local file
-        with open('input.json', 'w', encoding='utf-8') as f:
+        # Write the JSON data to a temporary file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
             json.dump(json_data, f)
-     
-        # Run the generator_main.py script with the local file as input
-        result = subprocess.run(
-            [
-                "python",
-                "catalog_parser/generator.py",
-                "--catalog",
-                "input.json",
-                "--schema",
-                "catalog_parser/resources/CatalogSchema.json"
-            ],
-            check=True
-        )
-        if result.returncode != 0:
-            return {"message": f"Failed to parse catalog. Return code: {result.returncode}"}
- 
+            temp_catalog_path = f.name
+
+        try:
+            # Call the generator API directly
+            generate_root_json_from_catalog(
+                catalog_path=temp_catalog_path,
+                output_root='out/generator',
+            )
+        finally:
+            # Clean up the temporary file
+            os.unlink(temp_catalog_path)
+
         # Return a success message
         return {"message": "Catalog parsed successfully"}
-    except subprocess.SubprocessError as e:
+    except FileNotFoundError as e:
+        # Return an error message if a file is not found
+        return {"message": f"File not found: {str(e)}"}
+    except Exception as e:
         # Return an error message if an exception occurs
         return {"message": str(e)}
 
@@ -111,31 +115,30 @@ async def generate_input_files(file: UploadFile = File(...)) -> dict:
         if not isinstance(json_data, dict):
             return {"message": "Invalid JSON data. The data must be a dictionary."}
 
-        # Write the JSON data to a local file
-        with open('input.json', 'w', encoding='utf-8') as f:
+        # Write the JSON data to a temporary file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
             json.dump(json_data, f)
+            temp_catalog_path = f.name
 
-        # Run the generator_main.py script with the local file as input
-        result = subprocess.run(
-            [
-                "python",
-                "catalog_parser/adapter.py",
-                "--catalog",
-                "input.json",
-                "--schema",
-                "catalog_parser/resources/CatalogSchema.json"
-            ],
-            check=True
-        )
-        if result.returncode != 0:
-            return {"message": f"Failed to generate input files. Return code: {result.returncode}"}
+        try:
+            # Call the adapter API directly
+            generate_omnia_json_from_catalog(
+                catalog_path=temp_catalog_path,
+                output_root='out/adapter/config',
+            )
+        finally:
+            # Clean up the temporary file
+            os.unlink(temp_catalog_path)
 
         # Return a success message
         return {"message": "Input files generated successfully"}
     except json.JSONDecodeError as e:
         # Return an error message if the JSON data is invalid
         return {"message": f"Invalid JSON data: {str(e)}"}
-    except subprocess.SubprocessError as e:
+    except FileNotFoundError as e:
+        # Return an error message if a file is not found
+        return {"message": f"File not found: {str(e)}"}
+    except Exception as e:
         # Return an error message if an exception occurs
         return {"message": str(e)}
 
