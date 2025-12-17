@@ -23,6 +23,7 @@ import logging
 import os
 from jsonschema import validate, ValidationError
 from .models import Catalog, FunctionalPackage, OsPackage, InfrastructurePackage, Driver
+from .utils import load_json_file
 
 logger = logging.getLogger(__name__)
 
@@ -41,10 +42,8 @@ def ParseCatalog(file_path: str, schema_path: str = _DEFAULT_SCHEMA_PATH) -> Cat
     """
 
     logger.info("Parsing catalog from %s using schema %s", file_path, schema_path)
-    with open(schema_path, encoding="utf-8") as f:
-        schema = json.load(f)
-    with open(file_path, encoding="utf-8") as f:
-        catalog_json = json.load(f)
+    schema = load_json_file(schema_path)
+    catalog_json = load_json_file(file_path)
 
     logger.debug("Validating catalog JSON against schema")
     try:

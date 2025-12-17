@@ -299,30 +299,30 @@ def write_config_files(configs: Dict[str, Dict], output_dir: str) -> None:
     for filename, data in configs.items():
         path = os.path.join(output_dir, filename)
         logger.debug("Writing config file %s", path)
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8") as out_file:
             # Expect shape: { top_key: { "cluster": [pkg_dicts...] } }
-            f.write("{\n")
+            out_file.write("{\n")
 
             items = list(data.items())
             for i, (top_key, body) in enumerate(items):
-                f.write(f"  {json.dumps(top_key)}: {{\n")
-                f.write("    \"cluster\": [\n")
+                out_file.write(f"  {json.dumps(top_key)}: {{\n")
+                out_file.write("    \"cluster\": [\n")
 
                 pkgs = body.get("cluster", [])
                 for j, pkg in enumerate(pkgs):
                     line = "      " + json.dumps(pkg, separators=(", ", ": "))
                     if j < len(pkgs) - 1:
                         line += ","
-                    f.write(line + "\n")
+                    out_file.write(line + "\n")
 
-                f.write("    ]\n")
-                f.write("  }")
+                out_file.write("    ]\n")
+                out_file.write("  }")
                 if i < len(items) - 1:
-                    f.write(",\n")
+                    out_file.write(",\n")
                 else:
-                    f.write("\n")
+                    out_file.write("\n")
 
-            f.write("}\n")
+            out_file.write("}\n")
 
 
 def generate_all_configs(

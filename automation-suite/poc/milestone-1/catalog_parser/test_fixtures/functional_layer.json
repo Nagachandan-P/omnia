@@ -141,11 +141,5 @@
       {"package": "slurm-pam_slurm", "type": "rpm", "repo_name": "x86_64_slurm_custom", "architecture": ["x86_64"]},
       {"package": "slurm-slurmd", "type": "rpm", "repo_name": "x86_64_slurm_custom", "architecture": ["x86_64"]}
     ]
-  },
-  "service_etcd": {
-    "packages": [
-      {"package": "etcd-v3.5.16-amd64", "type": "tarball", "uri": "https://github.com/etcd-io/etcd/releases/download/v3.5.16/etcd-v3.5.16-linux-amd64.tar.gz", "architecture": ["x86_64"]},
-      {"package": "quay.io/coreos/etcd", "type": "image", "tag": "v3.5.16", "architecture": ["x86_64"]}
-    ]
   }
 }

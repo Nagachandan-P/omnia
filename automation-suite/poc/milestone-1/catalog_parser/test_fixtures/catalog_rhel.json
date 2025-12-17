@@ -151,13 +151,6 @@
           "package_id_62",
           "package_id_64"
         ]
-      },
-      {
-        "Name": "service_etcd",
-        "FunctionalPackages": [
-          "package_id_20",
-          "package_id_45"
-        ]
       }
     ],
     "BaseOS": [

@@ -30,6 +30,7 @@ from jsonschema import ValidationError, validate
 
 from .models import Catalog
 from .parser import ParseCatalog
+from .utils import load_json_file
 
 logger = logging.getLogger(__name__)
 
@@ -466,14 +467,14 @@ def serialize_json(feature_list: FeatureList, output_path: str):
         len(feature_list.features),
         output_path,
     )
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write("{\n")
+    with open(output_path, "w", encoding="utf-8") as out_file:
+        out_file.write("{\n")
 
         items = list(feature_list.features.items())
         for i, (feature_name, feature) in enumerate(items):
             # Feature key
-            f.write(f"  {json.dumps(feature_name)}: {{\n")
-            f.write("    \"packages\": [\n")
+            out_file.write(f"  {json.dumps(feature_name)}: {{\n")
+            out_file.write("    \"packages\": [\n")
 
             pkgs = feature.packages
             for j, pkg in enumerate(pkgs):
@@ -481,16 +482,16 @@ def serialize_json(feature_list: FeatureList, output_path: str):
                 line = "      " + json.dumps(pkg_dict, separators=(", ", ": "))
                 if j < len(pkgs) - 1:
                     line += ","
-                f.write(line + "\n")
+                out_file.write(line + "\n")
 
-            f.write("    ]\n")
-            f.write("  }")
+            out_file.write("    ]\n")
+            out_file.write("  }")
             if i < len(items) - 1:
-                f.write(",\n")
+                out_file.write(",\n")
             else:
-                f.write("\n")
+                out_file.write("\n")
 
-        f.write("}\n")
+        out_file.write("}\n")
 
 
 def deserialize_json(input_path: str) -> FeatureList:
@@ -503,8 +504,7 @@ def deserialize_json(input_path: str) -> FeatureList:
     Returns:
     - FeatureList: The deserialized JSON data
     """
-    with open(input_path, "r", encoding="utf-8") as f:
-        json_data = json.load(f)
+    json_data = load_json_file(input_path)
 
     logger.debug("Deserializing FeatureList from %s", input_path)
 
@@ -547,12 +547,10 @@ def get_functional_layer_roles_from_file(
 
     logger.info("get_functional_layer_roles_from_file started for %s", functional_layer_json_path)
     logger.debug("Loading root-level schema from %s", _ROOT_LEVEL_SCHEMA_PATH)
-    with open(_ROOT_LEVEL_SCHEMA_PATH, "r", encoding="utf-8") as f:
-        schema = json.load(f)
+    schema = load_json_file(_ROOT_LEVEL_SCHEMA_PATH)
 
     logger.debug("Validating JSON")
-    with open(functional_layer_json_path, "r", encoding="utf-8") as f:
-        json_data = json.load(f)
+    json_data = load_json_file(functional_layer_json_path)
 
     try:
         validate(instance=json_data, schema=schema)
