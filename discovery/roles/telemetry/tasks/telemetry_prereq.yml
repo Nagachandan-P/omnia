@@ -36,30 +36,16 @@
     opts: "{{ hostvars['localhost']['k8s_mount_options'] }},vers=3"
     state: mounted
 
+- name: Delete existing telemetry deployment directory
+  ansible.builtin.file:
+    path: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/deployments"
+    state: absent
+
 - name: Create telemetry deployment directory
   ansible.builtin.file:
     path: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/deployments"
     state: directory
-    mode: '0755'
-
-- name: Git checkout for iDRAC Telemetry Reference Tools
-  block:
-    - name: Checkout iDRAC Telemetry GitHub repo
-      ansible.builtin.git:
-        repo: "{{ idrac_telemetry_github_repo }}"
-        dest: "{{ idrac_telemetry_reference_git_clone_path }}"
-        version: "{{ reference_tools_stable_commit }}"
-        update: false
-      register: clone_idrac_telemetry
-      until: clone_idrac_telemetry is succeeded
-      retries: "{{ max_retries }}"
-      delay: "{{ delay_count }}"
-
-  rescue:
-    - name: Fail if iDRAC telemetry Git clone fails
-      ansible.builtin.fail:
-        msg: "{{ idrac_git_clone_error_msg.splitlines() | join(' ') }}"
-      when: clone_idrac_telemetry is failed
+    mode: "{{ hostvars['localhost']['dir_permissions_755'] }}"
 
 - name: Git clone for iDRAC Telemetry script
   block:

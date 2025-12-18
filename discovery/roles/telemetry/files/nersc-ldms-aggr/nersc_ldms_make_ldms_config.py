@@ -154,13 +154,21 @@ class LdmsdManager:  # pylint: disable=too-many-instance-attributes
                     'LDMSD_CONF': f"/ldms_conf/ldmsd.nersc-ldms-aggr.{ldmsd_name}-{index}.conf",
                     # 'EXPORTER_PORT': 9101  # DISABLED: Exporter functionality
                 })
+                # Create environment file with pod name pattern for StatefulSet compatibility
+                pod_name = f"nersc-ldms-aggr-{index}"
+                self.create_ldms_env(
+                    os.path.join(self.out_dir, f"ldms-env.{pod_name}.sh"),
+                    self.env[ldmsd_name]['agg'][-1]
+                )
+                # Also create the original cluster-based name for backward compatibility
                 self.create_ldms_env(
                     os.path.join(self.out_dir, f"ldms-env.nersc-ldms-aggr.{ldmsd_name}-{index}.sh"),
                     self.env[ldmsd_name]['agg'][-1]
                 )
                 self.configmaps.extend([
                     os.path.join(self.out_dir, f"ldmsd.nersc-ldms-aggr.{ldmsd_name}-{index}.conf"),
-                    os.path.join(self.out_dir, f"ldms-env.nersc-ldms-aggr.{ldmsd_name}-{index}.sh")
+                    os.path.join(self.out_dir, f"ldms-env.nersc-ldms-aggr.{ldmsd_name}-{index}.sh"),
+                    os.path.join(self.out_dir, f"ldms-env.{pod_name}.sh")
                 ])
 
     def make_store_configs(self):  # pylint: disable=too-many-locals
@@ -212,13 +220,21 @@ class LdmsdManager:  # pylint: disable=too-many-instance-attributes
                         'LDMSD_CONF': f"/ldms_conf/ldmsd.nersc-ldms-store-{ldmsd_name}-{store_pod_index}.conf",
                         # 'EXPORTER_PORT': 9101  # DISABLED: Exporter functionality
                     })
+                    # Create environment file with pod name pattern for StatefulSet compatibility
+                    store_pod_name = f"nersc-ldms-store-{ldmsd_name}-{store_pod_index}"
+                    self.create_ldms_env(
+                        os.path.join(self.out_dir, f"ldms-env.{store_pod_name}.sh"),
+                        self.env[ldmsd_name]['store'][-1]
+                    )
+                    # Also create the original cluster-based name for backward compatibility
                     self.create_ldms_env(
                         os.path.join(self.out_dir, f"ldms-env.nersc-ldms-store-{ldmsd_name}-{store_pod_index}.sh"),
                         self.env[ldmsd_name]['store'][-1]
                     )
                     self.configmaps.extend([
                         os.path.join(self.out_dir, f"ldmsd.nersc-ldms-store-{ldmsd_name}-{store_pod_index}.conf"),
-                        os.path.join(self.out_dir, f"ldms-env.nersc-ldms-store-{ldmsd_name}-{store_pod_index}.sh")
+                        os.path.join(self.out_dir, f"ldms-env.nersc-ldms-store-{ldmsd_name}-{store_pod_index}.sh"),
+                        os.path.join(self.out_dir, f"ldms-env.{store_pod_name}.sh")
                     ])
                     store_pod_index += 1
 
@@ -406,10 +422,9 @@ class LdmsdManager:  # pylint: disable=too-many-instance-attributes
             "scripts/ldmsd_stream.bash",
             "scripts/ldms_ls.bash",
             "scripts/ldms_stats.bash",
-            "scripts/ldms_exporter.bash",
-            "scripts/ldms_exporter.py",
             "scripts/start_munge.bash",
-            "scripts/decomp.json"
+            "scripts/decomp.json",
+            "scripts/kafka.conf"
         ]
         data = self.asseble_configmap_data(script_files)
         self.create_configmap_yaml(
@@ -537,13 +552,16 @@ class LdmsdManager:  # pylint: disable=too-many-instance-attributes
         cfg.append(f"updtr_start name={ldmsd_name}")
         cfg.append("prdcr_start_regex regex=.*")
         cfg.extend([
-            "# Store in kafka - port 9092 (plaintext, no TLS, no auth)",
-            "# NOTE: store_avro_kafka plugin using plaintext for anonymous access",
-            "# Using plaintext listener on port 9092 (internal cluster only)",
+            "# Store in Kafka - port 9093 (TLS with mTLS authentication)",
+            "# Uses kafkapump user certificates for mTLS authentication",
+            "# Security: TLS encryption + client certificate authentication",
+            "#   - TLS port 9093 requires valid client certificates",
+            "#   - kafkapump user certificates mounted at /ldms_certs/",
+            "#   - Kafka configuration file provides TLS settings",
             "load name=store_avro_kafka",
-            "config name=store_avro_kafka encoding=json topic=ldms",
+            "config name=store_avro_kafka encoding=json topic=ldms kafka_conf=/ldms_bin/kafka.conf",
             f"strgp_add name=kafka regex=.* plugin=store_avro_kafka "
-            f"container=kafka-kafka-bootstrap.{self.namespace}.svc.cluster.local:9092 "
+            f"container=kafka-kafka-bootstrap.{self.namespace}.svc.cluster.local:9093 "
             "decomposition=/ldms_bin/decomp.json",
             "strgp_start name=kafka"
         ])

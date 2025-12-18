@@ -35,6 +35,7 @@ metadata:
   name: {{ idrac_telemetry_k8s_name }}
   namespace: {{ telemetry_namespace }}
 spec:
+  podManagementPolicy: Parallel
   serviceName: {{ idrac_telemetry_service_name }}
   replicas: 1
   selector:
@@ -46,10 +47,6 @@ spec:
         app: {{ idrac_telemetry_k8s_name }}
     spec:
       volumes:
-        - name: telemetry-reference-tools
-          hostPath:
-            path: {{ idrac_telemetry_reference_git_clone_path }}
-            type: Directory
 {% set types = hostvars['localhost']['idrac_telemetry_collection_type'].split(',') %}
 {% if 'kafka' in types %}
         # Mount Kafka cluster CA certificate for TLS verification
@@ -75,7 +72,7 @@ spec:
         - ip: "127.0.0.1"
           hostnames:
             - "mysqldb"
-      terminationGracePeriodSeconds: 3
+      terminationGracePeriodSeconds: 10
       tolerations:
       - effect: NoExecute
         key: node.kubernetes.io/not-ready
@@ -85,6 +82,20 @@ spec:
         key: node.kubernetes.io/unreachable
         operator: Exists
         tolerationSeconds: 5
+      initContainers:
+        # Clean up stale MySQL lock files from previous ungraceful shutdowns
+        - name: cleanup-mysql-locks
+          image: {{ mysql_image }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Checking for stale MySQL lock files..."
+              rm -f /var/lib/mysql/*.sock /var/lib/mysql/*.pid 2>/dev/null || true
+              echo "Lock file cleanup complete"
+          volumeMounts:
+            - name: mysqldb-pvc
+              mountPath: /var/lib/mysql/
       containers:
         - name: mysqldb
           image: {{ mysql_image }}
@@ -93,9 +104,9 @@ spec:
             - name: mysqldb-pvc
               mountPath: /var/lib/mysql/
           lifecycle:
-                preStop:
-                  exec:
-                    command: ["/bin/sh", "-c", "mysqladmin shutdown -uroot -p${MYSQL_ROOT_PASSWORD}"]
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "mysqladmin shutdown -uroot -p${MYSQL_ROOT_PASSWORD} 2>/dev/null || true"]
           env:
             - name: MYSQL_DATABASE
               value: {{ mysqldb_name }}
@@ -126,12 +137,8 @@ spec:
             - containerPort: {{ activemq_http_port_2 }}
 
         - name: idrac-telemetry-receiver
-          image: {{ go_image }}
+          image: {{ idrac_telemetry_receiver_image }}
           imagePullPolicy: IfNotPresent
-          volumeMounts:
-            - mountPath: /go/src/github.com/telemetry-reference-tools
-              name: telemetry-reference-tools
-          workingDir: /go/src/github.com/telemetry-reference-tools
           env:
             - name: MESSAGEBUS_HOST
               value: 127.0.0.1
@@ -155,16 +162,12 @@ spec:
               value: mysqldb
             - name: MYSQL_HOST_PORT
               value: "{{ mysqldb_container_port1 }}"
-          command: ["/bin/sh", "-c"]
-          args: ["./scripts/example/idrac-telemetry-receiver.sh"]
 
 {% if 'kafka' in types %}
         - name: kafka-pump
-          image: {{ go_image }}
+          image: {{ kafkapump_image }}
           imagePullPolicy: IfNotPresent
           volumeMounts:
-            - mountPath: /go/src/github.com/telemetry-reference-tools
-              name: telemetry-reference-tools
             # Mount kafkapump user certificates for mTLS (under /extrabin/certs/)
             - mountPath: /extrabin/certs/kafka-certs
               name: kafkapump-user-certs
@@ -173,13 +176,11 @@ spec:
             - mountPath: /extrabin/certs/cluster-ca
               name: kafka-cluster-ca-cert
               readOnly: true
-          workingDir: /go/src/github.com/telemetry-reference-tools
           env:
             - name: MESSAGEBUS_HOST
               value: 127.0.0.1
             - name: MESSAGEBUS_PORT
               value: "{{ messagebus_http_port }}"
-            # Use TLS port 9093 instead of plain 9092
             - name: KAFKA_BROKER
               value: "kafka-kafka-bootstrap.telemetry.svc.cluster.local:9093"
             - name: KAFKA_TOPIC
@@ -196,18 +197,12 @@ spec:
               value: "false"
             - name: KAFKA_PARTITION
               value: "0"
-          command: ["/bin/sh", "-c"]
-          args: ["go run cmd/kafkapump/kafkapump.go"]
 {% endif %}
 
 {% if 'victoria' in types %}
         - name: victoria-pump
-          image: {{ go_image }}
+          image: {{ victoriapump_image }}
           imagePullPolicy: IfNotPresent
-          volumeMounts:
-            - mountPath: /go/src/github.com/telemetry-reference-tools
-              name: telemetry-reference-tools
-          workingDir: /go/src/github.com/telemetry-reference-tools
           env:
             - name: MESSAGEBUS_HOST
               value: 127.0.0.1
@@ -218,15 +213,13 @@ spec:
           ports:
             - containerPort: 2112
               name: victoriapump
-          command: ["/bin/sh", "-c"]
-          args: ["go run cmd/victoriapump/victoriapump.go"]
 {% endif %}
 
   volumeClaimTemplates:
     - metadata:
         name: mysqldb-pvc
       spec:
-        accessModes: ["ReadWriteMany"]
+        accessModes: ["ReadWriteOnce"]
         resources:
           requests:
             storage: {{ mysqldb_storage }}
