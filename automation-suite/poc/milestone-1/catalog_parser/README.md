@@ -89,7 +89,7 @@ from catalog_parser.generator import (
     get_package_list,
 )
 
-functional_layer_path = "out/main/x86_64/rhel/9/functional_layer.json"
+functional_layer_path = "out/main/x86_64/rhel/10/functional_layer.json"
 
 # Get all functional layer roles
 roles = get_functional_layer_roles_from_file(functional_layer_path)
