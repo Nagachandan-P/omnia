@@ -6,7 +6,7 @@
 - Install **Python3**, **pip**, **FastAPI**, and **Uvicorn** if not already installed.
 - Accept a fully qualified path to your api_server.py application file. (e.g., Give the full path of checkout code of api_server.py. If the omnia code is checked out at root directory, give the path as /root/omnia/automation-suite/poc/milestone-1/api_server.py)
 - Create an environment file at `/etc/OmniaAPI.env`.
-- Generate a systemd service named `OmniaAPI` with:
+- Generate a systemd service named `omniaapi` with:
   - Auto-restart on failure.
   - Logging to `/var/log/OmniaAPI.log`.
   - Environment variables support.
@@ -39,27 +39,27 @@
 
 ## What Happens After Running?
 - The script installs required dependencies.
-- Creates `/etc/OmniaAPI.env` for environment variables.
-- Creates `/usr/local/bin/OmniaAPI.sh` to start Uvicorn.
-- Creates `/etc/systemd/system/OmniaAPI.service` for systemd.
+- Creates `/etc/omniaapi.env` for environment variables.
+- Creates `/usr/local/bin/omniaapi.sh` to start Uvicorn.
+- Creates `/etc/systemd/system/omniaapi.service` for systemd.
 - Opens port 80 via `firewalld`.
-- Enables and starts the `OmniaAPI` service.
+- Enables and starts the `omniaapi` service.
 
 ## Verify Service Status
 ```bash
-systemctl status OmniaAPI
+systemctl status omniaapi
 ```
 
 ## Logs
-- Setup log: `/var/log/OmniaAPI_setup.log`
-- Service log: `/var/log/OmniaAPI.log`
+- Setup log: `/var/log/omniaapi_setup.log`
+- Service log: `/var/log/omniaapi.log`
 
 ## Notes
 - If `firewalld` is not active, manually open port 80.
 
 ## API Endpoints
 
-The OmniaAPI service exposes the following endpoints:
+The `omniaapi` service exposes the following endpoints:
 
 ### 1. Parse Catalog (`/ParseCatalog`)
 Parses a catalog JSON file and generates root JSON files.

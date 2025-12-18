@@ -578,6 +578,151 @@ def get_functional_layer_roles_from_file(
     return roles
 
 
+def get_package_list(
+    functional_layer_json_path: str,
+    role: Optional[str] = None,
+    *,
+    configure_logging: bool = False,
+    log_file: Optional[str] = None,
+    log_level: int = logging.INFO,
+) -> List[Dict]:
+    """Return packages for a specific role or all roles from a functional_layer.json file.
+
+    The input JSON is validated against RootLevelSchema.json before it is
+    deserialized.
+
+    Args:
+        functional_layer_json_path: Path to the functional_layer.json file.
+        role: Optional role identifier. If None, returns packages for all roles.
+        configure_logging: If True, configure logging with optional file output.
+        log_file: Path to log file; if not set, logs go to stderr.
+        log_level: Logging level (default: logging.INFO).
+
+    Returns:
+        List of role objects, each containing:
+        - roleName: str
+        - packages: List[Dict] with keys: name, type, repo_name, architecture, uri, tag
+
+    Raises:
+        FileNotFoundError: If the JSON file does not exist.
+        ValidationError: If the JSON fails schema validation.
+        ValueError: If the specified role does not exist.
+    """
+    if configure_logging:
+        _configure_logging(log_file=log_file, log_level=log_level)
+
+    logger.info(
+        "get_package_list started for %s (role=%s)",
+        functional_layer_json_path,
+        role if role else "all",
+    )
+
+    logger.debug("Checking if file exists: %s", functional_layer_json_path)
+    if not os.path.isfile(functional_layer_json_path):
+        logger.error("File not found: %s", functional_layer_json_path)
+        raise FileNotFoundError(functional_layer_json_path)
+
+    logger.debug("Loading root-level schema from %s", _ROOT_LEVEL_SCHEMA_PATH)
+    with open(_ROOT_LEVEL_SCHEMA_PATH, "r", encoding="utf-8") as f:
+        schema = json.load(f)
+
+    logger.debug("Loading and validating JSON from %s", functional_layer_json_path)
+    with open(functional_layer_json_path, "r", encoding="utf-8") as f:
+        json_data = json.load(f)
+
+    try:
+        validate(instance=json_data, schema=schema)
+    except ValidationError as exc:
+        logger.error(
+            "JSON validation failed for %s",
+            functional_layer_json_path,
+        )
+        logger.debug(
+            "JSON validation details for %s: %s",
+            functional_layer_json_path,
+            exc.message,
+        )
+        raise
+    logger.info("JSON validation succeeded for %s", functional_layer_json_path)
+
+    logger.debug("Deserializing feature list from %s", functional_layer_json_path)
+    feature_list = deserialize_json(functional_layer_json_path)
+
+    available_roles = list(feature_list.features.keys())
+    logger.debug("Available roles: %s", available_roles)
+
+    if role is not None:
+        logger.debug("Filtering for specific role: %s", role)
+        if role == "":
+            logger.error(
+                "Invalid role input: empty string for %s (available roles: %s)",
+                functional_layer_json_path,
+                available_roles,
+            )
+            raise ValueError("Role must be a non-empty string")
+        # Case-insensitive role matching
+        role_lower = role.lower()
+        matched_role = None
+        for available_role in available_roles:
+            if available_role.lower() == role_lower:
+                matched_role = available_role
+                break
+
+        if matched_role is None:
+            logger.error(
+                "Role '%s' not found in %s. Available roles: %s",
+                role,
+                functional_layer_json_path,
+                available_roles,
+            )
+            raise ValueError(
+                f"Role '{role}' not found. Available roles: {available_roles}"
+            )
+        roles_to_process = [matched_role]
+    else:
+        logger.debug("Processing all roles")
+        roles_to_process = available_roles
+
+    result: List[Dict] = []
+    total_packages = 0
+
+    for role_name in roles_to_process:
+        feature = feature_list.features[role_name]
+        packages_list = []
+
+        for pkg in feature.packages:
+            pkg_dict = {
+                "name": pkg.package,
+                "type": pkg.type,
+                "repo_name": pkg.repo_name if pkg.repo_name else None,
+                "architecture": pkg.architecture,
+                "uri": pkg.uri,
+                "tag": pkg.tag,
+            }
+            packages_list.append(pkg_dict)
+
+        role_obj = {
+            "roleName": role_name,
+            "packages": packages_list,
+        }
+        result.append(role_obj)
+        total_packages += len(packages_list)
+        logger.debug(
+            "Processed role '%s': %d packages",
+            role_name,
+            len(packages_list),
+        )
+
+    logger.info(
+        "get_package_list completed for %s: %d role(s), %d total package(s)",
+        functional_layer_json_path,
+        len(result),
+        total_packages,
+    )
+
+    return result
+
+
 def generate_root_json_from_catalog(
     catalog_path: str,
     schema_path: str = _DEFAULT_SCHEMA_PATH,

@@ -68,14 +68,46 @@ You can also call both components directly from Python without going through the
 
 #### Catalog Parser API (`generator.py`)
 
-Programmatic entry point:
+Programmatic entry points:
 
 - `generate_root_json_from_catalog(catalog_path, schema_path="resources/CatalogSchema.json", output_root="out/generator", *, log_file=None, configure_logging=False, log_level=logging.INFO)`
+- `get_functional_layer_roles_from_file(functional_layer_json_path, *, configure_logging=False, log_file=None, log_level=logging.INFO)`
+- `get_package_list(functional_layer_json_path, role=None, *, configure_logging=False, log_file=None, log_level=logging.INFO)`
 
 Behavior:
 
 - Optionally configures logging when `configure_logging=True` (and will create the log directory if needed).
-- Writes per-arch/OS/version feature-list JSONs under `output_root/<arch>/<os>/<version>/`.
+- `generate_root_json_from_catalog` writes per-arch/OS/version feature-list JSONs under `output_root/<arch>/<os>/<version>/`.
+- `get_functional_layer_roles_from_file` reads a `functional_layer.json` file, validates it, and returns a list of role names (feature names) present in the functional layer.
+- `get_package_list` reads a `functional_layer.json` file and returns a list of role objects with their packages, suitable for use by REST APIs or other callers.
+
+Example usage:
+
+```python
+from catalog_parser.generator import (
+    get_functional_layer_roles_from_file,
+    get_package_list,
+)
+
+functional_layer_path = "out/main/x86_64/rhel/10/functional_layer.json"
+
+# Get all functional layer roles
+roles = get_functional_layer_roles_from_file(functional_layer_path)
+
+# roles might look like: ["Compiler", "K8S Controller", "K8S Worker", ...]
+
+# Get packages for a specific role (case-insensitive role name)
+compiler_packages = get_package_list(functional_layer_path, role="compiler")
+
+# Get packages for all roles
+all_role_packages = get_package_list(functional_layer_path)
+```
+
+Notes:
+
+- Role matching is case-insensitive (for example, `"k8s controller"` matches `"K8S Controller"`).
+- Passing `role=None` returns all roles.
+- Passing an empty string for `role` is treated as invalid input and raises `ValueError`.
 
 #### Adapter Config API (`adapter.py`)
 
