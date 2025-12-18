@@ -123,6 +123,20 @@ SLURM_KUBE_CLUSTER_OVERLAP_MSG = (
     "Cluster '{cluster}' is defined for both SLURM nodes and Kubernetes nodes. Overlap not allowed."
 )
 
+# Mapping File Validation Messages
+PROVISION_CONFIG_NOT_FOUND = (
+    "provision_config.yml not found."
+)
+PXE_MAPPING_FILE_NOT_FOUND = (
+    "PXE mapping file not found."
+)
+PXE_MAPPING_FILE_EMPTY_SERVICE_CLUSTER_MSG = (
+    "PXE mapping file does not have functional groups for service cluster."
+)
+PXE_MAPPING_FILE_EMPTY_SLURM_CLUSTER_MSG = (
+    "PXE mapping file does not have functional groups for slurm cluster."
+)
+
 # provision_config.yml
 PRIMARY_ADMIN_BMC_IP_SAME_MSG = "primary_oim_admin_ip and primary_oim_bmc_ip should not be the same."
 PRIMARY_ADMIN_IP_INVALID_MSG = "primary_oim_admin_ip is not a valid IPv4 address."
@@ -130,8 +144,6 @@ PRIMARY_BMC_IP_INVALID_MSG = "primary_oim_bmc_ip is not a valid IPv4 address."
 PRIMARY_ADMIN_IP_IN_DYNAMIC_RANGE_MSG = "primary_oim_admin_ip should not be within the dynamic_range."
 PRIMARY_BMC_IP_IN_DYNAMIC_RANGE_MSG = "primary_oim_bmc_ip should not be within the dynamic_range."
 DEFAULT_LEASE_TIME_FAIL_MSG = "Please provide a valid default_lease_time."
-TIMEZONE_FAIL_MSG = ("Unsupported Timezone. Please check the timezone.txt file "
-                    "for a list of valid timezones.")
 ENABLE_SWITCH_BASED_FAIL_MSG = "enable_switch_based must be set to either true or false."
 LANGUAGE_FAIL_MSG = "Only en_US.UTF-8 language supported"
 LANGUAGE_EMPTY_MSG = "Language setting cannot be empty"
@@ -148,6 +160,12 @@ REPO_STORE_PATH_MSG = "Please provide a valid repo_store_path value."
 OMNIA_REPO_URL_MSG = "Repo urls are empty. Please provide a url and corresponding key."
 RHEL_OS_URL_MSG = "is empty. Please provide a rhel_os_url value."
 UBUNTU_OS_URL_MSG = "ubuntu_os_url is empty. Please provide a ubuntu_os_url value."
+LDMS_REQUIRES_SERVICE_K8S_MSG = (
+    "requires service_k8s to be present in the 'softwares' list in software_config.json."
+)
+LDMS_REQUIRES_SLURM_MSG = (
+    "requires Slurm package 'slurm_custom' to be present in the 'softwares' list in software_config.json."
+)
 
 # omnia_config.yml
 INVALID_PASSWORD_MSG = ("Provided password is invalid. Password must meet the specified "
@@ -206,11 +224,16 @@ KAFKA_ENABLE_FEDERATED_IDRAC_TELEMETRY_COLLECTION= ("requires federated_idrac_te
                                              "to be enabled. Please rerun the playbook "
                                              "with federated_idrac_telemetry_collection true"
                                              "in telemetry_config.yml.")
-TELEMETRY_SERVICE_CLUSTER_ENTRY_MISSING_ROLES_CONFIG_MSG= ("requires service k8s roles to be "
-                                             "defined in functional_groups_config.yml. Please either configure "
-                                             "service k8s roles in functional_groups_config.yml "
-                                             "or disable idrac_telemetry_support "
-                                             "in telemetry_config.yml and rerun the playbook.")
+TELEMETRY_SERVICE_CLUSTER_ENTRY_MISSING_ROLES_CONFIG_MSG= ("requires service k8s roles(service_kube_control_plane and service_kube_node)"
+                                             " to be defined in 'pxe_mapping_file.csv'. Please either configure "
+                                             "service k8s roles in the mapping file "
+                                             "or disable idrac_telemetry_support in in telemetry_config.yml "
+                                             "and rerun the playbook.")
+TELEMETRY_SERVICE_CLUSTER_ENTRY_FOR_LDMS_MISSING_ROLES_CONFIG_MSG= ("requires service k8s roles(service_kube_control_plane "
+                                             "and service_kube_node) or slurm nodes(slurm_control_node_x86_64 and slurm_node) "
+                                             " to be defined in 'pxe_mapping_file.csv'. Please either configure "
+                                             "service k8s/slurm roles in the mapping file or remove ldms from "
+                                             "software_config.json and rerun the playbook.")
 
 def boolean_fail_msg(value):
     """Returns a formatted message indicating boolean_fail_msg."""
@@ -269,6 +292,40 @@ ADMIN_NETWORK_MISSING_MSG = "Failed. admin_network configuration is mandatory in
 NETMASK_BITS_FAIL_MSG = "Netmask bit must be a valid number between 1 and 32"
 RANGE_NETMASK_BOUNDARY_FAIL_MSG = ("IP range is outside the valid address range for "
                                    "the specified netmask.")
+ADMIN_IP_OUTSIDE_NETWORK_RANGE_MSG = (
+    "ADMIN_IP is outside the admin network range defined in "
+    "network_spec.yml. Please ensure all ADMIN_IP addresses fall "
+    "within the configured network range."
+)
+ADMIN_IP_IN_DYNAMIC_RANGE_MSG = (
+    "ADMIN_IP falls within the dynamic_range which is reserved for DHCP. "
+    "Please use a static IP address outside the dynamic range."
+)
+ADMIN_IP_CONFLICTS_WITH_PRIMARY_MSG = (
+    "ADMIN_IP conflicts with the primary_oim_admin_ip defined in "
+    "network_spec.yml. Please use a different IP address."
+)
+ADMIN_NETWORK_NOT_FOUND_MSG = (
+    "admin_network configuration not found in network_spec.yml. "
+    "Please ensure the Networks section contains admin_network."
+)
+PRIMARY_ADMIN_IP_NETMASK_REQUIRED_MSG = (
+    "primary_oim_admin_ip and netmask_bits must be defined in "
+    "network_spec.yml admin_network section."
+)
+INVALID_NETWORK_CONFIG_MSG = (
+    "Invalid network configuration in network_spec.yml. "
+    "Please verify primary_oim_admin_ip and netmask_bits are correct."
+)
+INVALID_DYNAMIC_RANGE_FORMAT_MSG = (
+    "Invalid dynamic_range format in network_spec.yml. "
+    "Expected format: 'start_ip-end_ip' (e.g., 10.1.1.10-10.1.1.50)."
+)
+ADMIN_IP_HOSTNAME_COLUMN_MISSING_MSG = (
+    "ADMIN_IP or HOSTNAME column not found in PXE mapping file. "
+    "Please ensure the CSV file has the required headers."
+)
+NETWORK_SPEC_FILE_NOT_FOUND_MSG = "network_spec.yml file not found in input folder."
 
 # telemetry
 MANDATORY_FIELD_FAIL_MSG = "must not be empty"

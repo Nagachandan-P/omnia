@@ -2,11 +2,21 @@ resources:
   - telemetry_secret_creation.yaml
 {% set types = hostvars['localhost']['idrac_telemetry_collection_type'].split(',') %}
 {% if 'victoria' in types %}
+  # VictoriaMetrics Common Resources
   - victoria-tls-secret.yaml
   - victoria-vmagent-rbac.yaml
   - vmagent-scrape-config.yaml
   - victoria-agent-deployment.yaml
+  # VictoriaMetrics Deployment (mode: {{ hostvars['localhost']['victoria_configurations']['deployment_mode'] }})
+{% if hostvars['localhost']['victoria_configurations']['deployment_mode'] == 'cluster' %}
+  # Cluster Mode: High-availability deployment
+  - victoria-cluster-vmstorage.yaml
+  - victoria-cluster-vminsert.yaml
+  - victoria-cluster-vmselect.yaml
+{% else %}
+  # Single-Node Mode: Simple deployment
   - victoria-statefulset.yaml
+{% endif %}
   # Uncomment to deploy VictoriaMetrics TLS test job
   # - test/victoria-tls-test-job.yaml
 {% endif %}
@@ -19,9 +29,6 @@ resources:
 {% if hostvars['localhost']['ldms_support'] %}
   - kafka.topic_ldms.yaml
 {% endif %}
-{% if 'ome' in kafka_topic_partitions %}
-  - kafka.topic_ome.yaml
-{% endif %}
   - kafka.kafka_bridge.yaml
   - kafka.kafka_bridge_lb.yaml
   # Uncomment to deploy TLS test job
@@ -29,4 +36,6 @@ resources:
 {% endif %}
 {% if hostvars['localhost']['idrac_telemetry_support'] %}
   - idrac_telemetry_statefulset.yaml
+  - telemetry_cleaner_rbac.yaml
+  - telemetry_pod_cleanup.yaml
 {% endif %}

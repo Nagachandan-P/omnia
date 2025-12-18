@@ -33,6 +33,7 @@
     cluster_name: "{{ slurm_cluster[0].cluster_name }}"
     configs_input: "{{ slurm_cluster[0].config_sources | default({}) | dict2items | rejectattr('value', 'falsy') | list | items2dict }}"
     slurm_config_path: "{{ share_path }}/{{ slurm_dir_name }}"
+    controller_trackfile_path: "{{ share_path }}/ctld_track"
 
 - name: Configure openldap if supported
   ansible.builtin.include_tasks: openldap_config.yml
@@ -57,6 +58,16 @@
     group: root
     mode: "{{ common_mode }}"
 
+# This directory is created to store the controller track file in NFS
+# The track file is generated only after the Slurm controller has been fully configured in a fresh deployment
+- name: Create directory for controller init track file in share
+  ansible.builtin.file:
+    path: "{{ controller_trackfile_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ common_mode }}"
+
 - name: Create the slurm ctld directory on share
   ansible.builtin.file:
     path: "{{ slurm_config_path }}/{{ item[0] }}{{ item[1] }}"
@@ -76,6 +87,74 @@
     mode: "{{ common_mode }}"
   when: cmpt_list or login_list or compiler_login_list
   loop: "{{ (cmpt_list + login_list + compiler_login_list) | product(cmpt_dir) }}"
+
+- name: Create the cert directory on share
+  ansible.builtin.file:
+    path: "{{ slurm_config_path }}/cert"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ common_mode }}"
+
+- name: Copy pulp webserver certificate to client_share_path
+  ansible.builtin.copy:
+    src: "{{ pulp_webserver_cert_path }}"
+    dest: "{{ slurm_config_path }}/cert"
+    mode: "{{ file_mode }}"
+  become: true
+
+- name: Create the cuda directory on share
+  ansible.builtin.file:
+    path: "{{ slurm_config_path }}/cuda"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ common_mode }}"
+
+- name: Create the runfile directory on share
+  ansible.builtin.file:
+    path: "{{ slurm_config_path }}/runfile"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ common_mode }}"
+
+- name: Set NFS info fact
+  ansible.builtin.set_fact:
+    oim_shared_path: "{{ hostvars['localhost']['oim_shared_path'] }}"
+
+- name: Check if source directory exists
+  ansible.builtin.stat:
+    path: "{{ oim_shared_path }}/omnia/offline_repo/cluster/x86_64/rhel/10.0/iso/cuda-run/"
+  register: src_dir_check_x86_64
+
+
+- name: Check if source directory exists
+  ansible.builtin.stat:
+    path: "{{ oim_shared_path }}/omnia/offline_repo/cluster/aarch64/rhel/10.0/iso/cuda-run/"
+  register: src_dir_check_aarch64
+
+- name: Copy cuda run file using copy module for aarch64
+  ansible.builtin.copy:
+    src: "{{ oim_shared_path }}/omnia/offline_repo/cluster/aarch64/rhel/10.0/iso/cuda-run/"
+    dest: "{{ slurm_config_path }}/runfile/"
+    mode: '0755'
+    owner: root
+    group: root
+    directory_mode: '0755'
+    remote_src: true
+  when: src_dir_check_aarch64.stat.exists and src_dir_check_aarch64.stat.isdir
+
+- name: Copy cuda run file using copy module for x86_64
+  ansible.builtin.copy:
+    src: "{{ oim_shared_path }}/omnia/offline_repo/cluster/x86_64/rhel/10.0/iso/cuda-run/"
+    dest: "{{ slurm_config_path }}/runfile/"
+    mode: '0755'
+    owner: root
+    group: root
+    directory_mode: '0755'
+    remote_src: true
+  when: src_dir_check_x86_64.stat.exists and src_dir_check_x86_64.stat.isdir
 
 - name: Check if munge key exists top level
   ansible.builtin.stat:
@@ -207,6 +286,10 @@
   ansible.builtin.set_fact:
     cloud_init_nfs_path: "{{ nfs_server_ip }}:{{ nfs_server_path }}/slurm"
 
+- name: NFS path for controller trackfile
+  ansible.builtin.set_fact:
+    trackfile_nfs_path: "{{ nfs_server_ip }}:{{ nfs_server_path }}/ctld_track"
+
 - name: NFS path for cloud init
   ansible.builtin.set_fact:
     cloud_init_nfs_path_openldap: "{{ nfs_server_ip }}:{{ nfs_server_path }}/openldap"
@@ -216,3 +299,4 @@
 - name: NFS path for ucx, openmpi and ldms cloud init
   ansible.builtin.set_fact:
     cloud_init_slurm_nfs_path: "{{ nfs_server_ip }}:{{ nfs_server_path }}"
+    client_mount_path: "{{ share_path }}"

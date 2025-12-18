@@ -35,6 +35,9 @@
   loop: "{{ victoria_templates }}"
   when: "'victoria' in hostvars['localhost']['idrac_telemetry_collection_type'].split(',')"
   tags: telemetry_deployment
+  # NOTE: victoria_templates is automatically set based on deployment_mode in telemetry_config.yml
+  #       - cluster mode: includes vmstorage, vminsert, vmselect templates
+  #       - single-node mode: includes victoria-statefulset template
 
 - name: Kafka configurations
   when: kafka_support
@@ -84,15 +87,6 @@
         - hostvars['localhost']['ldms_support']
         - "kafka.topics.ldms.name in kafka_topic_partitions"
 
-    - name: Add ome topic (optional)
-      ansible.builtin.set_fact:
-        kafka_topics_to_create: >
-          {{ kafka_topics_to_create + [{
-            'name': kafka.topics.ome.name,
-            'key': kafka.topics.ome.name,
-            'filename': 'kafka.topic_ome.yaml'
-          }] }}
-      when: "kafka.topics.ome.name in kafka_topic_partitions"
 
     - name: Generate Kafka topic files dynamically
       ansible.builtin.template:

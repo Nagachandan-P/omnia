@@ -44,13 +44,14 @@ gpu_slurm_conf:
   GresTypes: gpu
   SelectType: select/cons_tres
   SelectTypeParameters: CR_Core_Memory
+  SlurmdParameters: l3cache_as_socket
 innodb_buffer_pool_size: 1G
 innodb_lock_wait_timeout: 120
 # TODO tmp
 nodes_yaml: "{{ hostvars['localhost']['oim_shared_path'] }}/omnia/openchami/workdir/nodes/nodes.yaml"
 bmc_username: "{{ hostvars['localhost']['bmc_username'] }}"
 bmc_password: "{{ hostvars['localhost']['bmc_password'] }}"
-clear_slurm_files: true
+clear_slurm_files: false
 conf_in_nfs: true
 input_project_dir: "{{ hostvars['localhost']['input_project_dir'] }}"
 cluster_name: cluster # TODO: direct load vars omnia_config.yml
@@ -100,3 +101,5 @@ software_config_file: "{{ input_project_dir }}/software_config.json"
 omnia_run_tags: "{{ hostvars['localhost']['omnia_run_tags'] }}"
 auth_tls_certs_path: "/opt/omnia/auth/tls_certs/ldapserver.crt"
 slurm_installation_type: configless
+pulp_webserver_cert_path: "/opt/omnia/pulp/settings/certs/pulp_webserver.crt"
+controller_empty_msg: "Slurm controller functional group is missing from PXE mapping file. Please update the file and rerun discovery.yml."

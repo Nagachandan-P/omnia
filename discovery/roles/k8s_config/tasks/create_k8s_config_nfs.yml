@@ -31,6 +31,7 @@
     csi_powerscale_driver_secret_file_path: "{{ service_k8s_cluster[0].csi_powerscale_driver_secret_file_path }}"
     csi_powerscale_driver_values_file_path: "{{ service_k8s_cluster[0].csi_powerscale_driver_values_file_path }}"
     nfs_storage_name: "{{ service_k8s_cluster[0].nfs_storage_name }}"
+    k8s_crio_storage_size: "{{ service_k8s_cluster[0].k8s_crio_storage_size }}"
 
 - name: Read the service_k8s mount point
   ansible.builtin.set_fact:
@@ -61,10 +62,11 @@
   ansible.builtin.set_fact:
     pulp_mirror: "{{ hostvars['localhost']['admin_nic_ip'] }}:2225"
 
-- name: Set fact for dns and csi driver support
+- name: Set fact for dns, csi driver support and service_k8s_version
   ansible.builtin.set_fact:
     dns: "{{ hostvars['localhost']['dns'] }}"
     csi_driver_powerscale_support: "{{ hostvars['localhost']['csi_driver_powerscale_support'] | string | lower }}"
+    service_k8s_version: "{{ hostvars['localhost']['service_k8s_version'] }}"
 
 - name: Create required share directories on NFS
   block:
@@ -72,21 +74,35 @@
       ansible.builtin.file:
         path: "{{ k8s_client_mount_path }}/{{ item }}"
         state: directory
-        mode: '0755'
+        mode: "{{ folder_mode }}"
         owner: root
         group: root
       loop:
         - calico
         - metallb
-        - multus
+        # - multus
         - nfs-client-provisioner
         - helm
-        - whereabouts
-        - "{{ 'csi-driver-powerscale' if hostvars['localhost']['csi_driver_powerscale_support'] | bool else omit }}"
+        # - whereabouts
+
+    - name: Create subdirectories on NFS share
+      ansible.builtin.file:
+        path: "{{ k8s_client_mount_path }}/{{ item }}"
+        state: directory
+        mode: "{{ folder_mode }}"
+        owner: root
+        group: root
+      loop:
+        - csi-driver-powerscale
+      when: hostvars['localhost']['csi_driver_powerscale_support']
+
   rescue:
     - name: Fail with NFS export advice
       ansible.builtin.fail:
         msg: "{{ nfs_export_help_msg }}"
+
+- name: Creating the persist folders in nfs share
+  ansible.builtin.include_tasks: create_node_dir.yml
 
 - name: Include local repo access variable file
   ansible.builtin.include_vars: "{{ local_repo_access_config_file }}"
@@ -131,11 +147,11 @@
     mode: "{{ file_mode }}"
 
 # multus
-- name: Download multus manifest
-  ansible.builtin.get_url:
-    url: "{{ multus_manifest_yaml_url }}"
-    dest: "{{ k8s_client_mount_path }}/multus/{{ multus_package }}.yml"
-    mode: "{{ file_mode }}"
+# - name: Download multus manifest
+#   ansible.builtin.get_url:
+#     url: "{{ multus_manifest_yaml_url }}"
+#     dest: "{{ k8s_client_mount_path }}/multus/{{ multus_package }}.yml"
+#     mode: "{{ file_mode }}"
 
 # helm
 - name: Download helm tarball
@@ -158,18 +174,18 @@
     mode: "{{ file_mode }}"
 
 # whereabouts
-- name: Get whereabouts plugin git folder
-  ansible.builtin.get_url:
-    url: "{{ whereabouts_git_url }}"
-    dest: "{{ k8s_client_mount_path }}/whereabouts/{{ whereabouts_pkg }}.tar.gz"
-    mode: "{{ file_mode }}"
+# - name: Get whereabouts plugin git folder
+#   ansible.builtin.get_url:
+#     url: "{{ whereabouts_git_url }}"
+#     dest: "{{ k8s_client_mount_path }}/whereabouts/{{ whereabouts_pkg }}.tar.gz"
+#     mode: "{{ file_mode }}"
 
-- name: Unarchive whereabouts git folder
-  ansible.builtin.unarchive:
-    src: "{{ k8s_client_mount_path }}/whereabouts/{{ whereabouts_pkg }}.tar.gz"
-    dest: "{{ k8s_client_mount_path }}/whereabouts"
-    mode: "{{ file_mode }}"
-    remote_src: true
+# - name: Unarchive whereabouts git folder
+#   ansible.builtin.unarchive:
+#     src: "{{ k8s_client_mount_path }}/whereabouts/{{ whereabouts_pkg }}.tar.gz"
+#     dest: "{{ k8s_client_mount_path }}/whereabouts"
+#     mode: "{{ file_mode }}"
+#     remote_src: true
 
 - name: Copy pulp webserver certificate to client_share_path
   ansible.builtin.copy:
