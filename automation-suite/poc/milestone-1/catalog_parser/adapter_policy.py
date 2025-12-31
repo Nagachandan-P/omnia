@@ -27,7 +27,7 @@ from collections import Counter
 
 from jsonschema import ValidationError, validate
 
-from .utils import load_json_file
+from .utils import _configure_logging, load_json_file
 from . import adapter_policy_schema_consts as schema
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,22 @@ logger = logging.getLogger(__name__)
 _BASE_DIR = os.path.dirname(__file__)
 _DEFAULT_POLICY_PATH = os.path.join(_BASE_DIR, "resources", "adapter_policy_default.json")
 _DEFAULT_SCHEMA_PATH = os.path.join(_BASE_DIR, "resources", "AdapterPolicySchema.json")
+
+
+def _validate_input_policy_and_schema_paths(
+    input_dir: str,
+    policy_path: str,
+    schema_path: str,
+) -> None:
+    if not os.path.isdir(input_dir):
+        logger.error("Input directory not found: %s", input_dir)
+        raise FileNotFoundError(input_dir)
+    if not os.path.isfile(policy_path):
+        logger.error("Adapter policy file not found: %s", policy_path)
+        raise FileNotFoundError(policy_path)
+    if not os.path.isfile(schema_path):
+        logger.error("Adapter policy schema file not found: %s", schema_path)
+        raise FileNotFoundError(schema_path)
 
 
 def validate_policy_config(policy_config: Any, schema_config: Any, policy_path: str, schema_path: str) -> None:
@@ -436,7 +452,11 @@ def generate_configs_from_policy(
     input_dir: str,
     output_dir: str,
     policy_path: str = _DEFAULT_POLICY_PATH,
-    schema_path: str = _DEFAULT_SCHEMA_PATH
+    schema_path: str = _DEFAULT_SCHEMA_PATH,
+    *,
+    log_file: Optional[str] = None,
+    configure_logging: bool = False,
+    log_level: int = logging.INFO,
 ) -> None:
     """Main function to generate adapter configs using adapter policy.
 
@@ -445,6 +465,11 @@ def generate_configs_from_policy(
         output_dir: Path to output directory (e.g., poc/milestone-1/out1/adapter/input/config)
         policy_path: Path to adapter policy JSON file
     """
+    if configure_logging:
+        _configure_logging(log_file=log_file, log_level=log_level)
+
+    _validate_input_policy_and_schema_paths(input_dir, policy_path, schema_path)
+
     policy_config = load_json_file(policy_path)
     schema_config = load_json_file(schema_path)
     validate_policy_config(policy_config, schema_config, policy_path=policy_path, schema_path=schema_path)
@@ -453,7 +478,10 @@ def generate_configs_from_policy(
     logger.info("Loaded %d target(s) from %s", len(targets), policy_path)
 
     architectures = discover_architectures(input_dir)
-    logger.info("Discovered architectures: %s", architectures)
+    if not architectures:
+        logger.warning("No architectures discovered under input directory: %s", input_dir)
+    else:
+        logger.info("Discovered architectures: %s", architectures)
 
     for arch in architectures:
         os_versions = discover_os_versions(input_dir, arch)
@@ -463,6 +491,10 @@ def generate_configs_from_policy(
 
             source_dir = os.path.join(input_dir, arch, os_family, version)
             target_dir = os.path.join(output_dir, arch, os_family, version)
+
+            if not os.path.isdir(source_dir):
+                logger.warning("Source directory not found, skipping: %s", source_dir)
+                continue
 
             source_files: Dict[str, Dict] = {}
             for filename in os.listdir(source_dir):
@@ -517,6 +549,12 @@ def main():
         help="Path to adapter policy schema JSON file"
     )
     parser.add_argument(
+        "--log-file",
+        required=False,
+        default=None,
+        help="Path to log file; if not set, logs go to stderr"
+    )
+    parser.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -525,9 +563,9 @@ def main():
 
     args = parser.parse_args()
 
-    logging.basicConfig(
-        level=getattr(logging, args.log_level),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    _configure_logging(
+        log_file=args.log_file,
+        log_level=getattr(logging, args.log_level),
     )
 
     logger.info("Starting adapter policy generation")
@@ -539,7 +577,8 @@ def main():
         input_dir=args.input_dir,
         output_dir=args.output_dir,
         policy_path=args.policy,
-        schema_path=args.schema
+        schema_path=args.schema,
+        configure_logging=False,
     )
 
     logger.info("Adapter config generation completed")

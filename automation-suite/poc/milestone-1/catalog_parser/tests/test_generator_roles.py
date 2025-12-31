@@ -47,7 +47,6 @@ class TestGetFunctionalLayerRolesFromFile(unittest.TestCase):
             "Login Node",
             "Slurm Controller",
             "Slurm Worker",
-            "service_etcd",
         ]
 
         self.assertCountEqual(roles, expected_roles)

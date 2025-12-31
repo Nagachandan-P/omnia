@@ -509,6 +509,54 @@ class TestGenerateConfigsFromPolicy(unittest.TestCase):
                 )
             self.assertIn("Adapter policy validation failed", str(ctx.exception))
 
+    def test_missing_input_dir_raises_file_not_found(self):
+        """Should raise FileNotFoundError if input_dir does not exist."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = os.path.join(tmpdir, "output")
+            missing_input_dir = os.path.join(tmpdir, "does_not_exist")
+
+            with self.assertRaises(FileNotFoundError):
+                generate_configs_from_policy(
+                    input_dir=missing_input_dir,
+                    output_dir=output_dir,
+                    policy_path=_DEFAULT_POLICY_PATH,
+                    schema_path=_DEFAULT_SCHEMA_PATH,
+                )
+
+    def test_missing_policy_file_raises_file_not_found(self):
+        """Should raise FileNotFoundError if policy_path does not exist."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_dir = os.path.join(tmpdir, "input")
+            output_dir = os.path.join(tmpdir, "output")
+            os.makedirs(input_dir)
+
+            missing_policy_path = os.path.join(tmpdir, "missing_policy.json")
+
+            with self.assertRaises(FileNotFoundError):
+                generate_configs_from_policy(
+                    input_dir=input_dir,
+                    output_dir=output_dir,
+                    policy_path=missing_policy_path,
+                    schema_path=_DEFAULT_SCHEMA_PATH,
+                )
+
+    def test_missing_schema_file_raises_file_not_found(self):
+        """Should raise FileNotFoundError if schema_path does not exist."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_dir = os.path.join(tmpdir, "input")
+            output_dir = os.path.join(tmpdir, "output")
+            os.makedirs(input_dir)
+
+            missing_schema_path = os.path.join(tmpdir, "missing_schema.json")
+
+            with self.assertRaises(FileNotFoundError):
+                generate_configs_from_policy(
+                    input_dir=input_dir,
+                    output_dir=output_dir,
+                    policy_path=_DEFAULT_POLICY_PATH,
+                    schema_path=missing_schema_path,
+                )
+
 
 class TestDefaultPaths(unittest.TestCase):
     """Tests for default path constants."""

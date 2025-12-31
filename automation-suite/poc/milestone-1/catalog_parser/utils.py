@@ -15,7 +15,33 @@
 """Utility functions for the catalog parser package."""
 
 import json
-from typing import Any
+import logging
+import os
+from typing import Any, Optional
+
+
+def _configure_logging(log_file: Optional[str] = None, log_level: int = logging.INFO) -> None:
+    """Configure root logging.
+
+    If log_file is provided, logs are written to that file and the directory is
+    created if needed; otherwise logs go to stderr.
+    """
+
+    if log_file:
+        log_dir = os.path.dirname(log_file)
+        if log_dir:
+            os.makedirs(log_dir, exist_ok=True)
+        logging.basicConfig(
+            level=log_level,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            filename=log_file,
+            encoding="utf-8",
+        )
+    else:
+        logging.basicConfig(
+            level=log_level,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
 
 
 def load_json_file(file_path: str) -> Any:

@@ -39,10 +39,9 @@ from .generator import (
     _filter_featurelist_for_arch,
     _discover_arch_os_version_from_catalog,
     _package_common_dict,
-    _configure_logging,
     _validate_catalog_and_schema_paths,
 )
-
+from .utils import _configure_logging
 
 logger = logging.getLogger(__name__)
 
