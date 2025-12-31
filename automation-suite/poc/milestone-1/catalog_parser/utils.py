@@ -25,7 +25,16 @@ def _configure_logging(log_file: Optional[str] = None, log_level: int = logging.
 
     If log_file is provided, logs are written to that file and the directory is
     created if needed; otherwise logs go to stderr.
+
+    Note: This function clears existing handlers before configuring, allowing
+    multiple calls with different log files to work correctly.
     """
+    root_logger = logging.getLogger()
+
+    # Remove existing handlers to allow reconfiguration
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+        handler.close()
 
     if log_file:
         log_dir = os.path.dirname(log_file)
@@ -36,11 +45,13 @@ def _configure_logging(log_file: Optional[str] = None, log_level: int = logging.
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             filename=log_file,
             encoding="utf-8",
+            force=True,
         )
     else:
         logging.basicConfig(
             level=log_level,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            force=True,
         )
 
 
