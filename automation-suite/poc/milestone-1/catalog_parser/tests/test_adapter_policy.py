@@ -122,6 +122,133 @@ class TestValidatePolicyConfig(unittest.TestCase):
             )
         self.assertIn("Adapter policy validation failed", str(ctx.exception))
 
+    def test_allowlist_filter_policy_validates(self):
+        """Policy using allowlist filter type should validate against schema."""
+        policy = {
+            "version": "2.0.0",
+            "targets": {
+                "openldap.json": {
+                    "sources": [
+                        {
+                            "source_file": "base_os.json",
+                            "pulls": [
+                                {
+                                    "source_key": "Base OS",
+                                    "filter": {
+                                        "type": "allowlist",
+                                        "field": "package",
+                                        "values": ["openldap-clients"],
+                                        "case_sensitive": False,
+                                    },
+                                }
+                            ],
+                        }
+                    ]
+                }
+            },
+        }
+
+        validate_policy_config(
+            policy,
+            self.schema_config,
+            policy_path="test_policy.json",
+            schema_path=self.schema_path,
+        )
+
+    def test_field_in_filter_policy_validates(self):
+        """Policy using field_in filter type should validate against schema."""
+        policy = {
+            "version": "2.0.0",
+            "targets": {
+                "openldap.json": {
+                    "sources": [
+                        {
+                            "source_file": "base_os.json",
+                            "pulls": [
+                                {
+                                    "source_key": "Base OS",
+                                    "filter": {
+                                        "type": "field_in",
+                                        "field": "feature",
+                                        "values": ["openldap"],
+                                        "case_sensitive": False,
+                                    },
+                                }
+                            ],
+                        }
+                    ]
+                }
+            },
+        }
+
+        validate_policy_config(
+            policy,
+            self.schema_config,
+            policy_path="test_policy.json",
+            schema_path=self.schema_path,
+        )
+
+    def test_any_of_filter_requires_filters(self):
+        """any_of filter must define nested filters."""
+        policy = {
+            "version": "2.0.0",
+            "targets": {
+                "openldap.json": {
+                    "sources": [
+                        {
+                            "source_file": "base_os.json",
+                            "pulls": [
+                                {"source_key": "Base OS", "filter": {"type": "any_of"}}
+                            ],
+                        }
+                    ]
+                }
+            },
+        }
+
+        with self.assertRaises(ValueError) as ctx:
+            validate_policy_config(
+                policy,
+                self.schema_config,
+                policy_path="test_policy.json",
+                schema_path=self.schema_path,
+            )
+        self.assertIn("Adapter policy validation failed", str(ctx.exception))
+
+    def test_any_of_filter_policy_validates(self):
+        """Policy using any_of filter type should validate against schema."""
+        policy = {
+            "version": "2.0.0",
+            "targets": {
+                "openldap.json": {
+                    "sources": [
+                        {
+                            "source_file": "base_os.json",
+                            "pulls": [
+                                {
+                                    "source_key": "Base OS",
+                                    "filter": {
+                                        "type": "any_of",
+                                        "filters": [
+                                            {"type": "substring", "values": ["ldap"]},
+                                            {"type": "field_in", "field": "feature", "values": ["openldap"]},
+                                        ],
+                                    },
+                                }
+                            ],
+                        }
+                    ]
+                }
+            },
+        }
+
+        validate_policy_config(
+            policy,
+            self.schema_config,
+            policy_path="test_policy.json",
+            schema_path=self.schema_path,
+        )
+
 
 class TestDiscoverArchitectures(unittest.TestCase):
     """Tests for discover_architectures function."""
@@ -260,6 +387,78 @@ class TestApplySubstringFilter(unittest.TestCase):
         filter_config = {schema.FIELD: "package", schema.VALUES: []}
         result = apply_substring_filter(packages, filter_config)
         self.assertEqual(result, packages)
+
+
+class TestAllowlistAndFieldFilters(unittest.TestCase):
+    def test_allowlist_matches_exact_package_names(self):
+        packages = [
+            {"package": "openldap-clients"},
+            {"package": "openldap-servers"},
+            {"package": "openmpi"},
+        ]
+        filter_config = {
+            schema.TYPE: schema.ALLOWLIST_FILTER,
+            schema.FIELD: "package",
+            schema.VALUES: ["openldap-clients"],
+            schema.CASE_SENSITIVE: False,
+        }
+
+        result = apply_filter(packages, {}, "Base OS", filter_config)
+        self.assertEqual([p["package"] for p in result], ["openldap-clients"])
+
+    def test_field_in_matches_classification_field(self):
+        packages = [
+            {"package": "vendor-ldap", "feature": "openldap"},
+            {"package": "vendor-ldap2", "feature": "other"},
+            {"package": "no-feature"},
+        ]
+        filter_config = {
+            schema.TYPE: schema.FIELD_IN_FILTER,
+            schema.FIELD: "feature",
+            schema.VALUES: ["openldap"],
+            schema.CASE_SENSITIVE: False,
+        }
+
+        result = apply_filter(packages, {}, "Base OS", filter_config)
+        self.assertEqual([p["package"] for p in result], ["vendor-ldap"])
+
+    def test_any_of_combines_multiple_strategies(self):
+        packages = [
+            {"package": "openldap-clients"},
+            {"package": "vendor-ldap", "feature": "openldap"},
+            {"package": "slapd-utils"},
+            {"package": "unrelated"},
+        ]
+
+        filter_config = {
+            schema.TYPE: schema.ANY_OF_FILTER,
+            schema.FILTERS: [
+                {
+                    schema.TYPE: schema.ALLOWLIST_FILTER,
+                    schema.FIELD: "package",
+                    schema.VALUES: ["openldap-clients"],
+                    schema.CASE_SENSITIVE: False,
+                },
+                {
+                    schema.TYPE: schema.FIELD_IN_FILTER,
+                    schema.FIELD: "feature",
+                    schema.VALUES: ["openldap"],
+                    schema.CASE_SENSITIVE: False,
+                },
+                {
+                    schema.TYPE: schema.SUBSTRING_FILTER,
+                    schema.FIELD: "package",
+                    schema.VALUES: ["slapd"],
+                    schema.CASE_SENSITIVE: False,
+                },
+            ],
+        }
+
+        result = apply_filter(packages, {}, "Base OS", filter_config)
+        self.assertEqual(
+            [p["package"] for p in result],
+            ["openldap-clients", "vendor-ldap", "slapd-utils"],
+        )
 
 
 class TestComputeCommonPackages(unittest.TestCase):
@@ -486,6 +685,78 @@ class TestGenerateConfigsFromPolicy(unittest.TestCase):
 
             output_file = os.path.join(output_dir, "x86_64", "rhel", "9.0", "output.json")
             self.assertTrue(os.path.exists(output_file))
+
+    def test_generates_openldap_with_any_of_filter(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_dir = os.path.join(tmpdir, "input")
+            output_dir = os.path.join(tmpdir, "output")
+            os.makedirs(os.path.join(input_dir, "x86_64", "rhel", "9.0"))
+
+            source_data = {
+                "Base OS": {
+                    schema.PACKAGES: [
+                        {"package": "openldap-clients", "type": "rpm", "architecture": ["x86_64"]},
+                        {"package": "vendor-directory-client", "type": "rpm", "architecture": ["x86_64"], "feature": "openldap"},
+                        {"package": "slapd-utils", "type": "rpm", "architecture": ["x86_64"]},
+                        {"package": "bash", "type": "rpm", "architecture": ["x86_64"]},
+                    ]
+                }
+            }
+            with open(os.path.join(input_dir, "x86_64", "rhel", "9.0", "base_os.json"), "w") as f:
+                json.dump(source_data, f)
+
+            policy = {
+                "version": "2.0.0",
+                "targets": {
+                    "openldap.json": {
+                        "transform": {"exclude_fields": ["architecture"]},
+                        "sources": [
+                            {
+                                "source_file": "base_os.json",
+                                "pulls": [
+                                    {
+                                        "source_key": "Base OS",
+                                        "target_key": "openldap",
+                                        "filter": {
+                                            "type": "any_of",
+                                            "filters": [
+                                                {"type": "allowlist", "field": "package", "values": ["openldap-clients"], "case_sensitive": False},
+                                                {"type": "field_in", "field": "feature", "values": ["openldap"], "case_sensitive": False},
+                                                {"type": "substring", "field": "package", "values": ["slapd"], "case_sensitive": False},
+                                            ],
+                                        },
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                },
+            }
+            policy_path = os.path.join(tmpdir, "policy.json")
+            with open(policy_path, "w") as f:
+                json.dump(policy, f)
+
+            generate_configs_from_policy(
+                input_dir=input_dir,
+                output_dir=output_dir,
+                policy_path=policy_path,
+                schema_path=_DEFAULT_SCHEMA_PATH,
+            )
+
+            output_file = os.path.join(output_dir, "x86_64", "rhel", "9.0", "openldap.json")
+            self.assertTrue(os.path.exists(output_file))
+
+            with open(output_file, "r", encoding="utf-8") as f:
+                out_json = json.load(f)
+
+            self.assertIn("openldap", out_json)
+            pkgs = out_json["openldap"][schema.CLUSTER]
+
+            self.assertEqual(
+                [p.get("package") for p in pkgs],
+                ["openldap-clients", "vendor-directory-client", "slapd-utils"],
+            )
+            self.assertTrue(all("architecture" not in p for p in pkgs))
 
     def test_invalid_policy_raises_error(self):
         """Should raise ValueError for invalid policy."""

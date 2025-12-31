@@ -44,7 +44,29 @@
             {
               "source_key": "Base OS",
               "target_key": "openldap",
-              "filter": {"type": "substring", "field": "package", "values": ["ldap"], "case_sensitive": false}
+              "filter": {
+                "type": "any_of",
+                "filters": [
+                  {
+                    "type": "allowlist",
+                    "field": "package",
+                    "values": ["openldap", "openldap-clients", "openldap-servers"],
+                    "case_sensitive": false
+                  },
+                  {
+                    "type": "field_in",
+                    "field": "feature",
+                    "values": ["openldap"],
+                    "case_sensitive": false
+                  },
+                  {
+                    "type": "substring",
+                    "field": "package",
+                    "values": ["ldap", "openldap", "slapd"],
+                    "case_sensitive": false
+                  }
+                ]
+              }
             }
           ]
         }

@@ -167,6 +167,92 @@ def apply_substring_filter(
     return filtered
 
 
+def apply_allowlist_filter(
+    packages: List[Dict],
+    filter_config: Dict,
+) -> List[Dict]:
+    field = filter_config.get(schema.FIELD, "package")
+    values = filter_config.get(schema.VALUES, [])
+    case_sensitive = filter_config.get(schema.CASE_SENSITIVE, False)
+
+    if not values:
+        return packages
+
+    if not case_sensitive:
+        allowed = {str(v).lower() for v in values}
+    else:
+        allowed = {str(v) for v in values}
+
+    result: List[Dict] = []
+    for pkg in packages:
+        field_value = pkg.get(field)
+        if field_value is None:
+            continue
+        s = str(field_value)
+        if not case_sensitive:
+            s = s.lower()
+        if s in allowed:
+            result.append(pkg)
+    return result
+
+
+def apply_field_in_filter(
+    packages: List[Dict],
+    filter_config: Dict,
+) -> List[Dict]:
+    field = filter_config.get(schema.FIELD)
+    values = filter_config.get(schema.VALUES, [])
+    case_sensitive = filter_config.get(schema.CASE_SENSITIVE, False)
+
+    if not field or not values:
+        return packages
+
+    if not case_sensitive:
+        allowed = {str(v).lower() for v in values}
+    else:
+        allowed = {str(v) for v in values}
+
+    result: List[Dict] = []
+    for pkg in packages:
+        field_value = pkg.get(field)
+        if field_value is None:
+            continue
+
+        if isinstance(field_value, list):
+            vals = [str(v) for v in field_value]
+            if not case_sensitive:
+                vals = [v.lower() for v in vals]
+            if any(v in allowed for v in vals):
+                result.append(pkg)
+        else:
+            s = str(field_value)
+            if not case_sensitive:
+                s = s.lower()
+            if s in allowed:
+                result.append(pkg)
+    return result
+
+
+def apply_any_of_filter(
+    packages: List[Dict],
+    source_data: Dict,
+    source_key: str,
+    filter_config: Dict,
+) -> List[Dict]:
+    filters = filter_config.get(schema.FILTERS, [])
+    if not filters:
+        return packages
+
+    result: List[Dict] = []
+    for pkg in packages:
+        for sub_filter in filters:
+            filtered = apply_filter([pkg], source_data, source_key, sub_filter)
+            if filtered:
+                result.append(pkg)
+                break
+    return result
+
+
 def compute_common_packages(
     source_data: Dict,
     compare_keys: List[str],
@@ -258,6 +344,15 @@ def apply_filter(
 
     if filter_type == schema.SUBSTRING_FILTER:
         return apply_substring_filter(packages, filter_config)
+
+    if filter_type == schema.ALLOWLIST_FILTER:
+        return apply_allowlist_filter(packages, filter_config)
+
+    if filter_type == schema.FIELD_IN_FILTER:
+        return apply_field_in_filter(packages, filter_config)
+
+    if filter_type == schema.ANY_OF_FILTER:
+        return apply_any_of_filter(packages, _source_data, _source_key, filter_config)
 
     logger.warning("Unknown/unsupported filter type in v2: %s", filter_type)
     return packages

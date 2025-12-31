@@ -201,7 +201,7 @@
         "type": {
           "type": "string",
           "description": "Type of filter to apply",
-          "enum": ["substring"]
+          "enum": ["substring", "allowlist", "field_in", "any_of"]
         },
         "field": {
           "type": "string",
@@ -219,8 +219,22 @@
           "type": "boolean",
           "description": "Whether substring matching is case-sensitive",
           "default": false
+        },
+        "filters": {
+          "type": "array",
+          "description": "Sub-filters for composite any_of filter",
+          "items": {
+            "$ref": "#/definitions/filter"
+          },
+          "minItems": 1
         }
       },
+      "allOf": [
+        {
+          "if": {"properties": {"type": {"const": "any_of"}}},
+          "then": {"required": ["filters"]}
+        }
+      ],
       "required": ["type"]
     }
   }

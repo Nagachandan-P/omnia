@@ -18,6 +18,9 @@ PACKAGES = "packages"
 TYPE = "type"
 
 SUBSTRING_FILTER = "substring"
+ALLOWLIST_FILTER = "allowlist"
+FIELD_IN_FILTER = "field_in"
+ANY_OF_FILTER = "any_of"
 EXTRACT_COMMON_OPERATION = "extract_common"
 
 CLUSTER = "cluster"
@@ -28,6 +31,7 @@ RENAME_FIELDS = "rename_fields"
 FIELD = "field"
 VALUES = "values"
 CASE_SENSITIVE = "case_sensitive"
+FILTERS = "filters"
 COMPARE_KEYS = "compare_keys"
 
 ARCHITECTURES = "architectures"

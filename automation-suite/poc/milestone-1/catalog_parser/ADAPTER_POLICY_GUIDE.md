@@ -6,7 +6,7 @@ The adapter policy file lets you:
 
 - Pull one or more **roles** (top-level keys) from one or more **source JSON files** into a **target JSON file**.
 - Optionally **rename** roles while pulling.
-- Optionally **filter** packages while pulling (currently substring match).
+- Optionally **filter** packages while pulling (substring, allowlist, or composite filters).
 - Create a **derived role** that contains **common packages** across multiple roles.
 - Remove those common packages from the source roles so packages do not appear twice.
 
@@ -193,7 +193,94 @@ Resulting output file (`service_k8s.json`) will contain:
 
 ---
 
-## 5. Example: substring filtering (e.g., `nfs.json`)
+## 5. Filter types
+
+Filters select which packages to include when pulling from a source role.
+
+### 5.1 `substring` filter
+
+Keeps packages where the specified `field` **contains** any of the `values` as a substring.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `type` | `"substring"` | — | Filter type |
+| `field` | string | `"package"` | Field to match against |
+| `values` | array of strings | — | Substrings to search for |
+| `case_sensitive` | boolean | `false` | Case-sensitive matching |
+
+**Example** — keep packages containing `nfs`:
+
+```json
+{
+  "filter": {
+    "type": "substring",
+    "field": "package",
+    "values": ["nfs"],
+    "case_sensitive": false
+  }
+}
+```
+
+### 5.2 `allowlist` filter
+
+Keeps packages where the specified `field` **exactly equals** one of the `values`.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `type` | `"allowlist"` | — | Filter type |
+| `field` | string | `"package"` | Field to match against |
+| `values` | array of strings | — | Exact values to allow |
+| `case_sensitive` | boolean | `false` | Case-sensitive matching |
+
+**Example** — keep only specific package names:
+
+```json
+{
+  "filter": {
+    "type": "allowlist",
+    "field": "package",
+    "values": ["openldap", "openldap-clients", "openldap-servers"],
+    "case_sensitive": false
+  }
+}
+```
+
+### 5.3 `any_of` composite filter
+
+Combines multiple filters with **OR** logic: a package is kept if it matches **any** of the nested filters.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `type` | `"any_of"` | Filter type |
+| `filters` | array of filter objects | Sub-filters to evaluate |
+
+**Example** — keep packages matching an allowlist **or** a substring:
+
+```json
+{
+  "filter": {
+    "type": "any_of",
+    "filters": [
+      {
+        "type": "allowlist",
+        "field": "package",
+        "values": ["openldap", "openldap-clients", "openldap-servers"],
+        "case_sensitive": false
+      },
+      {
+        "type": "substring",
+        "field": "package",
+        "values": ["ldap", "slapd"],
+        "case_sensitive": false
+      }
+    ]
+  }
+}
+```
+
+---
+
+## 6. Example: substring filtering (`nfs.json`)
 
 Goal:
 
@@ -233,8 +320,61 @@ Goal:
 
 ---
 
+## 7. Example: composite filtering (`openldap.json`)
 
-## 6. Tips and common mistakes
+Goal:
+
+- Pull `Base OS` packages from `base_os.json`
+- Keep packages that match **either**:
+  - An explicit allowlist of known OpenLDAP package names, **or**
+  - A broadened substring search (`ldap`, `openldap`, `slapd`)
+
+```json
+{
+  "version": "2.0.0",
+  "description": "Example mapping: build openldap.json using composite filter",
+  "targets": {
+    "openldap.json": {
+      "transform": {
+        "exclude_fields": ["architecture"]
+      },
+      "sources": [
+        {
+          "source_file": "base_os.json",
+          "pulls": [
+            {
+              "source_key": "Base OS",
+              "target_key": "openldap",
+              "filter": {
+                "type": "any_of",
+                "filters": [
+                  {
+                    "type": "allowlist",
+                    "field": "package",
+                    "values": ["openldap", "openldap-clients", "openldap-servers"],
+                    "case_sensitive": false
+                  },
+                  {
+                    "type": "substring",
+                    "field": "package",
+                    "values": ["ldap", "openldap", "slapd"],
+                    "case_sensitive": false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+```
+
+---
+
+
+## 8. Tips and common mistakes
 
 - **Role names must match exactly**: `source_key` must exist in the source JSON.
 - **Derived roles operate on target role names**: `from_keys` refers to the names after renaming (`target_key`).
