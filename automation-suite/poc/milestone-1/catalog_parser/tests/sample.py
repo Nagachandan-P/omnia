@@ -23,12 +23,15 @@ import os
 
 from catalog_parser.generator import generate_root_json_from_catalog, get_functional_layer_roles_from_file, get_package_list
 from catalog_parser.adapter import generate_omnia_json_from_catalog
+from catalog_parser.adapter_policy import generate_configs_from_policy
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 CATALOG_PARSER_DIR = os.path.join(BASE_DIR, "")
 CATALOG_PATH = os.path.join(CATALOG_PARSER_DIR, "test_fixtures", "catalog_rhel.json")
 SCHEMA_PATH = os.path.join(CATALOG_PARSER_DIR, "resources", "CatalogSchema.json")
 FUNCTIONAL_LAYER_PATH = os.path.join(CATALOG_PARSER_DIR, "test_fixtures", "functional_layer.json")
+ADAPTER_POLICY_PATH = os.path.join(CATALOG_PARSER_DIR, "resources", "adapter_policy_default.json")
+ADAPTER_POLICY_SCHEMA_PATH = os.path.join(CATALOG_PARSER_DIR, "resources", "AdapterPolicySchema.json")
 
 try:
     generate_root_json_from_catalog(
@@ -49,9 +52,18 @@ try:
         log_level=logging.INFO,
     )
 
+    generate_configs_from_policy(
+        input_dir="out/generator2",
+        output_dir="out/adapter_policy/config2",
+        policy_path=ADAPTER_POLICY_PATH,
+        schema_path=ADAPTER_POLICY_SCHEMA_PATH,
+        configure_logging=True,
+        log_file="logs/adapter_policy.log",
+        log_level=logging.INFO,
+    )
+
     roles = get_functional_layer_roles_from_file(FUNCTIONAL_LAYER_PATH)
     print(f"Functional layer roles: {roles}")
-
 
     # Get packages for a specific role
     result = get_package_list(FUNCTIONAL_LAYER_PATH, role="K8S Controller")

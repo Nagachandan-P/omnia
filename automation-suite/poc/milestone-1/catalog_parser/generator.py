@@ -30,7 +30,7 @@ from jsonschema import ValidationError, validate
 
 from .models import Catalog
 from .parser import ParseCatalog
-from .utils import load_json_file
+from .utils import _configure_logging, load_json_file
 
 logger = logging.getLogger(__name__)
 
@@ -44,30 +44,6 @@ ERROR_CODE_PROCESSING_ERROR = 3
 # This code generates JSON files
 # i.e baseos.json, infrastructure.json, functional_layer.json, miscellaneous.json
 # for a given catalog
-
-def _configure_logging(log_file: Optional[str] = None, log_level: int = logging.INFO) -> None:
-    """Configure root logging for the catalog generator.
-
-    If log_file is provided, logs are written to that file and the directory is
-    created if needed; otherwise logs go to stderr.
-    """
-
-    if log_file:
-        log_dir = os.path.dirname(log_file)
-        if log_dir:
-            os.makedirs(log_dir, exist_ok=True)
-        logging.basicConfig(
-            level=log_level,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            filename=log_file,
-            encoding="utf-8",
-        )
-    else:
-        logging.basicConfig(
-            level=log_level,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        )
-
 
 def _validate_catalog_and_schema_paths(catalog_path: str, schema_path: str) -> None:
     """Validate that the catalog and schema paths exist.
