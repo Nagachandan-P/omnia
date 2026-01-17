@@ -30,7 +30,7 @@
 - name: Slurm dict ops
   ansible.builtin.set_fact:
     slurm_conf_dict: "{{ apply_config['slurm'] }}"
-  
+
 - name: Create all .conf for ctld only Write all files default config
   ansible.builtin.template:
     src: "{{ item.1 }}.conf.j2"

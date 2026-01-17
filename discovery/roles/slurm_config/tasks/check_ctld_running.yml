@@ -43,7 +43,9 @@
     - ansible_facts.services['slurmctld.service'].state == 'running'
 
 - name: Trigger the scontrol reconfigure
-  ansible.builtin.shell:
-    cmd: scontrol reconfigure
+  ansible.builtin.command: scontrol reconfigure
+  changed_when: scontrol_reconfig.rc == 0
+  failed_when: false
+  register: scontrol_reconfig
   delegate_to: "{{ item }}"
   when: ctld_state[item] is true
