@@ -30,7 +30,7 @@
 - name: Slurm dict ops
   ansible.builtin.set_fact:
     slurm_conf_dict: "{{ apply_config['slurm'] }}"
-
+  
 - name: Create all .conf for ctld only Write all files default config
   ansible.builtin.template:
     src: "{{ item.1 }}.conf.j2"
@@ -40,9 +40,17 @@
     mode: "{{ conf_file_mode }}"
   when: ctld_list
   loop: "{{ ctld_list | product(conf_files | default([])) }}"
+  register: ctld_conf_files
 
 - name: Conf merge and write using slurm_conf module
   ansible.builtin.include_tasks: conf_merge.yml
   when: ctld_list
   loop: "{{ ctld_list | product(configs_input.keys() | default([])) }}"
 # TODO: To apply the cluster_name after merge
+
+- name: Check if cluster running
+  ansible.builtin.include_tasks: check_ctld_running.yml
+  when:
+    - ctld_list
+    - ctld_conf_files is changed
+  loop: "{{ ctld_list }}"

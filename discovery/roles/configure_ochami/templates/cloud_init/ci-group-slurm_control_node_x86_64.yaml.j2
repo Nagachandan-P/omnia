@@ -88,10 +88,10 @@
           content: |
             SELECT VERSION();
             SHOW DATABASES;
-
-            CREATE DATABASE slurm_acct_db;
-            CREATE USER 'slurm'@'%' IDENTIFIED BY '{{ hostvars['localhost']['slurm_db_password'] }}';
-            GRANT ALL PRIVILEGES ON slurm_acct_db.* TO 'slurm'@'%';
+            CREATE DATABASE IF NOT EXISTS {{ apply_config['slurmdbd']['StorageLoc'] }};
+            CREATE USER IF NOT EXISTS '{{ apply_config['slurmdbd']['SlurmUser'] }}'@'%' IDENTIFIED BY '{{ hostvars['localhost']['slurm_db_password'] }}';
+            ALTER USER '{{ apply_config['slurmdbd']['SlurmUser'] }}'@'%' IDENTIFIED BY '{{ hostvars['localhost']['slurm_db_password'] }}';
+            GRANT ALL PRIVILEGES ON {{ apply_config['slurmdbd']['StorageLoc'] }}.* TO '{{ apply_config['slurmdbd']['SlurmUser'] }}'@'%';
             FLUSH PRIVILEGES;
 
         - path: /root/omnia_slurm_scripts/00_munge_setup.sh
