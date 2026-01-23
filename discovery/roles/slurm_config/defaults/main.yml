@@ -263,7 +263,7 @@ __default_config:
     SlurmctldPort: 6817
     SlurmdPort: 6818
     SrunPortRange: "60001-63000"
-    StateSaveLocation: "/var/spool/state"
+    StateSaveLocation: "/var/spool"
     SlurmdSpoolDir: "/var/spool/slurmd"
     ReturnToService: 2
     SchedulerType: sched/backfill
