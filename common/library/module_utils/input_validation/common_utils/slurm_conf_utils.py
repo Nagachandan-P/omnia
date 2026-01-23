@@ -410,12 +410,12 @@ slurmdbd_options = {
     "ArchiveSuspend": S_P_BOOLEAN,
     "ArchiveTXN": S_P_BOOLEAN,
     "ArchiveUsage": S_P_BOOLEAN,
-    "AuthAltTypes": S_P_STRING,
-    "AuthAltParameters": S_P_STRING,
-    "AuthInfo": S_P_STRING,
+    "AuthAltTypes": S_P_CSV,
+    "AuthAltParameters": S_P_CSV,
+    "AuthInfo": S_P_CSV,
     "AuthType": S_P_STRING,
     "CommitDelay": S_P_UINT16,
-    "CommunicationParameters": S_P_STRING,
+    "CommunicationParameters": S_P_CSV,
     "DbdAddr": S_P_STRING,
     "DbdBackupHost": S_P_STRING,
     "DbdHost": S_P_STRING,
@@ -433,10 +433,10 @@ slurmdbd_options = {
     "MaxPurgeLimit": S_P_UINT32,
     "MaxQueryTimeRange": S_P_STRING,
     "MessageTimeout": S_P_UINT16,
-    "Parameters": S_P_STRING,
+    "Parameters": S_P_CSV,
     "PidFile": S_P_STRING,
     "PluginDir": S_P_STRING,
-    "PrivateData": S_P_STRING,
+    "PrivateData": S_P_CSV,
     "PurgeEventAfter": S_P_STRING,
     "PurgeJobAfter": S_P_STRING,
     "PurgeResvAfter": S_P_STRING,
@@ -455,14 +455,14 @@ slurmdbd_options = {
     "StorageBackupHost": S_P_STRING,
     "StorageHost": S_P_STRING,
     "StorageLoc": S_P_STRING,
-    "StorageParameters": S_P_STRING,
+    "StorageParameters": S_P_CSV,
     "StoragePass": S_P_STRING,
     "StoragePassScript": S_P_STRING,
     "StoragePort": S_P_UINT16,
     "StorageType": S_P_STRING,
     "StorageUser": S_P_STRING,
     "TCPTimeout": S_P_UINT16,
-    "TLSParameters": S_P_STRING,
+    "TLSParameters": S_P_CSV,
     "TLSType": S_P_STRING,
     "TrackWCKey": S_P_BOOLEAN,
     "TrackSlurmctldDown": S_P_BOOLEAN
@@ -509,7 +509,7 @@ mpi_options = {
     "PMIxNetDevicesUCX": S_P_STRING,
     "PMIxShareServerTopology": S_P_BOOLEAN,
     "PMIxTimeout": S_P_UINT32,
-    "PMIxTlsUCX": S_P_STRING
+    "PMIxTlsUCX": S_P_CSV
 }
 
 # From https://github.com/SchedMD/slurm/blob/slurm-<VERSION>s/src/interfaces/gres.c#L101C40-L116C2
@@ -517,13 +517,13 @@ gres_options = {
     "AutoDetect": S_P_STRING,
     "Count": S_P_STRING,  # Number of Gres available */
     "CPUs": S_P_STRING,  # CPUs to bind to Gres resource
-    "Cores": S_P_STRING,  # Cores to bind to Gres resource */
+    "Cores": S_P_CSV,  # Cores to bind to Gres resource */
     "File": S_P_STRING,  # Path to Gres device */
     "Files": S_P_STRING,  # Path to Gres device */
     "Flags": S_P_STRING,  # GRES Flags */
     "Link": S_P_STRING,  # Communication link IDs */
-    "Links": S_P_STRING,  # Communication link IDs */
-    "MultipleFiles": S_P_STRING,  # list of GRES device files */
+    "Links": S_P_CSV,  # Communication link IDs */
+    "MultipleFiles": S_P_CSV,  # list of GRES device files */
     "Name": S_P_STRING,  # Gres name */
     "Type": S_P_STRING  # Gres type (e.g. model name) */
 }
