@@ -19,28 +19,28 @@ short_description: Parse, convert, and merge Slurm configuration files
 version_added: "1.0.0"
 description:
     - This module provides utilities for working with Slurm configuration files.
-    - It can parse a Slurm conf file into a dictionary (f2d).
-    - It can convert a dictionary back to Slurm conf INI format (d2f).
+    - It can parse a Slurm conf file into a dictionary (parse).
+    - It can convert a dictionary back to Slurm conf INI format (render).
     - It can merge multiple configuration sources (files and/or dicts) into one (merge).
 options:
     op:
         description:
             - The operation to perform.
-            - C(f2d) - File to dict. Parse a Slurm conf file and return as dictionary.
-            - C(d2f) - Dict to file. Convert a dictionary to Slurm conf INI lines.
+            - C(parse) - File to dict. Parse a Slurm conf file and return as dictionary.
+            - C(render) - Dict to file. Convert a dictionary to Slurm conf INI lines.
             - C(merge) - Merge multiple configuration sources into one.
         required: true
         type: str
-        choices: ['f2d', 'd2f', 'merge']
+        choices: ['parse', 'render', 'merge']
     path:
         description:
             - Path to the Slurm configuration file.
-            - Required when I(op=f2d).
+            - Required when I(op=parse).
         type: str
     conf_map:
         description:
             - Dictionary of configuration key-value pairs.
-            - Required when I(op=d2f).
+            - Required when I(op=render).
         type: dict
         default: {}
     conf_sources:
@@ -63,14 +63,13 @@ author:
     - Jagadeesh N V (@jagadeeshnv)
 notes:
     - Array-type parameters (NodeName, PartitionName, SlurmctldHost, etc.) are handled specially.
-    - Module is not case sensitive for conf keys
 '''
 
 EXAMPLES = r'''
 # Parse a slurm.conf file into a dictionary
 - name: Read slurm.conf
   slurm_conf:
-    op: f2d
+    op: parse
     path: /etc/slurm/slurm.conf
     conf_name: slurm
   register: slurm_config
@@ -78,13 +77,13 @@ EXAMPLES = r'''
 # Convert a dictionary to slurm.conf INI lines
 - name: Generate slurm.conf lines
   slurm_conf:
-    op: d2f
+    op: render
     conf_map:
       ClusterName: mycluster
       SlurmctldPort: 6817
       SlurmctldHost:
-        - SlurmctldHost: controller1
-        - SlurmctldHost: controller2
+        - controller1
+        - controller2
       NodeName:
         - NodeName: node[1-10]
           CPUs: 16
@@ -119,14 +118,14 @@ EXAMPLES = r'''
 
 RETURN = r'''
 slurm_dict:
-    description: Parsed configuration as a dictionary (when op=f2d).
+    description: Parsed configuration as a dictionary (when op=parse).
     type: dict
-    returned: when op=f2d
+    returned: when op=parse
     sample: {"ClusterName": "mycluster", "SlurmctldPort": "6817"}
 slurm_conf:
-    description: Configuration as INI-format lines (when op=d2f).
+    description: Configuration as INI-format lines (when op=render).
     type: list
-    returned: when op=d2f
+    returned: when op=render
     sample: ["ClusterName=mycluster", "SlurmctldPort=6817"]
 conf_dict:
     description: Merged configuration as a dictionary (when op=merge).
@@ -140,11 +139,14 @@ ini_lines:
     sample: ["ClusterName=mycluster", "SlurmctldTimeout=120"]
 '''
 
-# TODO: Support for validation of S_P_<data> types
-# TODO: Validation for choices for each type
-# TODO: Choices types for each type
-# TODO: Merge of sub options
-# TODO: Hostlist expressions, split and merge computations
+# TODO: 
+#   - Module is not case sensitive for conf keys
+#   - Support for validation of S_P_<data> types
+#   - Validation for choices for each type
+#   - Choices types for each type
+#   - Merge of sub options
+#   - Hostlist expressions, split and merge computations
+
 
 from collections import OrderedDict
 from ansible.module_utils.basic import AnsibleModule
@@ -172,7 +174,6 @@ def read_dict2ini(conf_dict):
 
 def parse_slurm_conf(file_path, module):
     """Parses the slurm.conf file and returns it as a dictionary."""
-    # slurm_dict = {"NodeName": [], "PartitionName": []}
     conf_name = module.params['conf_name']
     current_conf = all_confs.get(conf_name)
     slurm_dict = OrderedDict()
@@ -184,8 +185,6 @@ def parse_slurm_conf(file_path, module):
         for line in f:
             # handles any comment after the data
             line = line.split('#')[0].strip()
-
-            # Skip comments and empty lines
             if not line:
                 continue
             # Split the line by one or more spaces
@@ -199,27 +198,21 @@ def parse_slurm_conf(file_path, module):
             if skey not in current_conf:
                 raise ValueError(f"Invalid key while parsing {file_path}: {skey}")
             if current_conf[skey] == SlurmParserEnum.S_P_ARRAY:
-                # TODO hostlist expressions and multiple DEFAULT entries handling
-                module.warn(f"{skey} is S_P_ARRAY")
                 slurm_dict[list(tmp_dict.keys())[0]] = list(
                     slurm_dict.get(list(tmp_dict.keys())[0], [])) + [tmp_dict]
             elif current_conf[skey] == SlurmParserEnum.S_P_CSV:
-                module.warn(f"{skey} is S_P_CSV")
                 existing_values = [v.strip() for v in slurm_dict.get(skey, "").split(',') if v.strip()]
                 new_values = [v.strip() for v in tmp_dict[skey].split(',') if v.strip()]
                 slurm_dict[skey] = ",".join(list(dict.fromkeys(existing_values + new_values)))
             elif current_conf[skey] == SlurmParserEnum.S_P_LIST:
-                module.warn(f"{skey} is S_P_LIST")
                 slurm_dict[skey] = list(slurm_dict.get(skey, [])) + list(tmp_dict.values())
             else:
-                # TODO handle csv values, currently no definite data type for csv values
                 slurm_dict.update(tmp_dict)
 
     return slurm_dict
 
 
 def slurm_conf_dict_merge(conf_dict_list, module):
-    # TODO: Case insensitivity
     merged_dict = OrderedDict()
     conf_name = module.params['conf_name']
     current_conf = all_confs.get(conf_name)
@@ -245,7 +238,6 @@ def slurm_conf_dict_merge(conf_dict_list, module):
                 existing_values = [v.strip() for v in merged_dict.get(ky, "").split(',') if v.strip()]
                 new_values = [v.strip() for v in vl.split(',') if v.strip()]
                 merged_dict[ky] = ",".join(list(dict.fromkeys(existing_values + new_values)))
-                # module.exit_json(changed=True, existing_values=existing_values, new_values=new_values,ky=ky,vl=vl)
             else:
                 merged_dict[ky] = vl
     # flatten the dict
@@ -259,7 +251,7 @@ def slurm_conf_dict_merge(conf_dict_list, module):
 def run_module():
     module_args = {
         "path": {'type': 'str'},
-        "op": {'type': 'str', 'required': True, 'choices': ['f2d', 'd2f', 'merge']},
+        "op": {'type': 'str', 'required': True, 'choices': ['parse', 'render', 'merge']},
         "conf_map": {'type': 'dict', 'default': {}},
         "conf_sources": {'type': 'list', 'elements': 'raw', 'default': []},
         "conf_name": {'type': 'str', 'default': 'slurm'}
@@ -270,16 +262,16 @@ def run_module():
     # Create the AnsibleModule object
     module = AnsibleModule(argument_spec=module_args,
                            required_if=[
-                               ('op', 'd2f', ('conf_map',)),
+                               ('op', 'render', ('conf_map',)),
                                ('op', 'merge', ('conf_sources',))
                            ],
                            supports_check_mode=True)
     try:
         # Parse the slurm.conf file
-        if module.params['op'] == 'f2d':
+        if module.params['op'] == 'parse':
             s_dict = parse_slurm_conf(module.params['path'], module)
             result['slurm_dict'] = s_dict
-        elif module.params['op'] == 'd2f':
+        elif module.params['op'] == 'render':
             s_list = read_dict2ini(module.params['conf_map'])
             result['slurm_conf'] = s_list
         elif module.params['op'] == 'merge':
@@ -294,7 +286,6 @@ def run_module():
                     conf_dict_list.append(s_dict)
                 else:
                     raise TypeError(f"Invalid type for conf_source: {type(conf_source)}")
-            # module.exit_json(changed=True, conf_dict_list=conf_dict_list)
             merged_dict = slurm_conf_dict_merge(conf_dict_list, module)
             result['conf_dict'] = merged_dict
             result['ini_lines'] = read_dict2ini(merged_dict)
