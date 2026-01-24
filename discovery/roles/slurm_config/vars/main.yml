@@ -84,7 +84,7 @@ root_user: root
 root_group: root
 plugin_slurm_dir: "usr/lib64/slurm"
 munge_key_cmd: "dd if=/dev/urandom bs=1 count=1024"
-slurm_ctld_parameters: []
+slurm_ctld_parameters: ['enable_configless']
 partitions: {}
 _clean_before_install: false
 _force_install_nfs: true
@@ -96,6 +96,15 @@ munge_dir_mode: "0700"
 common_mode: "0755"
 slurm_dbd_mode: "0600"
 slurm_db_cnf_mode: "0600"
+dbd_slurm_conf:
+  AccountingStorageHost: "{{ dbd_list[0] }}"
+  AccountingStoragePort: "{{ slurm_dbd_port }}"
+  AccountingStorageType: accounting_storage/slurmdbd
+partition_params:
+  PartitionName: "{{ slurm_partition_name }}"
+  Nodes: "{{ cmpt_list | join(',') }}"
+  MaxTime: "INFINITE"
+  State: "UP"
 openldap_dir_name: "openldap/"
 software_config_file: "{{ input_project_dir }}/software_config.json"
 omnia_run_tags: "{{ hostvars['localhost']['omnia_run_tags'] }}"

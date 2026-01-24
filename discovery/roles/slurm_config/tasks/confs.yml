@@ -21,31 +21,49 @@
   when: cmpt_list
   loop: "{{ cmpt_list }}"
 
-- name: Add gpu parameters to slurm conf
-  ansible.builtin.set_fact:
-    apply_config: "{{ apply_config | default({}) | combine({'slurm': (apply_config['slurm'] | combine(gpu_slurm_conf))}) }}"
-  when: gpu_params is defined and gpu_params
-
-# TODO: Move to input validation with all confs
 - name: Slurm dict ops
   ansible.builtin.set_fact:
     slurm_conf_dict: "{{ apply_config['slurm'] }}"
+    slurmdbd_conf_dict: "{{ apply_config['slurmdbd'] }}"
 
-- name: Create all .conf for ctld only Write all files default config
-  ansible.builtin.template:
-    src: "{{ item.1 }}.conf.j2"
-    dest: "{{ slurm_config_path }}/{{ item.0 }}/etc/slurm/{{ item.1 }}.conf"
-    owner: "{{ root_user }}"
-    group: "{{ root_group }}"
-    mode: "{{ conf_file_mode }}"
+- name: Build slurm.conf
+  ansible.builtin.include_tasks: build_slurm_conf.yml
+
+- name: Slurm dbd opts
+  ansible.builtin.set_fact:
+    slurmdbd_conf_dict: "{{ slurmdbd_conf_dict | combine({'DbdHost': ctld_list[0], 'StorageHost': ctld_list[0]}) }}"
+  when: ctld_list
+
+- name: Check .conf files existence
+  ansible.builtin.stat:
+    path: "{{ slurm_config_path }}/{{ item.0 }}/etc/slurm/{{ item.1 }}.conf"
   when: ctld_list
   loop: "{{ ctld_list | product(conf_files | default([])) }}"
   register: ctld_conf_files
+
+# - name: Prepare list for conf merge
+#   ansible.builtin.set_fact:
+#     conf_merge_list: "{{ ctld_list | product(configs_input.keys() | default([])) }}"
+
+# TODO: Move to input validation with all confs
+
+
+# - name: Create all .conf for ctld only Write all files default config
+#   ansible.builtin.template:
+#     src: "{{ item.1 }}.conf.j2"
+#     dest: "{{ slurm_config_path }}/{{ item.0 }}/etc/slurm/{{ item.1 }}.conf"
+#     owner: "{{ root_user }}"
+#     group: "{{ root_group }}"
+#     mode: "{{ conf_file_mode }}"
+#   when: ctld_list
+#   loop: "{{ ctld_list | product(conf_files | default([])) }}"
+#   register: ctld_conf_files
 
 - name: Conf merge and write using slurm_conf module
   ansible.builtin.include_tasks: conf_merge.yml
   when: ctld_list
   loop: "{{ ctld_list | product(configs_input.keys() | default([])) }}"
+  # debugger: always
 # TODO: To apply the cluster_name after merge
 
 - name: Check if cluster running

@@ -515,17 +515,17 @@ mpi_options = {
 # From https://github.com/SchedMD/slurm/blob/slurm-<VERSION>s/src/interfaces/gres.c#L101C40-L116C2
 gres_options = {
     "AutoDetect": S_P_STRING,
-    "Count": S_P_STRING,  # Number of Gres available */
+    "Count": S_P_STRING,  # Number of Gres available
     "CPUs": S_P_STRING,  # CPUs to bind to Gres resource
-    "Cores": S_P_CSV,  # Cores to bind to Gres resource */
-    "File": S_P_STRING,  # Path to Gres device */
-    "Files": S_P_STRING,  # Path to Gres device */
-    "Flags": S_P_STRING,  # GRES Flags */
-    "Link": S_P_STRING,  # Communication link IDs */
-    "Links": S_P_CSV,  # Communication link IDs */
-    "MultipleFiles": S_P_CSV,  # list of GRES device files */
-    "Name": S_P_STRING,  # Gres name */
-    "Type": S_P_STRING  # Gres type (e.g. model name) */
+    "Cores": S_P_CSV,  # Cores to bind to Gres resource
+    "File": S_P_STRING,  # Path to Gres device
+    "Files": S_P_STRING,  # Path to Gres device
+    "Flags": S_P_STRING,  # GRES Flags
+    "Link": S_P_STRING,  # Communication link IDs
+    "Links": S_P_CSV,  # Communication link IDs
+    "MultipleFiles": S_P_CSV,  # list of GRES device files
+    "Name": S_P_STRING,  # Gres name
+    "Type": S_P_STRING  # Gres type (e.g. model name)
 }
 
 all_confs = {

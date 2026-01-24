@@ -58,11 +58,8 @@ options:
             - Used for validation of configuration keys.
         type: str
         default: slurm
-        choices: ['slurm', 'cgroup', 'gres', 'mpi', 'slurmdbd']
 author:
     - Jagadeesh N V (@jagadeeshnv)
-notes:
-    - Array-type parameters (NodeName, PartitionName, SlurmctldHost, etc.) are handled specially.
 '''
 
 EXAMPLES = r'''
@@ -139,7 +136,7 @@ ini_lines:
     sample: ["ClusterName=mycluster", "SlurmctldTimeout=120"]
 '''
 
-# TODO: 
+# TODO:
 #   - Module is not case sensitive for conf keys
 #   - Support for validation of S_P_<data> types
 #   - Validation for choices for each type
@@ -155,6 +152,7 @@ import os
 
 
 def read_dict2ini(conf_dict):
+    """Convert a configuration dictionary to INI-style lines for slurm.conf."""
     data = []
     for k, v in conf_dict.items():
         if isinstance(v, list):
@@ -172,9 +170,8 @@ def read_dict2ini(conf_dict):
     return data
 
 
-def parse_slurm_conf(file_path, module):
+def parse_slurm_conf(file_path, conf_name):
     """Parses the slurm.conf file and returns it as a dictionary."""
-    conf_name = module.params['conf_name']
     current_conf = all_confs.get(conf_name)
     slurm_dict = OrderedDict()
 
@@ -212,9 +209,9 @@ def parse_slurm_conf(file_path, module):
     return slurm_dict
 
 
-def slurm_conf_dict_merge(conf_dict_list, module):
+def slurm_conf_dict_merge(conf_dict_list, conf_name):
+    """Merge multiple Slurm configuration dictionaries into a single dictionary."""
     merged_dict = OrderedDict()
-    conf_name = module.params['conf_name']
     current_conf = all_confs.get(conf_name)
     for conf_dict in conf_dict_list:
         for ky, vl in conf_dict.items():
@@ -249,6 +246,7 @@ def slurm_conf_dict_merge(conf_dict_list, module):
 
 
 def run_module():
+    """Entry point for the Ansible module handling slurm.conf operations."""
     module_args = {
         "path": {'type': 'str'},
         "op": {'type': 'str', 'required': True, 'choices': ['parse', 'render', 'merge']},
@@ -267,6 +265,7 @@ def run_module():
                            ],
                            supports_check_mode=True)
     try:
+        conf_name = module.params['conf_name']
         # Parse the slurm.conf file
         if module.params['op'] == 'parse':
             s_dict = parse_slurm_conf(module.params['path'], module)
@@ -282,11 +281,11 @@ def run_module():
                 elif isinstance(conf_source, str):
                     if not os.path.exists(conf_source):
                         raise FileNotFoundError(f"File {conf_source} does not exist")
-                    s_dict = parse_slurm_conf(conf_source, module)
+                    s_dict = parse_slurm_conf(conf_source, conf_name)
                     conf_dict_list.append(s_dict)
                 else:
                     raise TypeError(f"Invalid type for conf_source: {type(conf_source)}")
-            merged_dict = slurm_conf_dict_merge(conf_dict_list, module)
+            merged_dict = slurm_conf_dict_merge(conf_dict_list, conf_name)
             result['conf_dict'] = merged_dict
             result['ini_lines'] = read_dict2ini(merged_dict)
     except (FileNotFoundError, ValueError, TypeError) as e:
