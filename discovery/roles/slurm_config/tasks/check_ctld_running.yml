@@ -19,7 +19,7 @@
 - name: Check if remote host is reachable via SSH
   ansible.builtin.wait_for:
     host: "{{ item }}"
-    port: 22
+    port: 22 # TODO: make it configurable
     timeout: 10
     state: started
   delegate_to: localhost

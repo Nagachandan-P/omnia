@@ -19,7 +19,7 @@
         slurm_conf_dict
         | combine(
             {
-              'NodeName': (slurm_conf_dict.NodeName | default([])) + node_params
+              'NodeName': (slurm_conf_dict.NodeName | default([])) + (node_params | default([]))
             },
             recursive=True
           )
