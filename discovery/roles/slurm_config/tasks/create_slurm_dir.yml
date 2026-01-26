@@ -39,6 +39,18 @@
   ansible.builtin.include_tasks: openldap_config.yml
   when: hostvars['localhost']['openldap_support']
 
+- name: Create slurm group
+  ansible.builtin.group:
+    name: "{{ slurm_user_group }}"
+    gid: "{{ slurm_uid }}"
+
+- name: Create slurm User
+  ansible.builtin.user:
+    name: "{{ slurm_user }}"
+    uid: "{{ slurm_uid }}"
+    group: "{{ slurm_user_group }}"
+    create_home: false
+
 - name: Set facts for slurm
   ansible.builtin.set_fact:
     share_prefix: "{{ slurm_config_path }}"

@@ -114,25 +114,15 @@ EXAMPLES = r'''
 '''
 
 RETURN = r'''
-slurm_dict:
-    description: Parsed configuration as a dictionary (when op=parse).
-    type: dict
-    returned: when op=parse
-    sample: {"ClusterName": "mycluster", "SlurmctldPort": "6817"}
-slurm_conf:
-    description: Configuration as INI-format lines (when op=render).
-    type: list
-    returned: when op=render
-    sample: ["ClusterName=mycluster", "SlurmctldPort=6817"]
 conf_dict:
-    description: Merged configuration as a dictionary (when op=merge).
+    description: Merged configuration as a dictionary (when op=merge or op=parse).
     type: dict
-    returned: when op=merge
+    returned: when op=merge or op=parse
     sample: {"ClusterName": "mycluster", "SlurmctldTimeout": 120}
 ini_lines:
-    description: Merged configuration as INI-format lines (when op=merge).
+    description: Merged configuration as INI-format lines (when op=merge or op=render).
     type: list
-    returned: when op=merge
+    returned: when op=merge or op=render
     sample: ["ClusterName=mycluster", "SlurmctldTimeout=120"]
 '''
 
@@ -256,7 +246,7 @@ def run_module():
         "validate": {'type': 'bool', 'default': False}
     }
 
-    result = {"changed": False, "slurm_dict": {}, "failed": False}
+    result = {"changed": False, "failed": False}
 
     # Create the AnsibleModule object
     module = AnsibleModule(argument_spec=module_args,
@@ -271,10 +261,10 @@ def run_module():
         # Parse the slurm.conf file
         if module.params['op'] == 'parse':
             s_dict = parse_slurm_conf(module.params['path'], conf_name, validate)
-            result['slurm_dict'] = s_dict
+            result['conf_dict'] = s_dict
         elif module.params['op'] == 'render':
             s_list = read_dict2ini(module.params['conf_map'])
-            result['slurm_conf'] = s_list
+            result['ini_lines'] = s_list
         elif module.params['op'] == 'merge':
             conf_dict_list = []
             for conf_source in module.params['conf_sources']:

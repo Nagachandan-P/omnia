@@ -14,38 +14,32 @@
 ---
 - name: Append node_params list into NodeName list
   ansible.builtin.set_fact:
-    slurm_conf_dict: >-
-      {{
-        slurm_conf_dict
-        | combine(
-            {
-              'NodeName': (slurm_conf_dict.NodeName | default([])) + (node_params | default([]))
-            },
-            recursive=True
-          )
-      }}
+    apply_config: "{{
+      apply_config | default({})
+       | combine(
+        {'slurm': (apply_config['slurm'] | combine({
+              'NodeName': (apply_config['slurm'].NodeName | default([])) + (node_params | default([]))
+            }))})
+      }}"
   when: node_params is defined and node_params
 
 - name: Append Partition
   ansible.builtin.set_fact:
-    slurm_conf_dict: >-
-      {{
-        slurm_conf_dict
-        | combine(
-            {
-              'PartitionName': (slurm_conf_dict.PartitionName | default([])) + [partition_params]
-            },
-            recursive=True
-          )
-      }}
+    apply_config: "{{
+      apply_config | default({})
+       | combine(
+        {'slurm': (apply_config['slurm'] | combine({
+              'PartitionName': (apply_config['slurm'].PartitionName | default([])) + [partition_params]
+            }))})
+      }}"
   when: node_params is defined and node_params
 
 - name: Add gpu parameters to slurm conf
   ansible.builtin.set_fact:
-    slurm_conf_dict: "{{ slurm_conf_dict | combine(gpu_slurm_conf) }}"
+    apply_config: "{{ apply_config | default({}) | combine({'slurm': (apply_config['slurm'] | combine(gpu_slurm_conf))}) }}"
   when: gpu_params is defined and gpu_params
 
 - name: Add dbd parameters to slurm conf
   ansible.builtin.set_fact:
-    slurm_conf_dict: "{{ slurm_conf_dict | combine(dbd_slurm_conf) }}"
+    apply_config: "{{ apply_config | default({}) | combine({'slurm': (apply_config['slurm'] | combine(dbd_slurm_conf))}) }}"
   when: dbd_list is defined and dbd_list
