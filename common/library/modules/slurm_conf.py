@@ -79,7 +79,6 @@ EXAMPLES = r'''
       ClusterName: mycluster
       SlurmctldPort: 6817
       SlurmctldHost:
-        - controller1
         - controller2
       NodeName:
         - NodeName: node[1-10]
