@@ -290,7 +290,7 @@ def run_module():
             merged_dict = slurm_conf_dict_merge(conf_dict_list, conf_name)
             result['conf_dict'] = merged_dict
             result['ini_lines'] = read_dict2ini(merged_dict)
-    except (FileNotFoundError, ValueError, TypeError) as e:
+    except (FileNotFoundError, ValueError, TypeError, AttributeError) as e:
         result['failed'] = True
         result['msg'] = str(e)
         module.fail_json(msg=str(e))
