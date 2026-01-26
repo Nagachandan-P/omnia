@@ -232,7 +232,7 @@ slurm_options = {
     "HttpParserType": S_P_STRING,
     "InactiveLimit": S_P_UINT16,
     "InteractiveStepOptions": S_P_STRING,
-    "JobAcctGatherFrequency": S_P_CSV,
+    "JobAcctGatherFrequency": S_P_STRING,
     "JobAcctGatherParams": S_P_STRING,
     "JobAcctGatherType": S_P_STRING,
     "JobCompHost": S_P_STRING,
@@ -533,8 +533,8 @@ all_confs = {
     "slurmdbd": slurmdbd_options,
     "cgroup": cgroup_options,
     "mpi": mpi_options,
-    # "gres": gres_options,
-    # GRES can have different combinations, hence excluded
+    "gres": gres_options,
+    # TOD: GRES can have different combinations, NodeName and Name
     # https://slurm.schedmd.com/gres.conf.html#SECTION_EXAMPLES
     "PartitionName": partition_options,
     "NodeName": nodename_options,

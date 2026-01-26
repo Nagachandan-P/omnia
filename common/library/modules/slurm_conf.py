@@ -170,9 +170,9 @@ def read_dict2ini(conf_dict):
     return data
 
 
-def parse_slurm_conf(file_path, conf_name):
+def parse_slurm_conf(file_path, conf_name, validate):
     """Parses the slurm.conf file and returns it as a dictionary."""
-    current_conf = all_confs.get(conf_name)
+    current_conf = all_confs.get(conf_name, {})
     slurm_dict = OrderedDict()
 
     if not os.path.exists(file_path):
@@ -192,16 +192,16 @@ def parse_slurm_conf(file_path, conf_name):
                 key, value = item.split('=', 1)
                 tmp_dict[key.strip()] = value.strip()
             skey = list(tmp_dict.keys())[0]
-            if skey not in current_conf:
+            if validate and skey not in current_conf:
                 raise ValueError(f"Invalid key while parsing {file_path}: {skey}")
-            if current_conf[skey] == SlurmParserEnum.S_P_ARRAY:
+            if current_conf.get(skey) == SlurmParserEnum.S_P_ARRAY:
                 slurm_dict[list(tmp_dict.keys())[0]] = list(
                     slurm_dict.get(list(tmp_dict.keys())[0], [])) + [tmp_dict]
-            elif current_conf[skey] == SlurmParserEnum.S_P_CSV:
+            elif current_conf.get(skey) == SlurmParserEnum.S_P_CSV:
                 existing_values = [v.strip() for v in slurm_dict.get(skey, "").split(',') if v.strip()]
                 new_values = [v.strip() for v in tmp_dict[skey].split(',') if v.strip()]
                 slurm_dict[skey] = ",".join(list(dict.fromkeys(existing_values + new_values)))
-            elif current_conf[skey] == SlurmParserEnum.S_P_LIST:
+            elif current_conf.get(skey) == SlurmParserEnum.S_P_LIST:
                 slurm_dict[skey] = list(slurm_dict.get(skey, [])) + list(tmp_dict.values())
             else:
                 slurm_dict.update(tmp_dict)
@@ -212,10 +212,10 @@ def parse_slurm_conf(file_path, conf_name):
 def slurm_conf_dict_merge(conf_dict_list, conf_name):
     """Merge multiple Slurm configuration dictionaries into a single dictionary."""
     merged_dict = OrderedDict()
-    current_conf = all_confs.get(conf_name)
+    current_conf = all_confs.get(conf_name, {})
     for conf_dict in conf_dict_list:
         for ky, vl in conf_dict.items():
-            if current_conf[ky] == SlurmParserEnum.S_P_ARRAY:
+            if current_conf.get(ky) == SlurmParserEnum.S_P_ARRAY:
                 for item in vl:
                     if isinstance(item, dict):
                         existing_dict = merged_dict.get(ky, {})
@@ -224,14 +224,14 @@ def slurm_conf_dict_merge(conf_dict_list, conf_name):
                         # TODO Partition node combiner logic
                         existing_dict[item.get(ky)] = inner_dict
                         merged_dict[ky] = existing_dict
-            elif current_conf[ky] == SlurmParserEnum.S_P_LIST:
+            elif current_conf.get(ky) == SlurmParserEnum.S_P_LIST:
                 existing_list = merged_dict.get(ky, [])
                 if isinstance(vl, list):
                     new_items = vl
                 else:
                     new_items = [vl]
                 merged_dict[ky] = list(dict.fromkeys(existing_list + new_items))
-            elif current_conf[ky] == SlurmParserEnum.S_P_CSV:
+            elif current_conf.get(ky) == SlurmParserEnum.S_P_CSV:
                 existing_values = [v.strip() for v in merged_dict.get(ky, "").split(',') if v.strip()]
                 new_values = [v.strip() for v in vl.split(',') if v.strip()]
                 merged_dict[ky] = ",".join(list(dict.fromkeys(existing_values + new_values)))
@@ -252,7 +252,8 @@ def run_module():
         "op": {'type': 'str', 'required': True, 'choices': ['parse', 'render', 'merge']},
         "conf_map": {'type': 'dict', 'default': {}},
         "conf_sources": {'type': 'list', 'elements': 'raw', 'default': []},
-        "conf_name": {'type': 'str', 'default': 'slurm'}
+        "conf_name": {'type': 'str', 'default': 'slurm'},
+        "validate": {'type': 'bool', 'default': False}
     }
 
     result = {"changed": False, "slurm_dict": {}, "failed": False}
@@ -266,9 +267,10 @@ def run_module():
                            supports_check_mode=True)
     try:
         conf_name = module.params['conf_name']
+        validate = module.params['validate']
         # Parse the slurm.conf file
         if module.params['op'] == 'parse':
-            s_dict = parse_slurm_conf(module.params['path'], module)
+            s_dict = parse_slurm_conf(module.params['path'], conf_name, validate)
             result['slurm_dict'] = s_dict
         elif module.params['op'] == 'render':
             s_list = read_dict2ini(module.params['conf_map'])
@@ -281,7 +283,7 @@ def run_module():
                 elif isinstance(conf_source, str):
                     if not os.path.exists(conf_source):
                         raise FileNotFoundError(f"File {conf_source} does not exist")
-                    s_dict = parse_slurm_conf(conf_source, conf_name)
+                    s_dict = parse_slurm_conf(conf_source, conf_name, validate)
                     conf_dict_list.append(s_dict)
                 else:
                     raise TypeError(f"Invalid type for conf_source: {type(conf_source)}")

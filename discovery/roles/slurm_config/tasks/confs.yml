@@ -41,6 +41,53 @@
   loop: "{{ ctld_list | product(conf_files | default([])) }}"
   register: ctld_conf_files
 
+# - name: Get ctld_conf_files
+#   ansible.builtin.set_fact:
+#     ctld_conf_data: "{{ ctld_conf_files.results | rekey_on_member('item') }}"
+#   ignore_errors: true
+
+# - name: Create lists for conf_merge
+#   ansible.builtin.debug:
+#     var: conf_set.item.1
+#   loop: "{{ ctld_conf_files.results }}"
+#   loop_control:
+#     loop_var: conf_set
+# - pause:
+- name: Create lists for conf_merge
+  ansible.builtin.set_fact:
+    conf_merge_dict: "{{
+        conf_merge_dict | default({})
+        | combine({
+            conf_set.item.1: (
+              [apply_config[conf_set.item.1]]
+              + ([conf_set.stat.path] if conf_set.stat.exists else [])
+              + ([configs_input.get(conf_set.item.1)] if configs_input.get(conf_set.item.1) else [])
+            )
+          })
+      }}"
+  loop: "{{ ctld_conf_files.results }}"
+  loop_control:
+    loop_var: conf_set
+  register: prepared_conf_lists
+  # debugger: always
+# - pause:
+
+- name: Merge the confs
+  slurm_conf:
+    op: merge
+    conf_sources: "{{ item.value }}"
+    conf_name: "{{ item.key }}"
+  loop: "{{ conf_merge_dict | dict2items }}"
+  register: merged_conf
+
+- name: Write merged .conf
+  ansible.builtin.copy:
+    content: "{{ item.ini_lines | join('\n') }}\n"
+    dest: "{{ slurm_config_path }}/{{ ctld_list[0] }}/etc/slurm/{{ item.item.key }}.conf"
+    mode: "{{ conf_file_mode }}"
+    remote_src: "{{ copy_from_oim }}"
+  loop: "{{ merged_conf.results }}"
+  debugger: always
 # - name: Prepare list for conf merge
 #   ansible.builtin.set_fact:
 #     conf_merge_list: "{{ ctld_list | product(configs_input.keys() | default([])) }}"
@@ -59,10 +106,10 @@
 #   loop: "{{ ctld_list | product(conf_files | default([])) }}"
 #   register: ctld_conf_files
 
-- name: Conf merge and write using slurm_conf module
-  ansible.builtin.include_tasks: conf_merge.yml
-  when: ctld_list
-  loop: "{{ ctld_list | product(configs_input.keys() | default([])) }}"
+# - name: Conf merge and write using slurm_conf module
+#   ansible.builtin.include_tasks: conf_merge.yml
+#   when: ctld_list
+#   loop: "{{ ctld_list | product(configs_input.keys() | default([])) }}"
   # debugger: always
 # TODO: To apply the cluster_name after merge
 
