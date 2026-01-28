@@ -25,6 +25,7 @@
   delegate_to: localhost
   register: ssh_check
   ignore_errors: true
+  # debugger: always
 
 - name: Check if slurmctld is running on remote host
   ansible.builtin.service_facts:
@@ -49,3 +50,4 @@
   register: scontrol_reconfig
   delegate_to: "{{ item }}"
   when: ctld_state[item] is true
+  # debugger: always

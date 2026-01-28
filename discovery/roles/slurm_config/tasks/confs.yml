@@ -76,6 +76,22 @@
     slurm_conf_dict: "{{ (merged_conf.results | selectattr('item.key', 'equalto', 'slurm') | first).conf_dict }}"
   when: "'slurm' in conf_merge_dict"
 
+- name: Create directories from conf values
+  ansible.builtin.include_tasks: exist_dir.yml
+  loop:
+    - "{{ ctld_list | product([
+        slurm_conf_dict.get('StateSaveLocation', '/var/spool/slurmctld'),
+        (slurm_conf_dict.get('SlurmctldLogFile', '/var/log/slurmctld.log') | dirname),
+        (slurm_conf_dict.get('SlurmctldPidFile', '/var/run/slurmctld.pid') | dirname)
+      ]) }}"
+    - "{{ (cmpt_list + login_list + compiler_login_list) | product([
+        slurm_conf_dict.get('SlurmdSpoolDir', '/var/spool/slurmd'),
+        (slurm_conf_dict.get('SlurmdLogFile', '/var/log/slurmd.log') | dirname),
+        (slurm_conf_dict.get('SlurmdPidFile', '/var/run/slurmd.pid') | dirname)
+      ]) }}"
+  loop_control:
+    loop_var: product
+
 - name: Write merged .conf
   ansible.builtin.copy:
     content: "{{ item.ini_lines | join('\n') }}\n"

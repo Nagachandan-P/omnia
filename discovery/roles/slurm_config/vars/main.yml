@@ -22,24 +22,17 @@ conf_files: # Must match this MASTER list
   - cgroup
   - gres
 copy_from_oim: false
+common_dir:
+  - /etc/munge
 ctld_dir:
   - /etc/slurm
+db_dir:
   - /etc/my.cnf.d
   - /var/lib/mysql
   - /var/log/mariadb
-  - /var/log/slurm
-  - /var/spool
-  - /etc/munge
-
 cmpt_dir:
-  - /var/log/slurm
-  - /var/spool
-  - /var/lib/slurm
   - /etc/slurm/epilog.d
-  - /etc/munge
 
-login_dir:
-  - /etc/munge
 gpu_slurm_conf:
   GresTypes: gpu
   SelectType: select/cons_tres

@@ -263,7 +263,7 @@ __default_config:
     SlurmctldPort: 6817
     SlurmdPort: 6818
     SrunPortRange: "60001-63000"
-    StateSaveLocation: "/var/spool"
+    StateSaveLocation: "/var/spool/slurmctld"
     SlurmdSpoolDir: "/var/spool/slurmd"
     SlurmctldParameters: "{{ slurm_ctld_parameters | join(',') }}"
     ReturnToService: 2
