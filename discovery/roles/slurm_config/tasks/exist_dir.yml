@@ -20,8 +20,8 @@
   register: existing_dir
 
 - name: Create directories if not exist
-  ansible.builtin.file:
+  ansible.builtin.file: # noqa: risky-file-permissions
     path: "{{ slurm_config_path }}/{{ item.item.0 }}{{ item.item.1 }}"
     state: directory
   loop: "{{ existing_dir.results }}"
-  when: item.stat.exists == false
+  when: not item.stat.exists

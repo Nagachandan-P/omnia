@@ -111,10 +111,10 @@
 - name: Create all common directories
   ansible.builtin.include_tasks: exist_dir.yml
   loop:
-   - "{{ (ctld_list + cmpt_list + login_list + compiler_login_list) | product(common_dir) }}"
-   - "{{ ctld_list | product(ctld_dir) }}"
-   - "{{ dbd_list | product(db_dir) }}"
-   - "{{ cmpt_list | product(cmpt_dir) }}"
+    - "{{ (ctld_list + cmpt_list + login_list + compiler_login_list) | product(common_dir) }}"
+    - "{{ ctld_list | product(ctld_dir) }}"
+    - "{{ dbd_list | product(db_dir) }}"
+    - "{{ cmpt_list | product(cmpt_dir) }}"
   loop_control:
     loop_var: product
 
@@ -191,9 +191,9 @@
     dest: "{{ slurm_config_path }}/{{ item.0 }}/etc/slurm/epilog.d/{{ item.1 }}"
     owner: "{{ root_user }}"
     group: "{{ root_group }}"
-    mode: "{{ common_mode }}"
+    mode: "{{ conf_file_mode }}"
   when: login_list or compiler_login_list
-  loop: "{{ (login_list + compiler_login_list) | product(['logout_user.sh', 'slurmd.service']) }}"
+  loop: "{{ (login_list + compiler_login_list) | product(['slurmd.service']) }}"
 
 - name: Get the slurm NFS path
   ansible.builtin.debug:
