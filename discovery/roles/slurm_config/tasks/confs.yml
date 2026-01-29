@@ -73,6 +73,33 @@
     slurm_conf_dict: "{{ (merged_conf.results | selectattr('item.key', 'equalto', 'slurm') | first).conf_dict }}"
   when: "'slurm' in conf_merge_dict"
 
+- name: Get nodes from normal partition and compare with cmpt_list
+  ansible.builtin.set_fact:
+    normal_partition: "{{ slurm_conf_dict.PartitionName | default([]) | selectattr('PartitionName', 'equalto', slurm_partition_name) | first | default({}) }}"
+  when: "'slurm' in conf_merge_dict"
+
+- name: Parse normal partition nodes and compare
+  ansible.builtin.set_fact:
+    normal_partition_nodes: "{{ (normal_partition.Nodes | default('ALL')).split(',') | map('trim') | reject('equalto', 'ALL') | list }}"
+    nodes_in_cmpt_not_in_normal: "{{ cmpt_list | difference((normal_partition.Nodes | default('ALL')).split(',') | map('trim') | list) }}"
+    nodes_in_normal_not_in_cmpt: "{{ (normal_partition.Nodes | default('ALL')).split(',') | map('trim') | reject('equalto', 'ALL') | list | difference(cmpt_list) }}"
+  when: 
+    - "'slurm' in conf_merge_dict"
+    - normal_partition is defined
+    - normal_partition | length > 0
+
+- name: Remove nodes
+  ansible.builtin.include_tasks: remove_node.yml
+  when:
+    - "'slurm' in conf_merge_dict"
+    - nodes_in_normal_not_in_cmpt is defined
+    - nodes_in_normal_not_in_cmpt | length > 0
+
+- name: debug
+  ansible.builtin.debug:
+    var: nodes_in_normal_not_in_cmpt
+  debugger: always
+
 - name: Create directories from conf values
   ansible.builtin.include_tasks: exist_dir.yml
   loop:
