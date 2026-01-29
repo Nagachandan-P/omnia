@@ -97,6 +97,7 @@
     remote_src: "{{ copy_from_oim }}"
   loop: "{{ merged_conf.results }}"
   register: ctld_conf_files
+  # debugger: always
 
 - name: Check if cluster running
   ansible.builtin.include_tasks: check_ctld_running.yml

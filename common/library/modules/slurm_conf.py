@@ -209,8 +209,18 @@ def slurm_conf_dict_merge(conf_dict_list, conf_name):
                     if isinstance(item, dict):
                         existing_dict = merged_dict.get(ky, {})
                         inner_dict = existing_dict.get(item.get(ky), {})
-                        inner_dict.update(item)
-                        # TODO Partition node combiner logic
+                        # Get the sub-options for this array type (e.g., nodename_options, partition_options)
+                        sub_options = all_confs.get(ky, {})
+                        # Merge item into inner_dict, handling CSV fields specially
+                        for k, v in item.items():
+                            if sub_options.get(k) == SlurmParserEnum.S_P_CSV and k in inner_dict:
+                                # Merge CSV values
+                                existing_values = [val.strip() for val in inner_dict[k].split(',') if val.strip()]
+                                new_values = [val.strip() for val in v.split(',') if val.strip()]
+                                inner_dict[k] = ",".join(list(dict.fromkeys(existing_values + new_values)))
+                            else:
+                                # Regular update for non-CSV fields
+                                inner_dict[k] = v
                         existing_dict[item.get(ky)] = inner_dict
                         merged_dict[ky] = existing_dict
             elif current_conf.get(ky) == SlurmParserEnum.S_P_LIST:
