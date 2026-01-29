@@ -24,15 +24,12 @@
     state: started
   delegate_to: localhost
   register: ssh_check
-  # ignore_errors: true
-  # debugger: always
 
 - name: Check if slurmctld is running on remote host
   ansible.builtin.service_facts:
   delegate_to: "{{ item }}"
   register: service_facts
   when: ssh_check is success
-  # ignore_errors: true
 
 - name: Update ctld_state if slurmctld is running
   ansible.builtin.set_fact:
@@ -54,8 +51,6 @@
     loop_var: ip
   delegate_to: "{{ item }}"
   when: ssh_check is success
-  ignore_errors: true
-  # debugger: always
 
 - name: Trigger the scontrol reconfigure
   ansible.builtin.command: scontrol reconfigure
@@ -64,4 +59,3 @@
   register: scontrol_reconfig
   delegate_to: "{{ item }}"
   when: ctld_state[item] is true
-  # debugger: always

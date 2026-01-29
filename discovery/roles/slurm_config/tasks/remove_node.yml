@@ -29,7 +29,8 @@
 
 - name: Update normal partition Nodes to match cmpt_list
   ansible.builtin.set_fact:
-    updated_partitions: "{{ updated_partitions | default([]) + [item | combine({'Nodes': cmpt_list | join(',')}) if item.PartitionName == slurm_partition_name else item] }}"
+    updated_partitions: "{{ updated_partitions | default([])
+     + [item | combine({'Nodes': cmpt_list | join(',')}) if item.PartitionName == slurm_partition_name else item] }}"
   loop: "{{ slurm_conf_dict.PartitionName | default([]) }}"
   when:
     - "'slurm' in conf_merge_dict"
@@ -43,17 +44,6 @@
     - "'slurm' in conf_merge_dict"
     - updated_partitions is defined
 
-- name: Debug updated configuration
-  ansible.builtin.debug:
-    msg:
-      - "Removed nodes: {{ nodes_in_normal_not_in_cmpt | default([]) }}"
-      - "Updated NodeName count: {{ slurm_conf_dict.NodeName | length }}"
-      - "Updated partition Nodes: {{ (slurm_conf_dict.PartitionName | selectattr('PartitionName', 'equalto', slurm_partition_name) | first).Nodes | default('N/A') }}"
-  when:
-    - "'slurm' in conf_merge_dict"
-    - nodes_in_normal_not_in_cmpt is defined
-    - nodes_in_normal_not_in_cmpt | length > 0
-
 - name: Convert slurm conf to ini
   slurm_conf:
     op: render
@@ -63,7 +53,8 @@
 
 - name: Update merged_conf results with new ini_lines for slurm
   ansible.builtin.set_fact:
-    updated_merged_results: "{{ updated_merged_results | default([]) + [item | combine({'ini_lines': slurm_conf_ini.ini_lines}) if item.item.key == 'slurm' else item] }}"
+    updated_merged_results: "{{ updated_merged_results | default([])
+     + [item | combine({'ini_lines': slurm_conf_ini.ini_lines}) if item.item.key == 'slurm' else item] }}"
   loop: "{{ merged_conf.results }}"
   when:
     - slurm_conf_ini is defined
@@ -74,4 +65,3 @@
     merged_conf: "{{ merged_conf | combine({'results': updated_merged_results}) }}"
   when:
     - updated_merged_results is defined
-  
