@@ -148,10 +148,10 @@ def read_dict2ini(conf_dict):
             for dct_item in v:
                 if isinstance(dct_item, dict):
                     # TODO: Ordered dict, move the key to the top
-                    # od = OrderedDict([('a', 1), ('b', 2), ('c', 3)])
-                    # od.move_to_end('c', last=False)  # Move 'c' to the beginning
+                    od = OrderedDict(dct_item)
+                    od.move_to_end(k, last=False)  # Move k to the beginning
                     data.append(
-                        " ".join(f"{key}={value}" for key, value in dct_item.items()))
+                        " ".join(f"{key}={value}" for key, value in od.items()))
                 else:
                     data.append(f"{k}={dct_item}")
         else:
@@ -268,12 +268,12 @@ def run_module():
             conf_dict_list = []
             for conf_source in module.params['conf_sources']:
                 if isinstance(conf_source, dict):
-                    conf_dict_list.append(conf_source)
+                    conf_dict_list.append(OrderedDict(conf_source))
                 elif isinstance(conf_source, str):
                     if not os.path.exists(conf_source):
                         raise FileNotFoundError(f"File {conf_source} does not exist")
                     s_dict = parse_slurm_conf(conf_source, conf_name, validate)
-                    conf_dict_list.append(s_dict)
+                    conf_dict_list.append(OrderedDict(s_dict))
                 else:
                     raise TypeError(f"Invalid type for conf_source: {type(conf_source)}")
             merged_dict = slurm_conf_dict_merge(conf_dict_list, conf_name)
