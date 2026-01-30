@@ -758,7 +758,7 @@ def process_tarball(package, repo_store_path, status_file_path, version_variable
     tarball_path = os.path.join(tarball_directory, f"{package_name}.tar.gz")
     tarball_path = shlex.quote(tarball_path).strip("'\"")
 
-    repository_name = arc-lower() + "_tarball" + package_name
+    repository_name = arc.lower() + "_tarball" + package_name
     output_file = package_name + ".tar.gz"
     relative_path = output_file
     base_path = tarball_directory.strip("/")
