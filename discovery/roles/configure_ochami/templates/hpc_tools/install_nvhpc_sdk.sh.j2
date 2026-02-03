@@ -9,10 +9,10 @@ echo "===== Starting NVIDIA HPC SDK installation ====="
 NVHPC_PKG_NAME="{{ nvhpc_pkg_name | default('nvhpc_2025_2511_Linux_x86_64_cuda_13.0') }}"
 NVHPC_EXPORT="{{ cloud_init_nfs_path }}/hpc_tools/nvidia_sdk"
 NVHPC_MOUNT="/shared-nvhpc-sdk"
-NVHPC_TARBALL="{{ NVHPC_MOUNT }}/{{ NVHPC_PKG_NAME }}.tar.gz"
-NVHPC_INSTALL_DIR_NFS="{{ NVHPC_MOUNT }}/nvhpc"
+NVHPC_TARBALL="$NVHPC_MOUNT/${NVHPC_PKG_NAME}.tar.gz"
+NVHPC_INSTALL_DIR_NFS="$NVHPC_MOUNT/nvhpc"
 NVHPC_LOCAL_MOUNT="/opt/nvidia/nvhpc"
-NVHPC_EXTRACT_DIR="{{ NVHPC_MOUNT }}/{{ NVHPC_PKG_NAME }}"
+NVHPC_EXTRACT_DIR="$NVHPC_MOUNT/${NVHPC_PKG_NAME}"
 
 # Skip if already mounted
 if mountpoint -q "$NVHPC_LOCAL_MOUNT"; then
