@@ -109,6 +109,28 @@
   loop_control:
     loop_var: product
 
+- name: Create backup directory with timestamp
+  ansible.builtin.file:
+    path: "{{ slurm_config_path }}/{{ ctld_list[0] }}/etc/slurm/backup_{{ ansible_date_time.date }}_{{ ansible_date_time.time | replace(':', '-') }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ slurm_user }}"
+    group: "{{ slurm_user_group }}"
+  when: ctld_list
+
+- name: Backup existing SLURM configuration files with timestamp
+  ansible.builtin.copy:
+    src: "{{ slurm_config_path }}/{{ ctld_list[0] }}/etc/slurm/{{ item.item.key }}.conf"
+    dest: "{{ slurm_config_path }}/{{ ctld_list[0] }}/etc/slurm/backup_{{ ansible_date_time.date }}_{{ ansible_date_time.time | replace(':', '-') }}/{{ item.item.key }}.conf"
+    remote_src: yes
+    mode: preserve
+  loop: "{{ merged_conf.results }}"
+  when: 
+    - ctld_list
+    - item.item.key in conf_files
+  register: backup_results
+  failed_when: false
+
 - name: Write merged .conf
   ansible.builtin.copy:
     content: "{{ item.ini_lines | join('\n') }}\n"
