@@ -1111,8 +1111,20 @@ install_omnia_core() {
     fi
 }
 
+# Check if Omnia core container is running
+check_container_status() {
+    # Check if the Omnia core container is running
+    if ! podman ps --format '{{.Names}}' | grep -qw "omnia_core"; then
+        echo -e "${RED}ERROR: Omnia core container is not running.${NC}"
+        exit 1
+    fi
+}
+
 # Function to display version information
 display_version() {
+    # Check if metadata file exists and Omnia core container is running
+    check_container_status
+    
     # Fetch the metadata from the oim_metadata.yml file in the container
     echo -e "${GREEN} Fetching metadata from omnia_core container...${NC}"
     core_config=$(podman exec omnia_core /bin/bash -c 'cat /opt/omnia/.data/oim_metadata.yml')
