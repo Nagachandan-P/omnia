@@ -13,6 +13,19 @@
 #  limitations under the License.
 ---
 
+- name: Preflight - validate inventory
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Fail if service_kube_control_plane group is missing or empty
+      ansible.builtin.fail:
+        msg: >-
+          Inventory must define a non-empty 'service_kube_control_plane' group.
+          Run with '-i <inventory>' and ensure at least one host is in that group.
+      when:
+        - groups['service_kube_control_plane'] is not defined or (groups['service_kube_control_plane'] | length) == 0
+
 - name: Fetch external Victoria connection details
   hosts: service_kube_control_plane
   connection: ssh
