@@ -19,14 +19,92 @@
   changed_when: false
   failed_when: kubectl_check.rc != 0
 
+- name: Check for Victoria cluster services
+  ansible.builtin.command: >-
+    kubectl get svc {{ item }} -n {{ victoria_namespace }} -o name
+  loop:
+    - vminsert
+    - vmselect
+  register: victoria_cluster_svcs
+  changed_when: false
+  failed_when: false
+
+- name: Check for Victoria single-node service
+  ansible.builtin.command: >-
+    kubectl get svc victoria-loadbalancer -n {{ victoria_namespace }} -o name
+  register: victoria_single_svc
+  changed_when: false
+  failed_when: false
+
+- name: Set Victoria deployment mode
+  ansible.builtin.set_fact:
+    victoria_deployment_mode: >-
+      {{
+        'cluster'
+        if (victoria_cluster_svcs.results | selectattr('rc', 'equalto', 0) | list | length) == 2
+        else ('single-node' if victoria_single_svc.rc == 0 else 'unknown')
+      }}
+
+- name: Fail if Victoria cluster mode is not deployed
+  ansible.builtin.fail:
+    msg: >-
+      Victoria deployment mode detected: {{ victoria_deployment_mode }}.
+      External integration is supported only for Victoria cluster mode (vminsert/vmselect/vmstorage).
+      Single-node Victoria (victoria-loadbalancer) is not supported for external integration.
+  when: victoria_deployment_mode != 'cluster'
+
 - name: Get Victoria pods status
   ansible.builtin.shell: >-
     kubectl get pods -n {{ victoria_namespace }}
     -l "app in (vminsert,vmselect,vmstorage,victoriametrics)"
     -o wide
-  register: victoria_pods
+  register: victoria_pods_wide
   changed_when: false
-  failed_when: victoria_pods.rc != 0
+  failed_when: victoria_pods_wide.rc != 0
+
+- name: Get Victoria pods status (json)
+  ansible.builtin.shell: >-
+    kubectl get pods -n {{ victoria_namespace }}
+    -l "app in (vminsert,vmselect,vmstorage,victoriametrics)"
+    -o json
+  register: victoria_pods_json
+  changed_when: false
+  failed_when: victoria_pods_json.rc != 0
+
+- name: Parse Victoria pods
+  ansible.builtin.set_fact:
+    victoria_pods_parsed: "{{ victoria_pods_json.stdout | from_json }}"
+
+- name: Fail if no Victoria pods found
+  ansible.builtin.fail:
+    msg: "No Victoria pods found in namespace '{{ victoria_namespace }}'."
+  when: (victoria_pods_parsed.items | default([]) | length) == 0
+
+- name: Fail if Victoria pods are not Running
+  ansible.builtin.fail:
+    msg: "One or more Victoria pods are not in Running state."
+  when: >-
+    {{
+      (victoria_pods_parsed.items | default([])
+      | selectattr('status.phase', 'ne', 'Running')
+      | list
+      | length) > 0
+    }}
+
+- name: Fail if Victoria pods are not Ready
+  ansible.builtin.fail:
+    msg: "One or more Victoria pods are not Ready."
+  when: >-
+    {{
+      (victoria_pods_parsed.items | default([])
+      | selectattr('status.containerStatuses', 'defined')
+      | map(attribute='status.containerStatuses')
+      | list
+      | flatten
+      | selectattr('ready', 'equalto', false)
+      | list
+      | length) > 0
+    }}
 
 - name: Get vminsert service LoadBalancer IP
   ansible.builtin.command: >-
@@ -34,7 +112,7 @@
     -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
   register: vminsert_lb_ip
   changed_when: false
-  failed_when: false
+  failed_when: vminsert_lb_ip.rc != 0
 
 - name: Get vminsert service LoadBalancer hostname
   ansible.builtin.command: >-
@@ -42,7 +120,7 @@
     -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
   register: vminsert_lb_hostname
   changed_when: false
-  failed_when: false
+  failed_when: vminsert_lb_hostname.rc != 0
 
 - name: Get vminsert service external port
   ansible.builtin.command: >-
@@ -50,7 +128,7 @@
     -o jsonpath='{.spec.ports[0].port}'
   register: vminsert_lb_port
   changed_when: false
-  failed_when: false
+  failed_when: vminsert_lb_port.rc != 0
 
 - name: Get vmselect service LoadBalancer IP
   ansible.builtin.command: >-
@@ -58,7 +136,7 @@
     -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
   register: vmselect_lb_ip
   changed_when: false
-  failed_when: false
+  failed_when: vmselect_lb_ip.rc != 0
 
 - name: Get vmselect service LoadBalancer hostname
   ansible.builtin.command: >-
@@ -66,7 +144,7 @@
     -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
   register: vmselect_lb_hostname
   changed_when: false
-  failed_when: false
+  failed_when: vmselect_lb_hostname.rc != 0
 
 - name: Get vmselect service external port
   ansible.builtin.command: >-
@@ -74,7 +152,7 @@
     -o jsonpath='{.spec.ports[0].port}'
   register: vmselect_lb_port
   changed_when: false
-  failed_when: false
+  failed_when: vmselect_lb_port.rc != 0
 
 - name: Set endpoint facts
   ansible.builtin.set_fact:
@@ -116,7 +194,8 @@
     victoria_connect_details:
       victoria:
         namespace: "{{ victoria_namespace }}"
-        pod_status: "{{ victoria_pods.stdout }}"
+        deployment_mode: "{{ victoria_deployment_mode }}"
+        pod_status: "{{ victoria_pods_wide.stdout }}"
         base_url: "https://{{ vminsert_host }}:{{ vminsert_port }}"
         endpoints:
           vminsert:
@@ -156,16 +235,16 @@
         [
           'Victoria connection details written to: ' ~ victoria_output_file,
           '',
+          'Mode: ' ~ victoria_deployment_mode,
+          '',
           'Endpoints:',
           '  vminsert write: https://' ~ vminsert_host ~ ':' ~ vminsert_port ~ '/insert/0/prometheus/api/v1/write',
           '  vmselect query: https://' ~ vmselect_host ~ ':' ~ vmselect_port ~ '/select/0/prometheus/api/v1/query',
           '  vmselect UI:    https://' ~ vmselect_host ~ ':' ~ vmselect_port ~ '/select/0/vmui',
           '',
           'TLS:',
-          '  server.crt: ' ~ victoria_tls_cert,
-          '',
-          'Pods:'
-        ] + (victoria_pods.stdout_lines | default([]))
+          '  server.crt: ' ~ victoria_tls_cert
+        ]
       }}
   delegate_to: localhost
   connection: local
