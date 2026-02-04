@@ -258,7 +258,7 @@ def cleanup_repository(name: str, base_path: str, logger) -> Dict[str, Any]:
             # Update status files - remove RPM entries from this repo and mark software as partial
             affected = remove_rpms_from_repository(name, base_path, logger)
             logger.info(f" mark affected softwares as partial {affected}")
-            mark_software_partial(affected, base_path, logger)
+            mark_software_partial(affected, base_path, logger, 'repository')
         else:
             result["message"] = f"Delete failed: {del_result['stderr']}"
             
@@ -307,7 +307,7 @@ def cleanup_container(user_input: str, base_path: str, logger) -> Dict[str, Any]
             result["message"] = "Container deleted"
             # Update status files - remove image entries and mark software as partial
             affected = remove_from_status_files(user_input, 'image', base_path, logger)
-            mark_software_partial(affected, base_path, logger)
+            mark_software_partial(affected, base_path, logger, 'image')
         else:
             result["message"] = f"Delete failed: {del_result['stderr']}"
             
@@ -457,7 +457,7 @@ def cleanup_pip_module(name: str, base_path: str, logger) -> Dict[str, Any]:
             affected = remove_from_status_files(name, 'pip_module', base_path, logger)
             if affected:
                 messages.append("Status files updated")
-                mark_software_partial(affected, base_path, logger)
+                mark_software_partial(affected, base_path, logger, 'pip_module')
         
         if pulp_deleted:
             result["status"] = "Success"
@@ -549,7 +549,7 @@ def cleanup_file_repository(name: str, file_type: str, base_path: str, logger) -
             if affected:
                 status_removed = True
                 messages.append("Status files updated")
-                mark_software_partial(affected, base_path, logger)
+                mark_software_partial(affected, base_path, logger, file_type)
         
         # Determine overall result
         if pulp_deleted or status_removed:
@@ -647,8 +647,8 @@ def remove_rpms_from_repository(repo_name: str, base_path: str, logger) -> List[
         logger.error(f"Failed to remove RPMs from repository {repo_name}: {e}")
         return []
 
-def remove_from_status_files(artifact_name: str, artifact_type: str, base_path: str, logger) -> List[str]:
-    """Remove artifact from status.csv files and return affected software names.
+def remove_from_status_files(artifact_name: str, artifact_type: str, base_path: str, logger) -> Dict[str, List[str]]:
+    """Remove artifact from status.csv files and return affected software names by architecture.
     
     Args:
         artifact_name: Name of the artifact to remove
@@ -657,11 +657,12 @@ def remove_from_status_files(artifact_name: str, artifact_type: str, base_path: 
         logger: Logger instance
         
     Returns:
-        List of software names that were affected
+        Dict mapping architecture to list of affected software names
     """
-    affected_software = []
+    affected_software = {}
     try:
         for arch in ARCH_SUFFIXES:
+            arch_affected = []
             for status_file in glob.glob(f"{base_path}/{arch}/*/status.csv"):
                 rows = []
                 removed = False
@@ -671,27 +672,20 @@ def remove_from_status_files(artifact_name: str, artifact_type: str, base_path: 
                     for row in reader:
                         name = row.get('name', '')
                         row_type = row.get('type', '')
+                        # Match logic based on type
+                        should_remove = False
+                        if artifact_type == 'image':
+                            # Container images: match with or without tag
+                            should_remove = (name == artifact_name or name.startswith(f"{artifact_name}:"))
+                        else:
+                            # Other types: exact match
+                            should_remove = (name == artifact_name)
 
-                        if name == artifact_name and row_type == artifact_type:
+                        if should_remove:
                             removed = True
-                            logger.info(f"Removing {artifact_type} '{name}' from {status_file}")
+                            logger.info(f"Removing '{name}' from {status_file}")
                         else:
                             rows.append(row)
-                        
-                        # # Match logic based on type
-                        # should_remove = False
-                        # if artifact_type == 'image':
-                        #     # Container images: match with or without tag
-                        #     should_remove = (name == artifact_name or name.startswith(f"{artifact_name}:"))
-                        # else:
-                        #     # Other types: exact match
-                        #     should_remove = (name == artifact_name)
-                        
-                        # if should_remove:
-                        #     removed = True
-                        #     logger.info(f"Removing '{name}' from {status_file}")
-                        # else:
-                        #     rows.append(row)
                 
                 if removed and fieldnames:
                     with open(status_file, 'w', newline='') as f:
@@ -701,47 +695,62 @@ def remove_from_status_files(artifact_name: str, artifact_type: str, base_path: 
                     
                     # Track affected software
                     software_name = os.path.basename(os.path.dirname(status_file))
-                    if software_name not in affected_software:
-                        affected_software.append(software_name)
+                    if software_name not in arch_affected:
+                        arch_affected.append(software_name)
+
+            if arch_affected:
+                affected_software[arch] = arch_affected
                     
+        logger.info(f"remove_from_status_files returning: {affected_software}")        
         return affected_software
     except Exception as e:
         logger.error(f"Failed to remove from status files: {e}")
-        return []
+        return {}
 
 
-def mark_software_partial(software_names: List[str], base_path: str, logger):
+def mark_software_partial(affected_software: Dict[str, List[str]], base_path: str, logger, artifact_type: str = None):
     """Mark software entries as partial in software.csv.
     
     Args:
-        software_names: List of software names to mark as partial
+        affected_software: Dict mapping architecture to list of affected software names
         base_path: Base path for software.csv
         logger: Logger instance
+        artifact_type: Type of artifact being removed (for logging purposes)
     """
-    if not software_names:
+    logger.info(f"mark_software_partial called with affected_software: {affected_software}")
+    if not affected_software:
+        logger.info("No affected software to mark as partial")
         return
         
     try:
-        for arch in ARCH_SUFFIXES:
-            software_file = f"{base_path}/{arch}/software.csv"
-            if not os.path.exists(software_file):
+        # Only mark architectures where artifacts were actually removed
+        for arch, software_names in affected_software.items():
+            logger.info(f"Processing arch: {arch}, software_names: {software_names}")
+            if not software_names:
                 continue
-            
-            rows = []
-            with open(software_file, 'r') as f:
-                reader = csv.DictReader(f)
-                fieldnames = reader.fieldnames
-                for row in reader:
-                    if row.get('name') in software_names:
-                        row['status'] = 'partial'
-                        logger.info(f"Marked '{row.get('name')}' as {GREEN}partial{RESET} in software.csv")
-                    rows.append(row)
-            
-            if fieldnames and rows:
-                with open(software_file, 'w', newline='') as f:
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    writer.writeheader()
-                    writer.writerows(rows)
+
+            software_file = f"{base_path}/{arch}/software.csv"
+            logger.info(f"Looking for software file: {software_file}")
+            if os.path.exists(software_file):
+                rows = []
+                updated = False
+                with open(software_file, 'r') as f:
+                    reader = csv.DictReader(f)
+                    fieldnames = reader.fieldnames
+                    for row in reader:
+                        logger.info(f"Checking row: {row}")
+                        if row.get('name') in software_names:
+                            row['status'] = 'partial'
+                            updated = True
+                            logger.info(f"Marked '{row.get('name')}' as {GREEN}partial{RESET} in {arch}/software.csv ({artifact_type} cleanup)")
+                        rows.append(row)
+
+                if fieldnames and rows:
+                    with open(software_file, 'w', newline='') as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(rows)
+                    logger.info(f"Successfully wrote updated software.csv for {arch}")
     except Exception as e:
         logger.error(f"Failed to update software.csv: {e}")
 
