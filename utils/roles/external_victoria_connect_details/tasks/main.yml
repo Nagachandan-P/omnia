@@ -127,10 +127,9 @@
             host: "{{ vmselect_host }}"
             port: "{{ vmselect_port | int }}"
             query_endpoint: "https://{{ vmselect_host }}:{{ vmselect_port }}/select/0/prometheus/api/v1/query"
+            ui_url: "https://{{ vmselect_host }}:{{ vmselect_port }}/select/0/vmui"
         tls:
-          ca_crt: "{{ victoria_tls_ca }}"
           server_crt: "{{ victoria_tls_cert }}"
-          server_key: "{{ victoria_tls_key }}"
 
 - name: Ensure output directory exists
   ansible.builtin.file:
@@ -152,14 +151,19 @@
 
 - name: Display Victoria connection details
   ansible.builtin.debug:
-    msg:
-      - "Victoria connection details written to: {{ victoria_output_file }}"
-      - "vminsert: https://{{ vminsert_host }}:{{ vminsert_port }}/insert/0/prometheus/api/v1/write"
-      - "vmselect: https://{{ vmselect_host }}:{{ vmselect_port }}/select/0/prometheus/api/v1/query"
-      - "TLS CA: {{ victoria_tls_ca }}"
-      - "TLS cert: {{ victoria_tls_cert }}"
-      - "TLS key: {{ victoria_tls_key }}"
-      - "Pods:\n{{ victoria_pods.stdout }}"
+    msg: |
+      Victoria connection details written to: {{ victoria_output_file }}
+
+      Endpoints:
+        vminsert write: https://{{ vminsert_host }}:{{ vminsert_port }}/insert/0/prometheus/api/v1/write
+        vmselect query: https://{{ vmselect_host }}:{{ vmselect_port }}/select/0/prometheus/api/v1/query
+        vmselect UI:    https://{{ vmselect_host }}:{{ vmselect_port }}/select/0/vmui
+
+      TLS:
+        server.crt: {{ victoria_tls_cert }}
+
+      Pods:
+      {{ victoria_pods.stdout }}
   delegate_to: localhost
   connection: local
   run_once: true
