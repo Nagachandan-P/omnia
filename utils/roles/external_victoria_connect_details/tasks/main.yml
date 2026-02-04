@@ -20,9 +20,9 @@
   failed_when: kubectl_check.rc != 0
 
 - name: Get Victoria pods status
-  ansible.builtin.command: >-
+  ansible.builtin.shell: >-
     kubectl get pods -n {{ victoria_namespace }}
-    -l app in (vminsert,vmselect,vmstorage,victoriametrics)
+    -l "app in (vminsert,vmselect,vmstorage,victoriametrics)"
     -o wide
   register: victoria_pods
   changed_when: false
