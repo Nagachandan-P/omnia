@@ -78,14 +78,14 @@
 - name: Fail if no Victoria pods found
   ansible.builtin.fail:
     msg: "No Victoria pods found in namespace '{{ victoria_namespace }}'."
-  when: (victoria_pods_parsed.items | default([]) | length) == 0
+  when: (victoria_pods_parsed.get('items', []) | length) == 0
 
 - name: Fail if Victoria pods are not Running
   ansible.builtin.fail:
     msg: "One or more Victoria pods are not in Running state."
   when: >-
     {{
-      (victoria_pods_parsed.items | default([])
+      (victoria_pods_parsed.get('items', [])
       | selectattr('status.phase', 'ne', 'Running')
       | list
       | length) > 0
@@ -96,7 +96,7 @@
     msg: "One or more Victoria pods are not Ready."
   when: >-
     {{
-      (victoria_pods_parsed.items | default([])
+      (victoria_pods_parsed.get('items', [])
       | selectattr('status.containerStatuses', 'defined')
       | map(attribute='status.containerStatuses')
       | list
