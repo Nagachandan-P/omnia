@@ -18,4 +18,3 @@
   connection: local
   roles:
     - role: upgrade_oim
-
