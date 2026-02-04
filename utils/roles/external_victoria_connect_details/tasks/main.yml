@@ -83,20 +83,17 @@
 - name: Fail if Victoria pods are not Running
   ansible.builtin.fail:
     msg: "One or more Victoria pods are not in Running state."
-  when: >-
-    {{
-      (victoria_pods_parsed.get('items', [])
+  when:
+    - (victoria_pods_parsed.get('items', [])
       | selectattr('status.phase', 'ne', 'Running')
       | list
       | length) > 0
-    }}
 
 - name: Fail if Victoria pods are not Ready
   ansible.builtin.fail:
     msg: "One or more Victoria pods are not Ready."
-  when: >-
-    {{
-      (victoria_pods_parsed.get('items', [])
+  when:
+    - (victoria_pods_parsed.get('items', [])
       | selectattr('status.containerStatuses', 'defined')
       | map(attribute='status.containerStatuses')
       | list
@@ -104,7 +101,6 @@
       | selectattr('ready', 'equalto', false)
       | list
       | length) > 0
-    }}
 
 - name: Get vminsert service LoadBalancer IP
   ansible.builtin.command: >-
