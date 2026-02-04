@@ -15,4 +15,4 @@
 
 - name: Include import input parameters
   ansible.builtin.include_role:
-    name: import_input_params
+    name: import_input_parameters
