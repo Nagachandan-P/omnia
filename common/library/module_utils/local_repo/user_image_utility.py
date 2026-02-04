@@ -395,11 +395,11 @@ def handle_user_image_registry(package, package_content, version_variables, user
                 logger.info(f"Image '{image_name}:{tag_val}' found in registry '{host}'")
                 result, package_info = process_user_registry(package, host, package_content, version_variables, cacert, key, logger)
                 break
-            
-            elif not image_found:
-                logger.info(f"Image '{image_name}:{tag_val}' not found in registry '{host}'")
-                result = False
-                break
+            else:
+                logger.info(f"Image '{image_name}:{tag_val}' not found in registry '{host}', checking next registry...")
+        else:
+            logger.info(f"Image '{image_name}:{tag_val}' not found in any user registry")
+            result = False
 
     except Exception as e:
         logger.error(f"Exception in {handle_user_image_registry.__name__}: {e}")

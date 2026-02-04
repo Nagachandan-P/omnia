@@ -17,17 +17,15 @@
           },
           "cert_path": {
             "type": "string",
-            "pattern": "^[a-zA-Z0-9/\\._-]*\\.crt$"
+            "pattern": "^$|^[a-zA-Z0-9/\\._-]*\\.crt$"
           },
           "key_path": {
             "type": "string",
-            "pattern": "^[a-zA-Z0-9/\\._-]*\\.key$"
+            "pattern": "^$|^[a-zA-Z0-9/\\._-]*\\.key$"
           }
         },
         "required": [
-          "host",
-          "cert_path",
-          "key_path"
+          "host"
         ],
         "allOf": [
           {
