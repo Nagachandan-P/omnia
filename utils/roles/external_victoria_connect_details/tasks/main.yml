@@ -151,19 +151,22 @@
 
 - name: Display Victoria connection details
   ansible.builtin.debug:
-    msg: |
-      Victoria connection details written to: {{ victoria_output_file }}
-
-      Endpoints:
-        vminsert write: https://{{ vminsert_host }}:{{ vminsert_port }}/insert/0/prometheus/api/v1/write
-        vmselect query: https://{{ vmselect_host }}:{{ vmselect_port }}/select/0/prometheus/api/v1/query
-        vmselect UI:    https://{{ vmselect_host }}:{{ vmselect_port }}/select/0/vmui
-
-      TLS:
-        server.crt: {{ victoria_tls_cert }}
-
-      Pods:
-      {{ victoria_pods.stdout }}
+    msg: >-
+      {{
+        [
+          'Victoria connection details written to: ' ~ victoria_output_file,
+          '',
+          'Endpoints:',
+          '  vminsert write: https://' ~ vminsert_host ~ ':' ~ vminsert_port ~ '/insert/0/prometheus/api/v1/write',
+          '  vmselect query: https://' ~ vmselect_host ~ ':' ~ vmselect_port ~ '/select/0/prometheus/api/v1/query',
+          '  vmselect UI:    https://' ~ vmselect_host ~ ':' ~ vmselect_port ~ '/select/0/vmui',
+          '',
+          'TLS:',
+          '  server.crt: ' ~ victoria_tls_cert,
+          '',
+          'Pods:'
+        ] + (victoria_pods.stdout_lines | default([]))
+      }}
   delegate_to: localhost
   connection: local
   run_once: true
