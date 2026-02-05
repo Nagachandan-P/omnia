@@ -15,4 +15,4 @@
 
 omnia_input_dir: /opt/omnia/input/project_default
 
-backup_location: /opt/omnia/backup/upgrade
+backup_location: /opt/omnia/backups/upgrade
