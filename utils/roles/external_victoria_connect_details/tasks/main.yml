@@ -47,10 +47,7 @@
 
 - name: Fail if Victoria cluster mode is not deployed
   ansible.builtin.fail:
-    msg: >-
-      Victoria deployment mode detected: {{ victoria_deployment_mode }}.
-      External integration is supported only for Victoria cluster mode (vminsert/vmselect/vmstorage).
-      Single-node Victoria (victoria-loadbalancer) is not supported for external integration.
+    msg: "{{ victoria_err_mode_not_supported }}"
   when: victoria_deployment_mode != 'cluster'
 
 - name: Get Victoria pods status
@@ -77,12 +74,12 @@
 
 - name: Fail if no Victoria pods found
   ansible.builtin.fail:
-    msg: "No Victoria pods found in namespace '{{ victoria_namespace }}'."
+    msg: "{{ victoria_err_no_pods_found }}"
   when: (victoria_pods_parsed.get('items', []) | length) == 0
 
 - name: Fail if Victoria pods are not Running
   ansible.builtin.fail:
-    msg: "One or more Victoria pods are not in Running state."
+    msg: "{{ victoria_err_pods_not_running }}"
   when:
     - (victoria_pods_parsed.get('items', [])
       | selectattr('status.phase', 'ne', 'Running')
@@ -91,7 +88,7 @@
 
 - name: Fail if Victoria pods are not Ready
   ansible.builtin.fail:
-    msg: "One or more Victoria pods are not Ready."
+    msg: "{{ victoria_err_pods_not_ready }}"
   when:
     - (victoria_pods_parsed.get('items', [])
       | selectattr('status.containerStatuses', 'defined')
@@ -172,9 +169,7 @@
 
 - name: Fail when LoadBalancer IPs are not available
   ansible.builtin.fail:
-    msg: >-
-      Failed to fetch Victoria LoadBalancer IP(s). Ensure services 'vminsert' and 'vmselect'
-      exist in namespace '{{ victoria_namespace }}' and have external IPs assigned.
+    msg: "{{ victoria_err_lb_missing }}"
   when:
     - vminsert_host | trim | length == 0 or vmselect_host | trim | length == 0
 

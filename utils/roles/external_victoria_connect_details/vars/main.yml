@@ -16,3 +16,16 @@
 victoria_namespace: "telemetry"
 victoria_output_file: "/opt/omnia/telemetry/external_victoria_connect_details.yml"
 victoria_tls_cert_dir: "/opt/omnia/telemetry/victoria-certs"
+
+victoria_err_mode_not_supported: >-
+  Victoria deployment mode detected: {{ victoria_deployment_mode }}.
+  External integration is supported only for Victoria cluster mode (vminsert/vmselect/vmstorage).
+  Single-node Victoria (victoria-loadbalancer) is not supported for external integration.
+
+victoria_err_no_pods_found: "No Victoria pods found in namespace '{{ victoria_namespace }}'."
+victoria_err_pods_not_running: "One or more Victoria pods are not in Running state."
+victoria_err_pods_not_ready: "One or more Victoria pods are not Ready."
+
+victoria_err_lb_missing: >-
+  Failed to fetch Victoria LoadBalancer IP(s). Ensure services 'vminsert' and 'vmselect'
+  exist in namespace '{{ victoria_namespace }}' and have external IPs assigned.

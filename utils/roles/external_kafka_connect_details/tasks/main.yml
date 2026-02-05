@@ -43,12 +43,12 @@
 
 - name: Fail if no Kafka pods found
   ansible.builtin.fail:
-    msg: "No Kafka pods found in namespace '{{ kafka_namespace }}'."
+    msg: "{{ kafka_err_no_pods_found }}"
   when: (kafka_pods_parsed.get('items', []) | length) == 0
 
 - name: Fail if Kafka pods are not Running
   ansible.builtin.fail:
-    msg: "One or more Kafka pods are not in Running state."
+    msg: "{{ kafka_err_pods_not_running }}"
   when:
     - (kafka_pods_parsed.get('items', [])
       | selectattr('status.phase', 'ne', 'Running')
@@ -57,7 +57,7 @@
 
 - name: Fail if Kafka pods are not Ready
   ansible.builtin.fail:
-    msg: "One or more Kafka pods are not Ready."
+    msg: "{{ kafka_err_pods_not_ready }}"
   when:
     - (kafka_pods_parsed.get('items', [])
       | selectattr('status.containerStatuses', 'defined')
@@ -76,43 +76,15 @@
   changed_when: false
   failed_when: kafka_lb_ip.rc != 0
 
-- name: Get Kafka LoadBalancer hostname
-  ansible.builtin.command: >-
-    kubectl get svc {{ kafka_lb_service_name }} -n {{ kafka_namespace }}
-    -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
-  register: kafka_lb_hostname
-  changed_when: false
-  failed_when: kafka_lb_hostname.rc != 0
-
-- name: Get Kafka LoadBalancer external port
-  ansible.builtin.command: >-
-    kubectl get svc {{ kafka_lb_service_name }} -n {{ kafka_namespace }}
-    -o jsonpath='{.spec.ports[0].port}'
-  register: kafka_lb_port
-  changed_when: false
-  failed_when: kafka_lb_port.rc != 0
-
 - name: Set Kafka external endpoint
   ansible.builtin.set_fact:
-    kafka_external_host: >-
-      {{
-        (kafka_lb_ip.stdout | trim)
-        if (kafka_lb_ip.stdout | trim | length) > 0
-        else (kafka_lb_hostname.stdout | trim)
-      }}
-    kafka_external_port: "{{ (kafka_lb_port.stdout | trim) | default('') }}"
+    kafka_external_ip: "{{ kafka_lb_ip.stdout | trim }}"
+    kafka_external_port: "{{ kafka_bootstrap_port | string }}"
 
 - name: Fail when Kafka external endpoint is not available
   ansible.builtin.fail:
-    msg: >-
-      Failed to fetch Kafka LoadBalancer endpoint. Ensure service '{{ kafka_lb_service_name }}'
-      exists in namespace '{{ kafka_namespace }}' and has an external IP/hostname assigned.
-  when: kafka_external_host | trim | length == 0
-
-- name: Set Kafka external port fallback
-  ansible.builtin.set_fact:
-    kafka_external_port: "{{ kafka_bootstrap_port | string }}"
-  when: kafka_external_port | trim | length == 0
+    msg: "{{ kafka_err_external_ip_missing }}"
+  when: kafka_external_ip | trim | length == 0
 
 - name: Ensure output directory exists
   ansible.builtin.file:
@@ -170,7 +142,7 @@
         namespace: "{{ kafka_namespace }}"
         loadbalancer_service: "{{ kafka_lb_service_name }}"
         pod_status: "{{ kafka_pods.stdout | default('') }}"
-        bootstrap_server: "{{ kafka_external_host }}:{{ kafka_external_port }}"
+        bootstrap_server: "{{ kafka_external_ip }}:{{ kafka_external_port }}"
         tls:
           ca_crt: "{{ kafka_output_dir }}/ca.crt"
           client_crt: "{{ kafka_output_dir }}/user.crt"
@@ -201,12 +173,16 @@
         [
           'Kafka connection details written to: ' ~ kafka_output_file,
           '',
-          'Bootstrap: ' ~ kafka_external_host ~ ':' ~ kafka_external_port,
+          'Bootstrap: ' ~ kafka_external_ip ~ ':' ~ kafka_external_port,
           '',
           'TLS:',
           '  CA: ' ~ kafka_output_dir ~ '/ca.crt',
           '  client cert: ' ~ kafka_output_dir ~ '/user.crt',
           '  client key: ' ~ kafka_output_dir ~ '/user.key',
+          '',
+          'OME note (client cert):',
+          '  Create a certificate in .pfx format (provide a passphrase when prompted):',
+          '  openssl pkcs12 -export -out user.pfx -inkey user.key -in user.crt',
           ''
         ]
       }}
