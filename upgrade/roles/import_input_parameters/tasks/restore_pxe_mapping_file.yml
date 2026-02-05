@@ -1,0 +1,49 @@
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+
+- name: Validate backup_location is provided
+  ansible.builtin.fail:
+    msg: "backup_location must be provided to restore pxe_mapping_file.csv"
+  when: backup_location is not defined or (backup_location | string | trim) == ""
+
+- name: Ensure backup directory exists
+  ansible.builtin.file:
+    path: "{{ backup_location }}"
+    state: directory
+    mode: '0755'
+
+- name: Check if backup pxe_mapping_file.csv exists
+  ansible.builtin.stat:
+    path: "{{ backup_location }}/pxe_mapping_file.csv"
+  register: backup_pxe_mapping_stat
+
+- name: Fail if backup pxe_mapping_file.csv is not present
+  ansible.builtin.fail:
+    msg: "Backup pxe_mapping_file.csv is not present at {{ backup_location }}/pxe_mapping_file.csv"
+  when: not backup_pxe_mapping_stat.stat.exists
+
+- name: Overwrite pxe_mapping_file.csv in input directory from backup
+  ansible.builtin.copy:
+    src: "{{ backup_location }}/pxe_mapping_file.csv"
+    dest: "{{ omnia_input_dir }}/pxe_mapping_file.csv"
+    mode: '0644'
+    remote_src: true
+
+- name: Display pxe_mapping_file.csv restore summary
+  ansible.builtin.debug:
+    msg: |
+      pxe_mapping_file.csv restored from backup.
+      Backup preserved at: {{ backup_location }}/pxe_mapping_file.csv
+      Restored to: {{ omnia_input_dir }}/pxe_mapping_file.csv

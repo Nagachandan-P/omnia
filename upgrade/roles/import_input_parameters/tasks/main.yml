@@ -12,3 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ---
+
+- name: Transform network_spec.yml from Omnia 2.0 to 2.1
+  ansible.builtin.include_tasks: transform_network_spec.yml
+
+- name: Restore software_config.json from backup
+  ansible.builtin.include_tasks: restore_software_config.yml
+
+- name: Restore pxe_mapping_file.csv from backup
+  ansible.builtin.include_tasks: restore_pxe_mapping_file.yml
