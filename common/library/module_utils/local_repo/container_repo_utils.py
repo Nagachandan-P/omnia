@@ -109,13 +109,47 @@ def sync_container_repository(repo_name, remote_name, package_content, logger):
         bool: True if the synchronization is successful, False otherwise.
     """
     try:
+        logger.info(f"Getting repository version before sync for {repo_name}")
+        verify_command = pulp_container_commands["show_container_repo"] % repo_name
+        verify_result_before = execute_command(verify_command, logger, type_json=True)
+        
+        version_before = None
+        if verify_result_before and isinstance(verify_result_before, dict) and "stdout" in verify_result_before:
+            repo_data_before = verify_result_before["stdout"]
+            if isinstance(repo_data_before, dict):
+                version_before = repo_data_before.get("latest_version_href")
+                logger.info(f"Repository version before sync: {version_before}")
+        
         command = pulp_container_commands["sync_container_repository"] % (repo_name, remote_name)
         result = execute_command(command,logger)
         if result is False or (isinstance(result, dict) and result.get("returncode", 1) != 0):
+            logger.error(f"Sync command failed for repository {repo_name}")
             return False
-        else:
-            result = create_container_distribution(repo_name,package_content,logger)
-            return result
+        
+        logger.info(f"Validating sync result for repository {repo_name}")
+        verify_result_after = execute_command(verify_command, logger, type_json=True)
+        
+        if verify_result_after and isinstance(verify_result_after, dict) and "stdout" in verify_result_after:
+            repo_data_after = verify_result_after["stdout"]
+            if isinstance(repo_data_after, dict):
+                version_after = repo_data_after.get("latest_version_href")
+                logger.info(f"Repository version after sync: {version_after}")
+                
+                if not version_after or version_after.endswith("/versions/0/"):
+                    logger.error(f"Sync completed but no content was downloaded for {repo_name}. "
+                               f"The specified image tag likely does not exist in the upstream registry.")
+                    return False
+                
+                if version_before and version_after and version_before == version_after:
+                    logger.error(f"Sync completed but repository version did not change for {repo_name}. "
+                               f"Version remained at {version_after}. "
+                               f"The specified image tag likely does not exist in the remote registry.")
+                    return False
+                
+                logger.info(f"Sync validation successful: repository {repo_name} version changed from {version_before} to {version_after}")
+        
+        result = create_container_distribution(repo_name,package_content,logger)
+        return result
     except Exception as e:
         logger.error(f"Failed to synchronize repository {repo_name} with remote {remote_name}. Error: {e}")
         return False

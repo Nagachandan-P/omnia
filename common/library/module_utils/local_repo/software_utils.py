@@ -712,16 +712,21 @@ def get_new_packages_not_in_status(json_path, csv_path, subgroup_list,logger):
         raise
    
     for pkg in all_packages:
-
         if pkg["type"] == "image":
-           pkg_prefix = pkg.get("package", "").strip()
-           prefix_found = any(name.startswith(f"{pkg_prefix}:") for name in names)
-           if not prefix_found:
-               new_packages.append(pkg)
+            # Check exact package:tag or package:digest combination
+            pkg_base = pkg.get("package", "").strip()
+            pkg_identifier = pkg_base
+            
+            if "tag" in pkg:
+                pkg_identifier += f":{pkg['tag']}"
+            elif "digest" in pkg:
+                pkg_identifier += f":{pkg['digest']}"
+            
+            if pkg_identifier not in names:
+                new_packages.append(pkg)
         else:
             if pkg.get("package") not in names:
                 new_packages.append(pkg)
-
     logger.info("New packages list: %s", new_packages)
 
     logger.info("Finished get_new_packages_not_in_status()")
@@ -828,7 +833,9 @@ def remove_duplicates_from_trans(trans):
                 type_ = item.get("type")
 
                 if type_ == "image":
-                    key = (item.get("package"), item.get("tag"))
+                    # Use digest if present, otherwise use tag
+                    identifier = item.get("digest") or item.get("tag")
+                    key = (item.get("package"), identifier)
 
                 elif type_ == "pip_module":
                     key = item.get("package")
