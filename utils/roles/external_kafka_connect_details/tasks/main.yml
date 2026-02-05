@@ -173,16 +173,18 @@
         [
           'Kafka connection details written to: ' ~ kafka_output_file,
           '',
-          'Bootstrap: ' ~ kafka_external_ip ~ ':' ~ kafka_external_port,
+          'Kafka external endpoint: ' ~ kafka_external_ip ~ ':' ~ kafka_external_port,
           '',
           'TLS:',
           '  CA: ' ~ kafka_output_dir ~ '/ca.crt',
           '  client cert: ' ~ kafka_output_dir ~ '/user.crt',
           '  client key: ' ~ kafka_output_dir ~ '/user.key',
           '',
-          'OME note (client cert):',
-          '  Create a certificate in .pfx format (provide a passphrase when prompted):',
-          '  openssl pkcs12 -export -out user.pfx -inkey user.key -in user.crt',
+          'OME note (mTLS):',
+          '  Use ca.crt as the server certificate in OME.',
+          '  Create a client certificate in .pfx format (provide a passphrase when prompted):',
+          '    openssl pkcs12 -export -out user.pfx -inkey user.key -in user.crt',
+          '  Use user.pfx as the client certificate in OME.',
           ''
         ]
       }}

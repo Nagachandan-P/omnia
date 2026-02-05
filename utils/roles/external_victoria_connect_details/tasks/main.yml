@@ -173,6 +173,15 @@
   when:
     - vminsert_host | trim | length == 0 or vmselect_host | trim | length == 0
 
+- name: Build SFM hosts entry
+  ansible.builtin.set_fact:
+    victoria_sfm_hosts_entry: >-
+      {{
+        'echo "' ~ (vminsert_lb_ip.stdout | trim) ~ ' vminsert.' ~ victoria_namespace ~ '.svc.cluster.local" >> /etc/hosts'
+        if (vminsert_lb_ip.stdout | trim | length) > 0
+        else ''
+      }}
+
 - name: Set Victoria external port fallbacks
   ansible.builtin.set_fact:
     vminsert_port: "8480"
@@ -200,6 +209,10 @@
             ui_url: "https://{{ vmselect_host }}:{{ vmselect_port }}/select/0/vmui"
         tls:
           server_crt: "{{ victoria_tls_cert }}"
+        notes:
+          sfm:
+            vminsert_write_url: "https://{{ vminsert_host }}:{{ vminsert_port }}/insert/0/prometheus/api/v1/write"
+            hosts_entry: "{{ victoria_sfm_hosts_entry }}"
 
 - name: Ensure output directory exists
   ansible.builtin.file:
@@ -234,7 +247,12 @@
           '  vmselect UI:    https://' ~ vmselect_host ~ ':' ~ vmselect_port ~ '/select/0/vmui',
           '',
           'TLS:',
-          '  server.crt: ' ~ victoria_tls_cert
+          '  server.crt: ' ~ victoria_tls_cert,
+          '',
+          'SFM note:',
+          '  Use vminsert write URL for SFM: https://' ~ vminsert_host ~ ':' ~ vminsert_port ~ '/insert/0/prometheus/api/v1/write',
+          '  Add this entry to /etc/hosts on the SFM server:',
+          '    ' ~ (victoria_sfm_hosts_entry if (victoria_sfm_hosts_entry | length) > 0 else 'LoadBalancer IP not available; cannot generate /etc/hosts entry.')
         ]
       }}
   delegate_to: localhost
