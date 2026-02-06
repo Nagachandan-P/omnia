@@ -131,12 +131,26 @@
       (network_spec_21.Networks is not defined)
       or ((network_spec_21.Networks | select('mapping') | selectattr('ib_network', 'defined') | list | length) == 0)
 
+- name: Extract ib_network subnet from transformed output
+  ansible.builtin.set_fact:
+    ib_network_subnet: >-
+      {{
+        (
+          network_spec_21.Networks
+          | select('mapping')
+          | selectattr('ib_network', 'defined')
+          | map(attribute='ib_network')
+          | first
+          | default({})
+        ).subnet | default('')
+      }}
+
 - name: Validate mandatory ib_network.subnet is present in transformed output
   ansible.builtin.fail:
     msg: "{{ msg_ib_subnet_missing }}"
   when:
     - >-
-      ((network_spec_21.Networks | select('mapping') | selectattr('ib_network', 'defined') | map(attribute='ib_network') | first | default({})).subnet | default('') | string | trim) == ''
+      (ib_network_subnet | string | trim) == ''
 
 - name: Display transformation summary
   ansible.builtin.debug:
