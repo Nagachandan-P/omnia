@@ -409,7 +409,11 @@
 
 - name: Fail if slurmctld is not active
   ansible.builtin.fail:
-    msg: "slurmctld is not active on the controller. Rollback applied on disk, but cannot reconfigure until slurmctld is running. Verify munge and slurmctld services and restart slurmctld, then re-run rollback or run 'scontrol reconfigure' on the controller."
+    msg: >-
+      slurmctld is not active on the controller. Rollback applied on disk, but cannot
+      reconfigure until slurmctld is running. Verify munge and slurmctld services and
+      restart slurmctld, then re-run rollback or run 'scontrol reconfigure' on the
+      controller.
   when: slurmctld_state != 'running'
   tags: config_rollback
 
@@ -429,4 +433,7 @@
 
     - name: Fail with rollback guidance
       ansible.builtin.fail:
-        msg: "Rollback applied on disk, but scontrol reconfigure failed. Recommended action: rollback to the safety backup created before this rollback (if you chose to create it)."
+        msg: >-
+          Rollback applied on disk, but scontrol reconfigure failed. Recommended action:
+          rollback to the safety backup created before this rollback (if you chose to
+          create it).
