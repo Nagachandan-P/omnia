@@ -13,7 +13,7 @@
 # limitations under the License.
 ---
 
-backup_location: /opt/omnia/backups/upgrade/input
+backup_location: /opt/omnia/backups/upgrade/input/project_default
 
 backup_dir_mode: '0755'
 default_file_mode: '0644'
