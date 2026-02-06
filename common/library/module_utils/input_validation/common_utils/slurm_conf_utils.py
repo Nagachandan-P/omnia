@@ -604,7 +604,7 @@ def validate_config_types(conf_dict, conf_name):
                 type_errors.append({
                     "error_key": "omnia_config.yml",
                     "error_msg": f"{conf_name}.conf: '{key}': {error} -> '{value}'",
-                    "error_value": "slurm_cluster config_sources"
+                    "error_value": "slurm_cluster->config_sources"
                     })
     
     return {
