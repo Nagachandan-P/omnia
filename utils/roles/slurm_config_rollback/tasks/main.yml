@@ -326,12 +326,11 @@
   tags: config_rollback
 
 - name: Restore config directories
-  ansible.builtin.copy:
+  ansible.posix.synchronize:
     src: "{{ selected_backup_ctld_root }}/{{ item }}/"
     dest: "{{ slurm_config_path }}/{{ ctld_list[0] }}/{{ item }}/"
-    remote_src: true
-    mode: '0644'
-    directory_mode: '0755'
+    archive: true
+    recursive: true
   loop:
     - etc/slurm
     - etc/munge
@@ -387,7 +386,9 @@
   tags: config_rollback
 
 - name: Restart slurmdbd
-  ansible.builtin.command: systemctl restart slurmdbd
+  ansible.builtin.systemd:
+    name: slurmdbd
+    state: restarted
   delegate_to: slurm_controller
   when:
     - slurmdbd_before.stat.exists
@@ -396,18 +397,20 @@
   changed_when: true
   tags: config_rollback
 
-- name: Check slurmctld is active before reconfigure
-  ansible.builtin.command: systemctl is-active slurmctld
+- name: Gather service facts on controller
+  ansible.builtin.service_facts:
   delegate_to: slurm_controller
-  register: slurmctld_active
-  changed_when: false
-  failed_when: false
+  tags: config_rollback
+
+- name: Set slurmctld state
+  ansible.builtin.set_fact:
+    slurmctld_state: "{{ ansible_facts.services['slurmctld.service'].state | default('unknown') }}"
   tags: config_rollback
 
 - name: Fail if slurmctld is not active
   ansible.builtin.fail:
     msg: "slurmctld is not active on the controller. Rollback applied on disk, but cannot reconfigure until slurmctld is running. Verify munge and slurmctld services and restart slurmctld, then re-run rollback or run 'scontrol reconfigure' on the controller."
-  when: slurmctld_active.stdout | default('') | trim != 'active'
+  when: slurmctld_state != 'running'
   tags: config_rollback
 
 - name: Run scontrol reconfigure
