@@ -571,8 +571,6 @@ _HOSTLIST_RE = re.compile(
 def validate_config_types(conf_dict, conf_name, module):
     """Validate configuration keys and value types based on SlurmParserEnum."""
     current_conf = all_confs.get(conf_name, {})
-    module.warn(f"current_conf: {current_conf}")
-    module.warn(f"conf_dict: {conf_dict}")
     invalid_keys = list(set(conf_dict.keys()).difference(set(current_conf.keys())))
     type_errors = []
    
@@ -623,8 +621,6 @@ def validate_config_types(conf_dict, conf_name, module):
                         # Recursively validate each dict item in the array
                         for item in value:
                             item_result = validate_config_types(item, f"{conf_name}->{key}", module)
-                            module.warn(f"item: {item}")
-                            module.warn(json.dumps(item_result))
                             type_errors.extend(item_result['type_errors'])
                             invalid_keys.extend(item_result['invalid_keys'])
             elif expected_type == "object":
@@ -641,13 +637,6 @@ def validate_config_types(conf_dict, conf_name, module):
         'invalid_keys': list(invalid_keys),
         'type_errors': type_errors
     }
-
-def get_invalid_keys(conf_dict, conf_name):
-    """Get invalid configuration keys by comparing against expected keys."""
-    current_conf = all_confs.get(conf_name, {})
-    # get difference between conf_dict keys and current_conf keys
-    diff = set(conf_dict.keys()).difference(set(current_conf.keys()))
-    return list(diff)
 
 def parse_slurm_conf(file_path, conf_name, validate):
     """Parses the slurm.conf file and returns it as a dictionary."""

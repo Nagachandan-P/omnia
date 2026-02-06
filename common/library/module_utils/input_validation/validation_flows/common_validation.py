@@ -42,7 +42,6 @@ from ansible.module_utils.local_repo.software_utils import (
 )
 from ansible.module_utils.input_validation.common_utils.slurm_conf_utils import (
     parse_slurm_conf,
-    get_invalid_keys,
     validate_config_types
 )
 
