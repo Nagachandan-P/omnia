@@ -405,10 +405,9 @@
       ansible.builtin.fail:
         msg: "Rollback applied on disk, but scontrol reconfigure failed. Recommended action: rollback to the safety backup created before this rollback (if you chose to create it)."
 
-- name: Prompt to restart slurmdbd if slurmdbd.conf changed
-  ansible.builtin.pause:
-    prompt: "slurmdbd.conf has changed. Restart slurmdbd now? (Y/n)"
-  register: restart_slurmdbd_prompt
+- name: Notify slurmdbd.conf changed
+  ansible.builtin.debug:
+    msg: "Detected slurmdbd.conf change after rollback; restarting slurmdbd."
   when:
     - slurmdbd_before.stat.exists
     - slurmdbd_after.stat.exists
@@ -422,6 +421,5 @@
     - slurmdbd_before.stat.exists
     - slurmdbd_after.stat.exists
     - slurmdbd_before.stat.checksum != slurmdbd_after.stat.checksum
-    - restart_slurmdbd_prompt.user_input | default('Y') | lower != 'n'
   changed_when: true
   tags: config_rollback
