@@ -173,7 +173,7 @@ def slurm_conf_dict_merge(conf_dict_list, conf_name):
                         existing_dict = merged_dict.get(ky, {})
                         inner_dict = existing_dict.get(item.get(ky), {})
                         # Get the sub-options for this array type (e.g., nodename_options, partition_options)
-                        sub_options = all_confs.get(ky, {})
+                        sub_options = all_confs.get(f"{conf_name}->{ky}", {})
                         # Merge item into inner_dict, handling CSV fields specially
                         for k, v in item.items():
                             if sub_options.get(k) == SlurmParserEnum.S_P_CSV and k in inner_dict:

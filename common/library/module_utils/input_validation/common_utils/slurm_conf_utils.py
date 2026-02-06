@@ -13,6 +13,7 @@
 # limitations under the License.
 
 # These are the slurm options for version - 25.11
+import json
 import re
 import os
 from enum import Enum
@@ -67,6 +68,7 @@ downnodes_options = {
 
 
 nodename_options = {
+    "NodeName": S_P_STRING,
     "BcastAddr": S_P_STRING,
     "Boards": S_P_UINT16,
     "CoreSpecCount": S_P_UINT16,
@@ -99,12 +101,14 @@ nodename_options = {
 
 
 nodeset_options = {
+    "NodeSet": S_P_STRING,
     "Feature": S_P_STRING,
     "Nodes": S_P_STRING
 }
 
 
 partition_options = {
+    "Partition": S_P_STRING,
     "AllocNodes": S_P_CSV,
     "AllowAccounts": S_P_CSV,
     "AllowGroups": S_P_CSV,
@@ -514,7 +518,7 @@ mpi_options = {
 }
 
 # From https://github.com/SchedMD/slurm/blob/slurm-<VERSION>s/src/interfaces/gres.c#L101C40-L116C2
-gres_options = {
+_gres_options = {
     "AutoDetect": S_P_STRING,
     "Count": S_P_STRING,  # Number of Gres available
     "CPUs": S_P_STRING,  # CPUs to bind to Gres resource
@@ -525,10 +529,25 @@ gres_options = {
     "Link": S_P_STRING,  # Communication link IDs
     "Links": S_P_CSV,  # Communication link IDs
     "MultipleFiles": S_P_CSV,  # list of GRES device files
-    "Type": S_P_STRING,  # Gres type (e.g. model name)
-    "Name": S_P_ARRAY,  # Gres name
-    "NodeName": S_P_ARRAY
+    "Type": S_P_STRING
 }
+
+gres_options = _gres_options.copy()
+gres_options.update({
+    "Name": S_P_ARRAY,
+    "NodeName": S_P_ARRAY
+})
+
+gres_nodename_options = _gres_options.copy()
+gres_nodename_options.update({
+    "NodeName": S_P_STRING,
+    "Name": S_P_STRING
+})
+
+gres_name_options = _gres_options.copy()
+gres_name_options.update({
+    "Name": S_P_STRING
+})
 
 all_confs = {
     "slurm": slurm_options,
@@ -538,19 +557,23 @@ all_confs = {
     "gres": gres_options,
     # TOD: GRES can have different combinations, NodeName and Name
     # https://slurm.schedmd.com/gres.conf.html#SECTION_EXAMPLES
-    "PartitionName": partition_options,
-    "NodeName": nodename_options,
-    "DownNodes": downnodes_options,
-    "NodeSet": nodeset_options
+    "slurm->PartitionName": partition_options,
+    "slurm->NodeName": nodename_options,
+    "slurm->DownNodes": downnodes_options,
+    "slurm->NodeSet": nodeset_options,
+    "gres->Name": gres_name_options,
+    "gres->NodeName": gres_nodename_options
 }
 
 _HOSTLIST_RE = re.compile(
     r'^(?P<prefix>[^\[\]]*)\[(?P<inner>[^\[\]]+)\](?P<suffix>.*)$')
 
-def validate_config_types(conf_dict, conf_name):
+def validate_config_types(conf_dict, conf_name, module):
     """Validate configuration keys and value types based on SlurmParserEnum."""
     current_conf = all_confs.get(conf_name, {})
-    invalid_keys = set(conf_dict.keys()).difference(set(current_conf.keys()))
+    module.warn(f"current_conf: {current_conf}")
+    module.warn(f"conf_dict: {conf_dict}")
+    invalid_keys = list(set(conf_dict.keys()).difference(set(current_conf.keys())))
     type_errors = []
    
     for key, value in conf_dict.items():
@@ -593,24 +616,30 @@ def validate_config_types(conf_dict, conf_name):
             elif expected_type == "array":
                 if not isinstance(value, list):
                     error = f"Expected array (list), got {type(value).__name__}"
-                elif value and not all(isinstance(item, dict) for item in value):
-                    error = "Expected array of dicts, got mixed types"
-
+                elif value:
+                    if not all(isinstance(item, dict) for item in value):
+                        error = "Expected array of dicts, got mixed types"
+                    else:
+                        # Recursively validate each dict item in the array
+                        for item in value:
+                            item_result = validate_config_types(item, f"{conf_name}->{key}", module)
+                            module.warn(f"item: {item}")
+                            module.warn(json.dumps(item_result))
+                            type_errors.extend(item_result['type_errors'])
+                            invalid_keys.extend(item_result['invalid_keys'])
             elif expected_type == "object":
                 if not isinstance(value, (dict, object)):
                     error = f"Expected object, got {type(value).__name__}"
 
             if error:
-                type_errors.append({
+                type_errors.append({ # format for error message in input validator
                     "error_key": "omnia_config.yml",
                     "error_msg": f"{conf_name}.conf: '{key}': {error} -> '{value}'",
                     "error_value": "slurm_cluster->config_sources"
                     })
-    
     return {
         'invalid_keys': list(invalid_keys),
-        'type_errors': type_errors,
-        'valid': len(invalid_keys) == 0 and len(type_errors) == 0
+        'type_errors': type_errors
     }
 
 def get_invalid_keys(conf_dict, conf_name):

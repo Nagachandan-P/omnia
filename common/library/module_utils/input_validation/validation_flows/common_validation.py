@@ -1076,10 +1076,8 @@ def validate_omnia_config(
                         conf_dict = parse_slurm_conf(v, k, False)
                 else:
                     conf_dict = v
-                
-                # Validate config types once for both cases
                 if conf_dict:
-                    validation_result = validate_config_types(conf_dict, k)
+                    validation_result = validate_config_types(conf_dict, k, module)
                     if validation_result['type_errors']:
                         errors.extend(validation_result['type_errors'])
                     if validation_result['invalid_keys']:
