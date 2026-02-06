@@ -128,5 +128,3 @@ offline_path_aarch64:
     dest_path: "{{ packages_base_dir_aarch64 }}/doca-ofed"
 
 ssh_private_key_path: /root/.ssh/oim_rsa
-
-backup_dir: "{{ slurm_config_path }}/{{ ctld_list[0] }}/etc/slurm/backup_{{ ansible_date_time.date }}_{{ ansible_date_time.time | replace(':', '-') }}"

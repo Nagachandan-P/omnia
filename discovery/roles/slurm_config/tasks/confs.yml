@@ -152,28 +152,6 @@
   ansible.builtin.set_fact:
     conf_server: "--conf-server {{ ctld_list | map('regex_replace', '$', ':' ~ (slurm_conf_dict.get('SlurmctldPort', '6817') | string)) | join(',') }}"
 
-- name: Create backup directory with timestamp
-  ansible.builtin.file:
-    path: "{{ backup_dir }}"
-    state: directory
-    mode: '0755'
-    owner: "{{ slurm_user }}"
-    group: "{{ slurm_user_group }}"
-  when: ctld_list
-
-- name: Backup existing SLURM configuration files with timestamp
-  ansible.builtin.copy:
-    src: "{{ slurm_config_path }}/{{ ctld_list[0] }}/etc/slurm/{{ item.item.key }}.conf"
-    dest: "{{ backup_dir }}/{{ item.item.key }}.conf"
-    remote_src: true
-    mode: preserve
-  loop: "{{ merged_conf.results }}"
-  when:
-    - ctld_list
-    - item.item.key in conf_files
-  register: backup_results
-  failed_when: false
-
 - name: Write merged .conf
   ansible.builtin.copy:
     content: "{{ item.ini_lines | join('\n') }}\n"

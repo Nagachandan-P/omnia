@@ -525,8 +525,9 @@ gres_options = {
     "Link": S_P_STRING,  # Communication link IDs
     "Links": S_P_CSV,  # Communication link IDs
     "MultipleFiles": S_P_CSV,  # list of GRES device files
-    "Name": S_P_STRING,  # Gres name
-    "Type": S_P_STRING  # Gres type (e.g. model name)
+    "Type": S_P_STRING,  # Gres type (e.g. model name)
+    "Name": S_P_ARRAY,  # Gres name
+    "NodeName": S_P_ARRAY
 }
 
 all_confs = {
@@ -545,6 +546,72 @@ all_confs = {
 
 _HOSTLIST_RE = re.compile(
     r'^(?P<prefix>[^\[\]]*)\[(?P<inner>[^\[\]]+)\](?P<suffix>.*)$')
+
+def validate_config_types(conf_dict, conf_name):
+    """Validate configuration keys and value types based on SlurmParserEnum."""
+    current_conf = all_confs.get(conf_name, {})
+    invalid_keys = set(conf_dict.keys()).difference(set(current_conf.keys()))
+    type_errors = []
+   
+    for key, value in conf_dict.items():
+        if key in current_conf:
+            expected_type_enum = current_conf[key]
+            expected_type = expected_type_enum.value        
+            error = None
+
+            if expected_type == "int":
+                if not isinstance(value, int):
+                    try:
+                        int(str(value))
+                    except (ValueError, TypeError):
+                        error = f"Expected integer, got {type(value).__name__}"
+            
+            elif expected_type == "float":
+                if not isinstance(value, (int, float)):
+                    try:
+                        float(str(value))
+                    except (ValueError, TypeError):
+                        error = f"Expected float, got {type(value).__name__}"
+            
+            elif expected_type == "bool":
+                if not isinstance(value, bool):
+                    if str(value).lower() not in ['yes', 'no', 'true', 'false', '0', '1']:
+                        error = f"Expected boolean, got {type(value).__name__}"
+            
+            elif expected_type == "str":
+                if not isinstance(value, str):
+                    error = f"Expected string, got {type(value).__name__}"
+            
+            elif expected_type == "csv":
+                if not isinstance(value, str):
+                    error = f"Expected CSV string, got {type(value).__name__}"
+            
+            elif expected_type == "list":
+                if not isinstance(value, list):
+                    error = f"Expected list, got {type(value).__name__}"
+            
+            elif expected_type == "array":
+                if not isinstance(value, list):
+                    error = f"Expected array (list), got {type(value).__name__}"
+                elif value and not all(isinstance(item, dict) for item in value):
+                    error = "Expected array of dicts, got mixed types"
+
+            elif expected_type == "object":
+                if not isinstance(value, (dict, object)):
+                    error = f"Expected object, got {type(value).__name__}"
+
+            if error:
+                type_errors.append({
+                    "error_key": "omnia_config.yml",
+                    "error_msg": f"{conf_name}.conf: '{key}': {error} -> '{value}'",
+                    "error_value": "slurm_cluster config_sources"
+                    })
+    
+    return {
+        'invalid_keys': list(invalid_keys),
+        'type_errors': type_errors,
+        'valid': len(invalid_keys) == 0 and len(type_errors) == 0
+    }
 
 def get_invalid_keys(conf_dict, conf_name):
     """Get invalid configuration keys by comparing against expected keys."""

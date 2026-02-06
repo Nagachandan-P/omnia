@@ -21,6 +21,7 @@
   delegate_to: localhost
   register: ssh_check
   ignore_errors: true
+  ignore_unreachable: true
 
 - name: Block when ssh_check is success
   when: ssh_check is success

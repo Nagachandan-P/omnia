@@ -42,7 +42,8 @@ from ansible.module_utils.local_repo.software_utils import (
 )
 from ansible.module_utils.input_validation.common_utils.slurm_conf_utils import (
     parse_slurm_conf,
-    get_invalid_keys
+    get_invalid_keys,
+    validate_config_types
 )
 
 file_names = config.files
@@ -1072,7 +1073,9 @@ def validate_omnia_config(
                     else: # path and also exists
                         conf_dict = parse_slurm_conf(v, k, False)
                         # module.exit_json(failed=True, result=conf_dict)
-                        invalid_keys = get_invalid_keys(conf_dict, k)
+                        # invalid_keys = get_invalid_keys(conf_dict, k)
+                        type_errors = validate_config_types(conf_dict, k)
+                        module.exit_json(failed=True, result=type_errors)
                         if invalid_keys:
                             errors.append(
                                 create_error_msg(input_file_path, "slurm_cluster config_sources",
