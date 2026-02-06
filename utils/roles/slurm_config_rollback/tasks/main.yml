@@ -326,8 +326,11 @@
   tags: config_rollback
 
 - name: Restore config directories
-  ansible.builtin.command: >-
-    rsync -a "{{ selected_backup_ctld_root }}/{{ item }}/" "{{ slurm_config_path }}/{{ ctld_list[0] }}/{{ item }}/"
+  ansible.builtin.copy:
+    src: "{{ selected_backup_ctld_root }}/{{ item }}/"
+    dest: "{{ slurm_config_path }}/{{ ctld_list[0] }}/{{ item }}/"
+    remote_src: true
+    directory_mode: '0755'
   loop:
     - etc/slurm
     - etc/munge
@@ -373,6 +376,25 @@
   register: slurmdbd_after
   tags: config_rollback
 
+- name: Notify slurmdbd.conf changed
+  ansible.builtin.debug:
+    msg: "Detected slurmdbd.conf change after rollback; restarting slurmdbd."
+  when:
+    - slurmdbd_before.stat.exists
+    - slurmdbd_after.stat.exists
+    - slurmdbd_before.stat.checksum != slurmdbd_after.stat.checksum
+  tags: config_rollback
+
+- name: Restart slurmdbd
+  ansible.builtin.command: systemctl restart slurmdbd
+  delegate_to: slurm_controller
+  when:
+    - slurmdbd_before.stat.exists
+    - slurmdbd_after.stat.exists
+    - slurmdbd_before.stat.checksum != slurmdbd_after.stat.checksum
+  changed_when: true
+  tags: config_rollback
+
 - name: Check slurmctld is active before reconfigure
   ansible.builtin.command: systemctl is-active slurmctld
   delegate_to: slurm_controller
@@ -404,22 +426,3 @@
     - name: Fail with rollback guidance
       ansible.builtin.fail:
         msg: "Rollback applied on disk, but scontrol reconfigure failed. Recommended action: rollback to the safety backup created before this rollback (if you chose to create it)."
-
-- name: Notify slurmdbd.conf changed
-  ansible.builtin.debug:
-    msg: "Detected slurmdbd.conf change after rollback; restarting slurmdbd."
-  when:
-    - slurmdbd_before.stat.exists
-    - slurmdbd_after.stat.exists
-    - slurmdbd_before.stat.checksum != slurmdbd_after.stat.checksum
-  tags: config_rollback
-
-- name: Restart slurmdbd
-  ansible.builtin.command: systemctl restart slurmdbd
-  delegate_to: slurm_controller
-  when:
-    - slurmdbd_before.stat.exists
-    - slurmdbd_after.stat.exists
-    - slurmdbd_before.stat.checksum != slurmdbd_after.stat.checksum
-  changed_when: true
-  tags: config_rollback

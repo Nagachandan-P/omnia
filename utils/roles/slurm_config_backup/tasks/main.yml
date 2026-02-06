@@ -69,11 +69,15 @@
     backup_timestamp: "{{ ansible_date_time.date }}_{{ ansible_date_time.time | replace(':', '-') }}"
     backup_base_name: "{{ backup_base_name_input.user_input | default('') }}"
 
+- name: Set backup name suffix
+  ansible.builtin.set_fact:
+    backup_name_suffix: "{{ (backup_base_name | length > 0) | ternary(backup_base_name ~ '_' ~ backup_timestamp, backup_timestamp) }}"
+
 - name: Set backup directory
   ansible.builtin.set_fact:
     slurm_backups_root: "{{ share_path }}/{{ slurm_backups_dir_name }}"
-    backup_id: "{{ (backup_base_name | length > 0) | ternary(backup_base_name ~ '_' ~ backup_timestamp, backup_timestamp) }}"
-    backup_dir: "{{ share_path }}/{{ slurm_backups_dir_name }}/{{ (backup_base_name | length > 0) | ternary(backup_base_name ~ '_' ~ backup_timestamp, backup_timestamp) }}"
+    backup_id: "{{ backup_name_suffix }}"
+    backup_dir: "{{ share_path }}/{{ slurm_backups_dir_name }}/{{ backup_name_suffix }}"
 
 - name: Ensure slurm backups root exists
   ansible.builtin.file:
