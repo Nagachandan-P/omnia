@@ -625,14 +625,14 @@ def parse_json_data(file_path, package_types,logger, failed_list=None, subgroup_
                 for item in value:
                     # For every image, check if it is present in Pulp
                     if is_additional_packages and item.get("type") == "image":
-                            logger.info("Calling function to check %s existence in Pulp", item)
-                            tag_missing_entry = check_additional_image_in_pulp(item, logger)
-                            logger.info("tag_missing_entry: %s", tag_missing_entry)
-                            if tag_missing_entry == {}:
-                                continue
-                            if tag_missing_entry:
-                                filtered_list.append(tag_missing_entry)
+                        logger.info("Calling function to check %s existence in Pulp", item)
+                        tag_missing_entry = check_additional_image_in_pulp(item, logger)
+                        logger.info("tag_missing_entry: %s", tag_missing_entry)
+                        if tag_missing_entry == {}:
                             continue
+                        if tag_missing_entry:
+                            filtered_list.append(tag_missing_entry)
+                        continue
 
                     # Get package name
                     pkg_name = item.get("package")
