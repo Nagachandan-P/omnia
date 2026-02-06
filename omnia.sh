@@ -1212,7 +1212,7 @@ phase1_validate() {
         return 1
     fi
 
-    echo "[INFO] [ORCHESTRATOR] Container version validated: 1.0 (Omnia 2.0)"
+    echo "[INFO] [ORCHESTRATOR] Container version validated: 1.0 (Omnia 2.0.0.0)"
 
    
 
