@@ -13,17 +13,6 @@
 # limitations under the License.
 ---
 
-- name: Validate backup_location is provided
-  ansible.builtin.fail:
-    msg: "backup_location must be provided to run network_spec.yml upgrade"
-  when: backup_location is not defined or (backup_location | string | trim) == ""
-
-- name: Ensure backup directory exists
-  ansible.builtin.file:
-    path: "{{ backup_location }}"
-    state: directory
-    mode: '0755'
-
 - name: Check if backup network_spec.yml exists
   ansible.builtin.stat:
     path: "{{ backup_location }}/network_spec.yml"
@@ -31,55 +20,27 @@
 
 - name: Fail if backup network_spec.yml is not present
   ansible.builtin.fail:
-    msg: "Backup network_spec.yml is not present at {{ backup_location }}/network_spec.yml"
+    msg: "{{ msg_backup_network_spec_missing }}"
   when: not backup_network_spec_stat.stat.exists
 
 - name: Check if network_spec.yml exists
   ansible.builtin.stat:
-    path: "{{ omnia_input_dir }}/network_spec.yml"
+    path: "{{ input_project_dir }}/network_spec.yml"
   register: network_spec_stat
 
 - name: Fail if network_spec.yml is not present
   ansible.builtin.fail:
-    msg: "network_spec.yml is not present at {{ omnia_input_dir }}/network_spec.yml"
+    msg: "{{ msg_network_spec_missing }}"
   when: not network_spec_stat.stat.exists
 
-- name: Read existing network_spec.yml
-  ansible.builtin.slurp:
-    src: "{{ omnia_input_dir }}/network_spec.yml"
-  register: network_spec_slurp
-  when: network_spec_stat.stat.exists
-
-- name: Parse existing network_spec.yml
-  ansible.builtin.set_fact:
-    network_spec_existing: "{{ network_spec_slurp.content | b64decode | from_yaml }}"
-  when: network_spec_stat.stat.exists
-
-- name: Check if network_spec.yml is already in Omnia 2.1 format
-  ansible.builtin.set_fact:
-    network_spec_already_21: >-
-      {{
-        (network_spec_existing.schema_version | default('') | string) == '2.1'
-        and (network_spec_existing.Networks is defined)
-        and ((network_spec_existing.Networks | select('mapping') | selectattr('ib_network', 'defined') | list | length) > 0)
-      }}
-  when: network_spec_stat.stat.exists
-
-- name: Skip transformation when network_spec.yml is already in 2.1 format
-  ansible.builtin.debug:
-    msg: "network_spec.yml is already in Omnia 2.1 format. Skipping transformation."
-  when: network_spec_already_21 | default(false) | bool
-
-- name: Read backup network_spec.yml (Omnia 2.0 source)
+- name: Read backup network_spec.yml (source of truth)
   ansible.builtin.slurp:
     src: "{{ backup_location }}/network_spec.yml"
   register: backup_network_spec_slurp
-  when: not (network_spec_already_21 | default(false) | bool)
 
 - name: Parse backup network_spec.yml
   ansible.builtin.set_fact:
     backup_network_spec: "{{ backup_network_spec_slurp.content | b64decode | from_yaml }}"
-  when: not (network_spec_already_21 | default(false) | bool)
 
 - name: Extract admin_network and ib_network from backup file
   ansible.builtin.set_fact:
@@ -114,79 +75,69 @@
         )
       }}
   when:
-    - not (network_spec_already_21 | default(false) | bool)
+    - true
 
 - name: Render network_spec.yml in Omnia 2.1 format
   ansible.builtin.template:
     src: network_spec.j2
-    dest: "{{ omnia_input_dir }}/network_spec.yml"
-    mode: '0644'
+    dest: "{{ input_project_dir }}/network_spec.yml"
+    mode: "{{ default_file_mode }}"
   vars:
     admin_network_netmask_bits: "{{ admin_network.netmask_bits | default('24') }}"
-  when: not (network_spec_already_21 | default(false) | bool)
+  when: true
 
 - name: Read transformed network_spec.yml
   ansible.builtin.slurp:
-    src: "{{ omnia_input_dir }}/network_spec.yml"
+    src: "{{ input_project_dir }}/network_spec.yml"
   register: network_spec_21_slurp
-  when: not (network_spec_already_21 | default(false) | bool)
+  when: true
 
 - name: Parse transformed network_spec.yml
   ansible.builtin.set_fact:
     network_spec_21: "{{ network_spec_21_slurp.content | b64decode | from_yaml }}"
-  when: not (network_spec_already_21 | default(false) | bool)
+  when: true
 
 - name: Validate YAML syntax of transformed network_spec.yml
   ansible.builtin.command:
-    cmd: python3 -c "import yaml; yaml.safe_load(open('{{ omnia_input_dir }}/network_spec.yml','r'))"
+    cmd: python3 -c "import yaml; yaml.safe_load(open('{{ input_project_dir }}/network_spec.yml','r'))"
   register: network_spec_yaml_validation
   changed_when: false
-  when: not (network_spec_already_21 | default(false) | bool)
+  when: true
 
 - name: Fail if YAML validation fails
   ansible.builtin.fail:
-    msg: "YAML validation failed after transforming network_spec.yml"
+    msg: "{{ msg_yaml_validation_failed }}"
   when:
-    - not (network_spec_already_21 | default(false) | bool)
     - network_spec_yaml_validation.rc != 0
 
 - name: Ensure ib_network.netmask_bits matches admin_network.netmask_bits
   ansible.builtin.fail:
-    msg: "ib_network.netmask_bits must match admin_network.netmask_bits in Omnia 2.1"
+    msg: "{{ msg_ib_netmask_mismatch }}"
   when:
-    - not (network_spec_already_21 | default(false) | bool)
     - >-
       (ib_network.netmask_bits | default(admin_network.netmask_bits | default('24')) | string)
       != (admin_network.netmask_bits | default('24') | string)
 
 - name: Display backup path (no-op when skipped)
   ansible.builtin.debug:
-    msg: "Using backup as input source: {{ backup_location }}/network_spec.yml (backup is not modified)"
-  when: not (network_spec_already_21 | default(false) | bool)
+    msg: "{{ msg_using_backup_network_spec }}"
+  when: true
 
 - name: Validate mandatory ib_network is present in transformed output
   ansible.builtin.fail:
-    msg: "ib_network is mandatory in Omnia 2.1 network_spec.yml"
+    msg: "{{ msg_ib_network_missing }}"
   when:
-    - not (network_spec_already_21 | default(false) | bool)
     - >-
       (network_spec_21.Networks is not defined)
       or ((network_spec_21.Networks | select('mapping') | selectattr('ib_network', 'defined') | list | length) == 0)
 
 - name: Validate mandatory ib_network.subnet is present in transformed output
   ansible.builtin.fail:
-    msg: "ib_network.subnet is mandatory in Omnia 2.1 network_spec.yml"
+    msg: "{{ msg_ib_subnet_missing }}"
   when:
-    - not (network_spec_already_21 | default(false) | bool)
     - >-
       ((network_spec_21.Networks | select('mapping') | selectattr('ib_network', 'defined') | map(attribute='ib_network') | first | default({})).subnet | default('') | string | trim) == ''
 
 - name: Display transformation summary
   ansible.builtin.debug:
-    msg: |
-      network_spec.yml upgraded to Omnia 2.1 format.
-      Backup preserved at: {{ backup_location }}/network_spec.yml
-      Key changes:
-      - Added mandatory ib_network section
-      - primary_oim_bmc_ip treated as optional
-      - ib_network.netmask_bits aligned with admin_network.netmask_bits
+    msg: "{{ msg_network_spec_transform_summary }}"
