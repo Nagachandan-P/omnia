@@ -96,7 +96,7 @@ def load_docker_credentials(vault_yml_path, vault_password_file):
 
             if response.status_code == 200:
                 return docker_username, docker_password
-            
+
             if response.status_code == 429:
                 raise RuntimeError("Docker Hub rate limit exceeded. Please try again later.")
 
