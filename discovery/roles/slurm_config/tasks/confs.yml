@@ -86,11 +86,18 @@
     loop_var: existing_conf_set
   register: prepared_conf_lists
 
+# All the updates to the confs follow after this point before merge
 - name: Prepend ClusterName and SlurmctldHost to slurm conf sources
   ansible.builtin.set_fact: # TODO: Change order if needed
     conf_merge_dict: "{{ conf_merge_dict
-     | combine({'slurm': [{'ClusterName': cluster_name, 'SlurmctldHost': ctld_list}] + conf_merge_dict['slurm']}) }}"
+     | combine({'slurm': [{'ClusterName': cluster_name, 'AccountingStorageHost': dbd_list[0], 'SlurmctldHost': ctld_list}] + conf_merge_dict['slurm']}) }}"
   when: "'slurm' in conf_merge_dict"
+
+- name: Slurm dbd - DbdHost and StorageHost
+  ansible.builtin.set_fact:
+    conf_merge_dict: "{{ conf_merge_dict
+     | combine({'slurmdbd': [{'DbdHost': ctld_list[0], 'StorageHost': ctld_list[0]}] + conf_merge_dict['slurmdbd']}) }}"
+  when: "'slurmdbd' in conf_merge_dict"
 
 - name: Merge the confs
   slurm_conf:
@@ -140,6 +147,10 @@
       (slurm_conf_dict.get('SlurmdPidFile', '/var/run/slurmd.pid') | dirname)]) }}"
   loop_control:
     loop_var: product
+
+- name: Generate slurmd opts for Configless # TODO: Move to $SLURMD_OPTIONS
+  ansible.builtin.set_fact:
+    conf_server: "--conf-server {{ ctld_list | map('regex_replace', '$', ':' ~ (slurm_conf_dict.get('SlurmctldPort', '6817') | string)) | join(',') }}"
 
 - name: Create backup directory with timestamp
   ansible.builtin.file:
