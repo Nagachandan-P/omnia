@@ -330,6 +330,7 @@
     src: "{{ selected_backup_ctld_root }}/{{ item }}/"
     dest: "{{ slurm_config_path }}/{{ ctld_list[0] }}/{{ item }}/"
     remote_src: true
+    mode: '0644'
     directory_mode: '0755'
   loop:
     - etc/slurm
