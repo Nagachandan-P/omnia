@@ -326,11 +326,11 @@
   tags: config_rollback
 
 - name: Restore config directories
-  ansible.posix.synchronize:
+  ansible.builtin.copy:
     src: "{{ selected_backup_ctld_root }}/{{ item }}/"
     dest: "{{ slurm_config_path }}/{{ ctld_list[0] }}/{{ item }}/"
-    archive: true
-    recursive: true
+    remote_src: true
+    mode: preserve
   loop:
     - etc/slurm
     - etc/munge
