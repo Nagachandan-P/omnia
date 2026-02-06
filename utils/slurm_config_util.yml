@@ -1,0 +1,26 @@
+---
+
+- name: Include input project directory
+  when: not project_dir_status | default(false) | bool
+  ansible.builtin.import_playbook: include_input_dir.yml
+  vars:
+    omnia_metadata_support: true
+  tags: always
+
+- name: Create oim group
+  ansible.builtin.import_playbook: create_container_group.yml
+  vars:
+    oim_group: true
+  tags: always
+
+- name: Slurm config utilities
+  hosts: oim
+  connection: ssh
+  gather_facts: true
+  roles:
+    - role: slurm_config_backup
+      tags: config_backup
+    - role: slurm_cleanup
+      tags: slurm_cleanup
+    - role: slurm_config_rollback
+      tags: config_rollback
