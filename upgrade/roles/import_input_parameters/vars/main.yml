@@ -86,4 +86,3 @@ restore_input_files:
   - name: pxe_mapping_file.csv
     mode: '0644'
     validate_cmd: ""
-
