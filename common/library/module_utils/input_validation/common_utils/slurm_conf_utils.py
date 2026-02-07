@@ -13,11 +13,11 @@
 # limitations under the License.
 
 # These are the slurm options for version - 25.11
-import json
 import re
 import os
 from enum import Enum
 from collections import OrderedDict
+
 
 class SlurmParserEnum(str, Enum):
     """Enumeration of Slurm configuration parameter types for parsing and validation."""
@@ -62,6 +62,7 @@ S_P_LIST = SlurmParserEnum.S_P_LIST
 
 
 downnodes_options = {
+    "DownNodes": S_P_STRING,
     "Reason": S_P_STRING,
     "State": S_P_STRING,
 }
@@ -157,7 +158,8 @@ partition_options = {
     "TRESBillingWeights": S_P_CSV
 }
 
-# From https://github.com/SchedMD/slurm/blob/slurm-<VERSION>/src/common/read_config.c
+# From
+# https://github.com/SchedMD/slurm/blob/slurm-<VERSION>/src/common/read_config.c
 slurm_options = {
     "AccountingStorageBackupHost": S_P_STRING,
     "AccountingStorageEnforce": S_P_CSV,
@@ -402,7 +404,8 @@ slurm_options = {
     "SlurmctldHost": S_P_LIST
 }
 
-# From https://github.com/SchedMD/slurm/blob/slurm-<VERSION>/src/slurmdbd/read_config.c
+# From
+# https://github.com/SchedMD/slurm/blob/slurm-<VERSION>/src/slurmdbd/read_config.c
 slurmdbd_options = {
     "AllowNoDefAcct": S_P_BOOLEAN,
     "AllResourcesAbsolute": S_P_BOOLEAN,
@@ -473,7 +476,8 @@ slurmdbd_options = {
     "TrackSlurmctldDown": S_P_BOOLEAN
 }
 
-# From https://github.com/SchedMD/slurm/blob/slurm-<VERSION>/src/interfaces/cgroup.c#L332
+# From
+# https://github.com/SchedMD/slurm/blob/slurm-<VERSION>/src/interfaces/cgroup.c#L332
 cgroup_options = {
     "CgroupAutomount": S_P_BOOLEAN,
     "CgroupMountpoint": S_P_STRING,
@@ -500,7 +504,8 @@ cgroup_options = {
     "SystemdTimeout": S_P_UINT64
 }
 
-# From https://github.com/SchedMD/slurm/blob/slurm-<VERSION>/src/plugins/mpi/pmix/mpi_pmix.c#L83
+# From
+# https://github.com/SchedMD/slurm/blob/slurm-<VERSION>/src/plugins/mpi/pmix/mpi_pmix.c#L83
 mpi_options = {
     "PMIxCliTmpDirBase": S_P_STRING,
     "PMIxCollFence": S_P_STRING,
@@ -517,7 +522,8 @@ mpi_options = {
     "PMIxTlsUCX": S_P_CSV
 }
 
-# From https://github.com/SchedMD/slurm/blob/slurm-<VERSION>s/src/interfaces/gres.c#L101C40-L116C2
+# From
+# https://github.com/SchedMD/slurm/blob/slurm-<VERSION>s/src/interfaces/gres.c#L101C40-L116C2
 _gres_options = {
     "AutoDetect": S_P_STRING,
     "Count": S_P_STRING,  # Number of Gres available
@@ -568,16 +574,18 @@ all_confs = {
 _HOSTLIST_RE = re.compile(
     r'^(?P<prefix>[^\[\]]*)\[(?P<inner>[^\[\]]+)\](?P<suffix>.*)$')
 
+
 def validate_config_types(conf_dict, conf_name, module):
     """Validate configuration keys and value types based on SlurmParserEnum."""
     current_conf = all_confs.get(conf_name, {})
-    invalid_keys = list(set(conf_dict.keys()).difference(set(current_conf.keys())))
+    invalid_keys = list(
+        set(conf_dict.keys()).difference(set(current_conf.keys())))
     type_errors = []
-   
+
     for key, value in conf_dict.items():
         if key in current_conf:
             expected_type_enum = current_conf[key]
-            expected_type = expected_type_enum.value        
+            expected_type = expected_type_enum.value
             error = None
 
             if expected_type == "int":
@@ -586,41 +594,44 @@ def validate_config_types(conf_dict, conf_name, module):
                         int(str(value))
                     except (ValueError, TypeError):
                         error = f"Expected integer, got {type(value).__name__}"
-            
+
             elif expected_type == "float":
                 if not isinstance(value, (int, float)):
                     try:
                         float(str(value))
                     except (ValueError, TypeError):
                         error = f"Expected float, got {type(value).__name__}"
-            
+
             elif expected_type == "bool":
                 if not isinstance(value, bool):
-                    if str(value).lower() not in ['yes', 'no', 'true', 'false', '0', '1']:
+                    if str(value).lower() not in [
+                            'yes', 'no', 'true', 'false', '0', '1']:
                         error = f"Expected boolean, got {type(value).__name__}"
-            
+
             elif expected_type == "str":
                 if not isinstance(value, str):
                     error = f"Expected string, got {type(value).__name__}"
-            
+
             elif expected_type == "csv":
                 if not isinstance(value, str):
                     error = f"Expected CSV string, got {type(value).__name__}"
-            
+
             elif expected_type == "list":
                 if not isinstance(value, list):
                     error = f"Expected list, got {type(value).__name__}"
-            
+
             elif expected_type == "array":
                 if not isinstance(value, list):
-                    error = f"Expected array (list), got {type(value).__name__}"
+                    error = f"Expected array (list), got {
+                        type(value).__name__}"
                 elif value:
                     if not all(isinstance(item, dict) for item in value):
                         error = "Expected array of dicts, got mixed types"
                     else:
                         # Recursively validate each dict item in the array
                         for item in value:
-                            item_result = validate_config_types(item, f"{conf_name}->{key}", module)
+                            item_result = validate_config_types(
+                                item, f"{conf_name}->{key}", module)
                             type_errors.extend(item_result['type_errors'])
                             invalid_keys.extend(item_result['invalid_keys'])
             elif expected_type == "object":
@@ -628,15 +639,16 @@ def validate_config_types(conf_dict, conf_name, module):
                     error = f"Expected object, got {type(value).__name__}"
 
             if error:
-                type_errors.append({ # format for error message in input validator
+                type_errors.append({  # format for error message in input validator
                     "error_key": "omnia_config.yml",
                     "error_msg": f"{conf_name}.conf: '{key}': {error} -> '{value}'",
                     "error_value": "slurm_cluster->config_sources"
-                    })
+                })
     return {
         'invalid_keys': list(invalid_keys),
         'type_errors': type_errors
     }
+
 
 def parse_slurm_conf(file_path, conf_name, validate):
     """Parses the slurm.conf file and returns it as a dictionary."""
@@ -661,20 +673,30 @@ def parse_slurm_conf(file_path, conf_name, validate):
                 tmp_dict[key.strip()] = value.strip()
             skey = list(tmp_dict.keys())[0]
             if validate and skey not in current_conf:
-                raise ValueError(f"Invalid key while parsing {file_path}: {skey}")
+                raise ValueError(
+                    f"Invalid key while parsing {file_path}: {skey}")
             if current_conf.get(skey) == SlurmParserEnum.S_P_ARRAY:
                 slurm_dict[list(tmp_dict.keys())[0]] = list(
                     slurm_dict.get(list(tmp_dict.keys())[0], [])) + [tmp_dict]
             elif current_conf.get(skey) == SlurmParserEnum.S_P_CSV:
-                existing_values = [v.strip() for v in slurm_dict.get(skey, "").split(',') if v.strip()]
-                new_values = [v.strip() for v in tmp_dict[skey].split(',') if v.strip()]
-                slurm_dict[skey] = ",".join(list(dict.fromkeys(existing_values + new_values)))
+                existing_values = [
+                    v.strip() for v in slurm_dict.get(
+                        skey, "").split(',') if v.strip()]
+                new_values = [v.strip()
+                              for v in tmp_dict[skey].split(',') if v.strip()]
+                slurm_dict[skey] = ",".join(
+                    list(
+                        dict.fromkeys(
+                            existing_values +
+                            new_values)))
             elif current_conf.get(skey) == SlurmParserEnum.S_P_LIST:
-                slurm_dict[skey] = list(slurm_dict.get(skey, [])) + list(tmp_dict.values())
+                slurm_dict[skey] = list(slurm_dict.get(
+                    skey, [])) + list(tmp_dict.values())
             else:
                 slurm_dict.update(tmp_dict)
 
     return slurm_dict
+
 
 def expand_hostlist(expr):
     """
