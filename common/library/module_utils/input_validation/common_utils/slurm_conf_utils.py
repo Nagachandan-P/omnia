@@ -61,14 +61,14 @@ S_P_CSV = SlurmParserEnum.S_P_CSV
 S_P_LIST = SlurmParserEnum.S_P_LIST
 
 
-downnodes_options = {
+slurm_downnodes_options = {
     "DownNodes": S_P_STRING,
     "Reason": S_P_STRING,
     "State": S_P_STRING,
 }
 
 
-nodename_options = {
+slurm_nodename_options = {
     "NodeName": S_P_STRING,
     "BcastAddr": S_P_STRING,
     "Boards": S_P_UINT16,
@@ -101,14 +101,14 @@ nodename_options = {
 }
 
 
-nodeset_options = {
+slurm_nodeset_options = {
     "NodeSet": S_P_STRING,
     "Feature": S_P_STRING,
     "Nodes": S_P_STRING
 }
 
 
-partition_options = {
+slurm_partitionname_options = {
     "Partition": S_P_STRING,
     "AllocNodes": S_P_CSV,
     "AllowAccounts": S_P_CSV,
@@ -505,24 +505,6 @@ cgroup_options = {
 }
 
 # From
-# https://github.com/SchedMD/slurm/blob/slurm-<VERSION>/src/plugins/mpi/pmix/mpi_pmix.c#L83
-mpi_options = {
-    "PMIxCliTmpDirBase": S_P_STRING,
-    "PMIxCollFence": S_P_STRING,
-    "PMIxDebug": S_P_UINT32,
-    "PMIxDirectConn": S_P_BOOLEAN,
-    "PMIxDirectConnEarly": S_P_BOOLEAN,
-    "PMIxDirectConnUCX": S_P_BOOLEAN,
-    "PMIxDirectSameArch": S_P_BOOLEAN,
-    "PMIxEnv": S_P_STRING,
-    "PMIxFenceBarrier": S_P_BOOLEAN,
-    "PMIxNetDevicesUCX": S_P_STRING,
-    "PMIxShareServerTopology": S_P_BOOLEAN,
-    "PMIxTimeout": S_P_UINT32,
-    "PMIxTlsUCX": S_P_CSV
-}
-
-# From
 # https://github.com/SchedMD/slurm/blob/slurm-<VERSION>s/src/interfaces/gres.c#L101C40-L116C2
 _gres_options = {
     "AutoDetect": S_P_STRING,
@@ -555,20 +537,223 @@ gres_name_options.update({
     "Name": S_P_STRING
 })
 
+# From
+# https://github.com/SchedMD/slurm/blob/slurm-<VERSION>/src/plugins/mpi/pmix/mpi_pmix.c#L83
+mpi_options = {
+    "PMIxCliTmpDirBase": S_P_STRING,
+    "PMIxCollFence": S_P_STRING,
+    "PMIxDebug": S_P_UINT32,
+    "PMIxDirectConn": S_P_BOOLEAN,
+    "PMIxDirectConnEarly": S_P_BOOLEAN,
+    "PMIxDirectConnUCX": S_P_BOOLEAN,
+    "PMIxDirectSameArch": S_P_BOOLEAN,
+    "PMIxEnv": S_P_STRING,
+    "PMIxFenceBarrier": S_P_BOOLEAN,
+    "PMIxNetDevicesUCX": S_P_STRING,
+    "PMIxShareServerTopology": S_P_BOOLEAN,
+    "PMIxTimeout": S_P_UINT32,
+    "PMIxTlsUCX": S_P_CSV
+}
+
+# src/common/oci_config.c
+oci_options = {
+    "ContainerPath": S_P_STRING,
+    "CreateEnvFile": S_P_STRING,
+    "DisableHooks": S_P_STRING,
+    "EnvExclude": S_P_STRING,
+    "MountSpoolDir": S_P_STRING,
+    "RunTimeCreate": S_P_STRING,
+    "RunTimeDelete": S_P_STRING,
+    "RunTimeKill": S_P_STRING,
+    "RunTimeEnvExclude": S_P_STRING,
+    "RunTimeQuery": S_P_STRING,
+    "RunTimeRun": S_P_STRING,
+    "RunTimeStart": S_P_STRING,
+    "SrunPath": S_P_STRING,
+    "SrunArgs": S_P_LIST,
+    "DisableCleanup": S_P_BOOLEAN,
+    "StdIODebug": S_P_STRING,
+    "SyslogDebug": S_P_STRING,
+    "FileDebug": S_P_STRING,
+    "DebugFlags": S_P_STRING,
+    "IgnoreFileConfigJson": S_P_BOOLEAN
+}
+
+# From
+# src/plugins/acct_gather_*/*
+acct_gather_options = {
+    "EnergyIPMIDriverType": S_P_UINT32,
+    "EnergyIPMIDisableAutoProbe": S_P_UINT32,
+    "EnergyIPMIDriverAddress": S_P_UINT32,
+    "EnergyIPMIRegisterSpacing": S_P_UINT32,
+    "EnergyIPMIDriverDevice": S_P_STRING,
+    "EnergyIPMIProtocolVersion": S_P_UINT32,
+    "EnergyIPMIUsername": S_P_STRING,
+    "EnergyIPMIPassword": S_P_STRING,
+    "EnergyIPMIPrivilegeLevel": S_P_UINT32,
+    "EnergyIPMIAuthenticationType": S_P_UINT32,
+    "EnergyIPMICipherSuiteId": S_P_UINT32,
+    "EnergyIPMISessionTimeout": S_P_UINT32,
+    "EnergyIPMIRetransmissionTimeout": S_P_UINT32,
+    "EnergyIPMIWorkaroundFlags": S_P_UINT32,
+    "EnergyIPMIRereadSdrCache": S_P_BOOLEAN,
+    "EnergyIPMIIgnoreNonInterpretableSensors": S_P_BOOLEAN,
+    "EnergyIPMIBridgeSensors": S_P_BOOLEAN,
+    "EnergyIPMIInterpretOemData": S_P_BOOLEAN,
+    "EnergyIPMISharedSensors": S_P_BOOLEAN,
+    "EnergyIPMIDiscreteReading": S_P_BOOLEAN,
+    "EnergyIPMIIgnoreScanningDisabled": S_P_BOOLEAN,
+    "EnergyIPMIAssumeBmcOwner": S_P_BOOLEAN,
+    "EnergyIPMIEntitySensorNames": S_P_BOOLEAN,
+    "EnergyIPMIFrequency": S_P_UINT32,
+    "EnergyIPMICalcAdjustment": S_P_BOOLEAN,
+    "EnergyIPMIPowerSensors": S_P_STRING,
+    "EnergyIPMITimeout": S_P_UINT32,
+    "EnergyIPMIVariable": S_P_STRING,
+    "ProfileHDF5Dir": S_P_STRING,
+    "ProfileHDF5Default": S_P_STRING,
+    "ProfileInfluxDBDatabase": S_P_STRING,
+    "ProfileInfluxDBDefault": S_P_STRING,
+    "ProfileInfluxDBFrequency": S_P_UINT32,
+    "ProfileInfluxDBHost": S_P_STRING,
+    "ProfileInfluxDBPass": S_P_STRING,
+    "ProfileInfluxDBRTPolicy": S_P_STRING,
+    "ProfileInfluxDBTimeout": S_P_UINT32,
+    "ProfileInfluxDBUser": S_P_STRING,
+    "InterconnectOFEDPort": S_P_UINT32,
+    "InfinibandOFEDPort": S_P_UINT32,
+    "SysfsInterfaces": S_P_STRING
+}
+
+# src/plugins/burst_buffer/common/burst_buffer_common.c
+burst_buffer_options = {
+    "AllowUsers": S_P_STRING,
+    "CreateBuffer": S_P_STRING,
+    "DefaultPool": S_P_STRING,
+    "DenyUsers": S_P_STRING,
+    "DestroyBuffer": S_P_STRING,
+    "Directive": S_P_STRING,
+    "Flags": S_P_STRING,
+    "GetSysState": S_P_STRING,
+    "GetSysStatus": S_P_STRING,
+    "Granularity": S_P_STRING,
+    "OtherTimeout": S_P_UINT32,
+    "PollInterval": S_P_UINT32,
+    "Pools": S_P_STRING,
+    "StageInTimeout": S_P_UINT32,
+    "StageOutTimeout": S_P_UINT32,
+    "StartStageIn": S_P_STRING,
+    "StartStageOut": S_P_STRING,
+    "StopStageIn": S_P_STRING,
+    "StopStageOut": S_P_STRING,
+    "ValidateTimeout": S_P_UINT32
+}
+
+# src/plugins/node_features/helpers/node_features_helpers.c
+helpers_options = {
+    "AllowUserBoot": S_P_STRING,
+    "BootTime": S_P_UINT32,
+    "ExecTime": S_P_UINT32,
+    "Feature": S_P_ARRAY,
+    "MutuallyExclusive": S_P_LIST,
+    "NodeName": S_P_ARRAY
+}
+
+helpers_nodename_options = {
+    "AllowUserBoot": S_P_STRING,
+    "BootTime": S_P_UINT32,
+    "ExecTime": S_P_UINT32,
+    "Feature": S_P_CSV,
+    "MutuallyExclusive": S_P_LIST
+}
+
+helpers_feature_options = {
+    "Feature": S_P_CSV,
+    "Helper": S_P_STRING,
+    "Flags": S_P_STRING
+}
+
+# src/plugins/namespace/tmpfs/read_jcconf.c
+job_container_options = {
+    "AutoBasePath": S_P_BOOLEAN,
+    "InitScript": S_P_STRING,
+    "BasePath": S_P_ARRAY,
+    "EntireStepInNS": S_P_BOOLEAN,
+    "NodeName": S_P_ARRAY,
+    "Shared": S_P_BOOLEAN,
+    "CloneNSScript": S_P_STRING,
+    "CloneNSEpilog": S_P_STRING,
+    "CloneNSScript_Wait": S_P_UINT32,
+    "CloneNSEpilog_Wait": S_P_UINT32
+}
+
+job_container_nodename_options = {
+    "AutoBasePath": S_P_BOOLEAN,
+    "BasePath": S_P_STRING,
+    "Dirs": S_P_STRING,
+    "EntireStepInNS": S_P_BOOLEAN,
+    "NodeName": S_P_STRING,
+    "Shared": S_P_BOOLEAN,
+    "CloneNSScript": S_P_STRING,
+    "CloneNSEpilog": S_P_STRING,
+    "CloneNSScript_Wait": S_P_UINT32,
+    "CloneNSEpilog_Wait": S_P_UINT32
+}
+
+job_container_basename_options = {
+    "BasePath": S_P_STRING,
+    "Dirs": S_P_STRING
+}
+
+# src/plugins/topology/tree/switch_record.c
+topology_options = {
+    "SwitchName": S_P_ARRAY,
+    "LinkSpeed": S_P_UINT32,
+    "Nodes": S_P_STRING,
+    "Switches": S_P_STRING,
+    "BlockName": S_P_ARRAY,
+    "BlockSizes": S_P_STRING
+}
+
+topology_switchname_options = {
+    "SwitchName": S_P_STRING,
+    "LinkSpeed": S_P_UINT32,
+    "Nodes": S_P_STRING,
+    "Switches": S_P_STRING
+}
+
+topology_blockname_options = {
+    "BlockName": S_P_STRING,
+    "BlockSizes": S_P_STRING,
+    "Nodes": S_P_STRING
+}
+
 all_confs = {
     "slurm": slurm_options,
     "slurmdbd": slurmdbd_options,
     "cgroup": cgroup_options,
     "mpi": mpi_options,
+    "oci": oci_options,
+    "acct_gather": acct_gather_options,
+    "burst_buffer": burst_buffer_options,
+    "helpers": helpers_options,
+    "job_container": job_container_options,
+    "topology": topology_options,
     "gres": gres_options,
     # TOD: GRES can have different combinations, NodeName and Name
     # https://slurm.schedmd.com/gres.conf.html#SECTION_EXAMPLES
-    "slurm->PartitionName": partition_options,
-    "slurm->NodeName": nodename_options,
-    "slurm->DownNodes": downnodes_options,
-    "slurm->NodeSet": nodeset_options,
+    "slurm->PartitionName": slurm_partitionname_options,
+    "slurm->NodeName": slurm_nodename_options,
+    "slurm->DownNodes": slurm_downnodes_options,
+    "slurm->NodeSet": slurm_nodeset_options,
     "gres->Name": gres_name_options,
-    "gres->NodeName": gres_nodename_options
+    "gres->NodeName": gres_nodename_options,
+    "job_container->NodeName": job_container_nodename_options,
+    "job_container->BaseName": job_container_basename_options,
+    "topology->SwitchName": topology_switchname_options,
+    "topology->BlockName": topology_blockname_options,
+    "helpers->NodeName": helpers_nodename_options,
+    "helpers->Feature": helpers_feature_options
 }
 
 _HOSTLIST_RE = re.compile(
