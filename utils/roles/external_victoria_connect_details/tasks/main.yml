@@ -176,7 +176,7 @@
   ansible.builtin.set_fact:
     victoria_sfm_hosts_entry: >-
       {{
-        'echo "' ~ (vminsert_lb_ip.stdout | trim) ~ ' vminsert.' ~ victoria_namespace ~ '.svc.cluster.local" >> /etc/hosts'
+        'echo ' ~ (vminsert_lb_ip.stdout | trim) ~ ' vminsert.' ~ victoria_namespace ~ '.svc.cluster.local >> /etc/hosts'
         if (vminsert_lb_ip.stdout | trim | length) > 0
         else ''
       }}
@@ -185,7 +185,7 @@
   ansible.builtin.set_fact:
     victoria_sfm_hosts_entry_vmselect: >-
       {{
-        'echo "' ~ (vmselect_lb_ip.stdout | trim) ~ ' vmselect.' ~ victoria_namespace ~ '.svc.cluster.local" >> /etc/hosts'
+        'echo ' ~ (vmselect_lb_ip.stdout | trim) ~ ' vmselect.' ~ victoria_namespace ~ '.svc.cluster.local >> /etc/hosts'
         if (vmselect_lb_ip.stdout | trim | length) > 0
         else ''
       }}
