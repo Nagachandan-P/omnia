@@ -19,7 +19,7 @@
     conf_name: "{{ extra_conf }}"
   register: ex_conf
   delegate_to: localhost
-  when: 
+  when:
     - "'.' not in extra_conf"
 
 - name: Write merged .conf
@@ -30,6 +30,6 @@
     owner: "{{ slurm_user }}"
     group: "{{ slurm_user_group }}"
     remote_src: "{{ copy_from_oim }}"
-  when: 
+  when:
     - "'.' not in extra_conf"
     - ex_conf is success
