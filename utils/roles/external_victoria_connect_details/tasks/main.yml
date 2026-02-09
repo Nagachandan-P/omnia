@@ -51,7 +51,7 @@
   when: victoria_deployment_mode != 'cluster'
 
 - name: Get Victoria pods status
-  ansible.builtin.shell: >-
+  ansible.builtin.command: >-
     kubectl get pods -n {{ victoria_namespace }}
     -l "app in (vminsert,vmselect,vmstorage,victoriametrics)"
     -o wide
@@ -60,7 +60,7 @@
   failed_when: victoria_pods_wide.rc != 0
 
 - name: Get Victoria pods status (json)
-  ansible.builtin.shell: >-
+  ansible.builtin.command: >-
     kubectl get pods -n {{ victoria_namespace }}
     -l "app in (vminsert,vmselect,vmstorage,victoriametrics)"
     -o json
@@ -191,6 +191,27 @@
         else ''
       }}
 
+- name: Set endpoint urls and SFM note strings
+  ansible.builtin.set_fact:
+    victoria_vminsert_write_url: >-
+      https://vminsert.{{ victoria_namespace }}.svc.cluster.local:8480/insert/0/prometheus/api/v1/write
+    victoria_vmselect_query_url: >-
+      https://vmselect.{{ victoria_namespace }}.svc.cluster.local:8481/select/0/prometheus/api/v1/query
+    victoria_vmselect_ui_url: >-
+      https://vmselect.{{ victoria_namespace }}.svc.cluster.local:8481/select/0/vmui
+    victoria_sfm_hosts_entry_vminsert_display: >-
+      {{
+        victoria_sfm_hosts_entry
+        if (victoria_sfm_hosts_entry | length) > 0
+        else 'vminsert LoadBalancer IP not available; cannot generate /etc/hosts entry.'
+      }}
+    victoria_sfm_hosts_entry_vmselect_display: >-
+      {{
+        victoria_sfm_hosts_entry_vmselect
+        if (victoria_sfm_hosts_entry_vmselect | length) > 0
+        else 'vmselect LoadBalancer IP not available; cannot generate /etc/hosts entry.'
+      }}
+
 - name: Set Victoria external port fallbacks
   ansible.builtin.set_fact:
     vminsert_port: "8480"
@@ -220,7 +241,7 @@
           server_crt: "{{ victoria_tls_cert }}"
         notes:
           sfm:
-            vminsert_write_url: "https://vminsert.{{ victoria_namespace }}.svc.cluster.local:8480/insert/0/prometheus/api/v1/write"
+            vminsert_write_url: "{{ victoria_vminsert_write_url }}"
             hosts_entry: "{{ victoria_sfm_hosts_entry }}"
             hosts_entry_vmselect: "{{ victoria_sfm_hosts_entry_vmselect }}"
 
@@ -252,20 +273,20 @@
           'Mode: ' ~ victoria_deployment_mode,
           '',
           'Endpoints:',
-          '  vminsert write: https://vminsert.' ~ victoria_namespace ~ '.svc.cluster.local:8480/insert/0/prometheus/api/v1/write',
-          '  vmselect query: https://vmselect.' ~ victoria_namespace ~ '.svc.cluster.local:8481/select/0/prometheus/api/v1/query',
-          '  vmselect UI:    https://vmselect.' ~ victoria_namespace ~ '.svc.cluster.local:8481/select/0/vmui',
+          '  vminsert write: ' ~ victoria_vminsert_write_url,
+          '  vmselect query: ' ~ victoria_vmselect_query_url,
+          '  vmselect UI:    ' ~ victoria_vmselect_ui_url,
           '',
           'TLS:',
           '  server.crt: ' ~ victoria_tls_cert,
           '',
           'SFM note:',
-          '  Use vminsert write URL for SFM: https://vminsert.' ~ victoria_namespace ~ '.svc.cluster.local:8480/insert/0/prometheus/api/v1/write',
-          '  Add this entry to /etc/hosts on the SFM server:',
-          '    ' ~ (victoria_sfm_hosts_entry if (victoria_sfm_hosts_entry | length) > 0 else 'vminsert LoadBalancer IP not available; cannot generate /etc/hosts entry.'),
-          '  Add this entry to /etc/hosts on the SFM server:',
-          '    ' ~ (victoria_sfm_hosts_entry_vmselect if (victoria_sfm_hosts_entry_vmselect | length) > 0 else 'vmselect LoadBalancer IP not available; cannot generate /etc/hosts entry.'),
-          '  If you are using the SFM UI from a different system than the OIM host, copy server.crt from the OIM host to that system before selecting/uploading it in the UI.'
+          '  Use vminsert write URL for SFM: ' ~ victoria_vminsert_write_url,
+          '  Add these entries to /etc/hosts on the SFM server:',
+          '    ' ~ victoria_sfm_hosts_entry_vminsert_display,
+          '    ' ~ victoria_sfm_hosts_entry_vmselect_display,
+          '  If you are using the SFM UI from a different system than the OIM host,',
+          '  copy server.crt from the OIM host to that system before selecting/uploading it in the UI.'
         ]
       }}
   delegate_to: localhost
