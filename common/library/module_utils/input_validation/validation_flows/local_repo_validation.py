@@ -29,43 +29,77 @@ create_file_path = validation_utils.create_file_path
 
 def check_subscription_status(logger=None):
     """
-    Check if the system has an active Red Hat subscription.
-    Subscription status is considered True if either entitlement
-    certificates exist or the required Red Hat repository URLs are present.
-    
-    Checks mounted host paths (/etc/pki/entitlement, /etc/yum.repos.d/redhat.repo).
+    Check if the system has an active Red Hat subscription enabled.
+    If system entitlement certificates are found in /etc/pki/entitlement,
+    only system paths are checked. Otherwise, Omnia paths are checked.
+    Subscription is enabled only if entitlement certificates and required
+    Red Hat repository URLs are found in the same source (system or Omnia).
 
     Returns:
-        bool: True if the system is subscribed (either entitlement certs
-              exist or required repos are present), False otherwise.
-    """    
-    # 1. Check entitlement certs
-    entitlement_certs = glob.glob(config.ENTITLEMENT_PEM)
-    has_entitlement = len(entitlement_certs) > 0
-    if logger:
-        logger.info(f"Entitlement certs in {config.ENTITLEMENT_PEM}: {len(entitlement_certs)} found")
+        bool: True if subscription is enabled (both entitlement certs
+              and repos are found in the same source), False otherwise.
+    """
+    # 1. Check system entitlement certs first
+    system_entitlement_certs = glob.glob(config.SYSTEM_ENTITLEMENT_PATH)
+    has_system_entitlement = len(system_entitlement_certs) > 0
+    
+    if has_system_entitlement:
+        # System entitlement found - use system paths only
+        entitlement_certs = system_entitlement_certs
+        has_entitlement = True
+        repo_file_to_check = config.SYSTEM_REDHAT_REPO
+        
+        if logger:
+            logger.info(f"Found {len(system_entitlement_certs)} system entitlement certs - using system paths only")
+    else:
+        # No system entitlement - check Omnia paths
+        omnia_entitlement_certs = glob.glob(config.OMNIA_ENTITLEMENT_PATH)
+        entitlement_certs = omnia_entitlement_certs
+        has_entitlement = len(omnia_entitlement_certs) > 0
+        repo_file_to_check = config.OMNIA_REDHAT_REPO
+        
+        if logger:
+            logger.info(f"No system entitlement found - checking Omnia paths: {len(omnia_entitlement_certs)} certs found")
 
-    # 2. Check redhat repos in redhat.repo
+    # 2. Check repos based on which entitlement path was used
+    has_repos = False
     repo_urls = []
-    redhat_repo = config.REDHAT_REPO_FILE
-    if os.path.exists(redhat_repo):
-        with open(redhat_repo, "r") as f:
-            for line in f:
-                if line.startswith("baseurl ="):
-                    url = line.split("=", 1)[1].strip()
-                    if re.search(r"(codeready-builder|baseos|appstream)", url, re.IGNORECASE):
-                        repo_urls.append(url)
+    redhat_repo_used = None
+    
+    if os.path.exists(repo_file_to_check):
+        try:
+            with open(repo_file_to_check, "r") as f:
+                for line in f:
+                    if line.startswith("baseurl ="):
+                        url = line.split("=", 1)[1].strip()
+                        if re.search(r"(codeready-builder|baseos|appstream)", url, re.IGNORECASE):
+                            repo_urls.append(url)
+            
+            if repo_urls:
+                has_repos = True
+                redhat_repo_used = repo_file_to_check
+                if logger:
+                    logger.info(f"Found {len(repo_urls)} repo URLs in {repo_file_to_check}")
+            elif logger:
+                logger.info(f"No required repo URLs found in {repo_file_to_check}")
+        except (IOError, OSError) as e:
+            if logger:
+                logger.warning(f"Error reading {repo_file_to_check}: {e}")
+    elif logger:
+        logger.info(f"Repo file {repo_file_to_check} does not exist")
 
-    has_repos = len(repo_urls) > 0
+    # 3. Subscription enabled if entitlement and repos are found in the same source
+    subscription_enabled = has_entitlement and has_repos
+    
     if logger:
-        logger.info(f"Repo URLs in {redhat_repo}: {len(repo_urls)} found")
+        logger.info(
+            f"Subscription enabled: {subscription_enabled} "
+            f"(entitlement={has_entitlement}, repos={has_repos}, "
+            f"entitlement_source={entitlement_certs[0] if entitlement_certs else 'None'}, "
+            f"repo_source={redhat_repo_used})"
+        )
 
-    # 3. Subscription status logic
-    subscription_status = has_entitlement or has_repos
-    if logger:
-        logger.info(f"Subscription status: {subscription_status} (entitlement={has_entitlement}, repos={has_repos})")
-
-    return subscription_status
+    return subscription_enabled
 
 # Below is a validation function for each file in the input folder
 def validate_local_repo_config(input_file_path, data,
@@ -128,50 +162,6 @@ def validate_local_repo_config(input_file_path, data,
 
     software_config_file_path = create_file_path(input_file_path, file_names["software_config"])
     software_config_json = load_json(software_config_file_path)
-
-    # Check if additional_packages is enabled and contains image packages
-    additional_packages_enabled = any(sw.get("name") == "additional_packages" for sw in software_config_json.get("softwares", []))
-    if additional_packages_enabled:
-        # Get arch values from additional_packages entry in software_config.json
-        additional_packages_archs = []
-        for software in software_config_json.get("softwares", []):
-            if software.get("name") == "additional_packages":
-                arch_list = software.get("arch", [])
-                additional_packages_archs = arch_list  # Get all archs
-                break
-
-        # Check each arch specific additional_packages.json
-        has_image_packages = False
-        for additional_packages_arch in additional_packages_archs:
-            additional_packages_path = create_file_path(
-                input_file_path,
-                f"config/{additional_packages_arch}/{software_config_json['cluster_os_type']}/{software_config_json['cluster_os_version']}/additional_packages.json"
-            )
-            
-            if os.path.exists(additional_packages_path):
-                additional_packages_data = load_json(additional_packages_path)
-                has_image_packages = False
-                
-                # Check all sections for image packages
-                for section_name, section_data in additional_packages_data.items():
-                    if isinstance(section_data, dict) and "cluster" in section_data:
-                        cluster_packages = section_data.get("cluster", [])
-                        
-                        for package in cluster_packages:
-                            if package.get("type") == "image":
-                                has_image_packages = True
-                                break
-
-                    if has_image_packages:
-                        break
-
-        # If any architecture has image packages, user_registry must be defined and not empty
-        if has_image_packages and user_registry is None:
-            errors.append(create_error_msg(
-                local_repo_yml,
-                "user_registry", 
-                "user_registry must be defined when additional_packages.json contains packages of type 'image'"
-            ))
 
     # Extra validation: custom_slurm must have <arch>_slurm_custom in user_repo_url_<arch>
     for sw in software_config_json["softwares"]:
