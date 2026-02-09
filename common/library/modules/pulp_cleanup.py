@@ -216,6 +216,16 @@ def file_exists_in_status(name: str, base_path: str, logger) -> bool:
     except Exception:
         return False
 
+def get_all_repositories(logger) -> List[str]:
+    """Get all RPM repository names from Pulp."""
+    cmd = pulp_rpm_commands["list_repositories"]
+    result = run_cmd(cmd, logger)
+    if result["rc"] != 0:
+        logger.error(f"Failed to list repositories: {result['stderr']}")
+        return []
+    repos = safe_json_parse(result["stdout"])
+    return [r.get('name', '') for r in repos if r.get('name')]
+
 
 # =============================================================================
 # CLEANUP FUNCTIONS
@@ -708,11 +718,12 @@ def remove_from_status_files(artifact_name: str, artifact_type: str, base_path: 
         return {}
 
 
-def mark_software_partial(affected_software: Dict[str, List[str]], base_path: str, logger, artifact_type: str = None):
+def mark_software_partial(affected_software, base_path: str, logger, artifact_type: str = None):
     """Mark software entries as partial in software.csv.
     
     Args:
-        affected_software: Dict mapping architecture to list of affected software names
+        affected_software: Either a List[str] of software names (from remove_rpms_from_repository)
+                          or a Dict[str, List[str]] mapping arch to software names (from remove_from_status_files)
         base_path: Base path for software.csv
         logger: Logger instance
         artifact_type: Type of artifact being removed (for logging purposes)
@@ -721,39 +732,119 @@ def mark_software_partial(affected_software: Dict[str, List[str]], base_path: st
     if not affected_software:
         logger.info("No affected software to mark as partial")
         return
+
+    # Normalize input: if a flat list is passed, apply to all architectures
+    if isinstance(affected_software, list):
+        arch_software_map = {arch: affected_software for arch in ARCH_SUFFIXES}
+    else:
+        arch_software_map = affected_software
         
     try:
-        # Only mark architectures where artifacts were actually removed
-        for arch, software_names in affected_software.items():
-            logger.info(f"Processing arch: {arch}, software_names: {software_names}")
+        for arch, software_names in arch_software_map.items():
             if not software_names:
                 continue
 
             software_file = f"{base_path}/{arch}/software.csv"
             logger.info(f"Looking for software file: {software_file}")
-            if os.path.exists(software_file):
-                rows = []
-                updated = False
-                with open(software_file, 'r') as f:
-                    reader = csv.DictReader(f)
-                    fieldnames = reader.fieldnames
-                    for row in reader:
-                        logger.info(f"Checking row: {row}")
-                        if row.get('name') in software_names:
-                            row['status'] = 'partial'
-                            updated = True
-                            logger.info(f"Marked '{row.get('name')}' as {GREEN}partial{RESET} in {arch}/software.csv ({artifact_type} cleanup)")
-                        rows.append(row)
+            if not os.path.exists(software_file):
+                logger.warning(f"Software file not found: {software_file}")
+                continue
 
-                if fieldnames and rows:
-                    with open(software_file, 'w', newline='') as f:
-                        writer = csv.DictWriter(f, fieldnames=fieldnames)
-                        writer.writeheader()
-                        writer.writerows(rows)
-                    logger.info(f"Successfully wrote updated software.csv for {arch}")
+            rows = []
+            updated = False
+            with open(software_file, 'r') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                for row in reader:
+                    if row.get('name') in software_names:
+                        row['status'] = 'partial'
+                        updated = True
+                        logger.info(f"Marked '{row.get('name')}' as partial in {arch}/software.csv ({artifact_type} cleanup)")
+                    rows.append(row)
+            
+            if fieldnames and rows and updated:
+                with open(software_file, 'w', newline='') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(rows)
+                logger.info(f"Successfully wrote updated software.csv for {arch}")
     except Exception as e:
         logger.error(f"Failed to update software.csv: {e}")
 
+def software_has_rpms(software_name: str, arch: str, base_path: str, logger) -> bool:
+    """Check if a software has any RPM dependencies in its status.csv.
+    
+    Args:
+        software_name: Name of the software
+        arch: Architecture (x86_64 or aarch64)
+        base_path: Base path for status files
+        logger: Logger instance
+        
+    Returns:
+        True if software has RPM entries, False otherwise
+    """
+    status_file = f"{base_path}/{arch}/{software_name}/status.csv"
+    if not os.path.exists(status_file):
+        return False
+    
+    try:
+        with open(status_file, 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get('type', '').lower() == 'rpm':
+                    return True
+        return False
+    except Exception as e:
+        logger.error(f"Error checking RPMs for {software_name}: {e}")
+        return False
+
+
+def mark_all_software_partial(base_path: str, logger):
+    """Mark software entries as partial in software.csv for all architectures.
+    
+    This is called when cleanup_repos=all to mark software as partial
+    since all RPM repositories are being deleted.
+    Only marks software that actually has RPM dependencies.
+    
+    Args:
+        base_path: Base path for software.csv files
+        logger: Logger instance
+    """
+    logger.info("Marking software with RPM dependencies as partial (cleanup_repos=all)")
+    try:
+        for arch in ARCH_SUFFIXES:
+            software_file = f"{base_path}/{arch}/software.csv"
+            logger.info(f"Processing software file: {software_file}")
+            
+            if not os.path.exists(software_file):
+                logger.info(f"Software file not found: {software_file}")
+                continue
+            
+            rows = []
+            updated = False
+            with open(software_file, 'r') as f:
+                reader = csv.DictReader(f)
+                fieldnames = reader.fieldnames
+                for row in reader:
+                    software_name = row.get('name', '')
+                    if row.get('status') == 'success':
+                        # Only mark as partial if software has RPM dependencies
+                        if software_has_rpms(software_name, arch, base_path, logger):
+                            row['status'] = 'partial'
+                            updated = True
+                            logger.info(f"Marked '{software_name}' as partial in {arch}/software.csv (has RPM deps)")
+                        else:
+                            logger.info(f"Skipping '{software_name}' - no RPM dependencies")
+                    rows.append(row)
+            
+            if fieldnames and rows and updated:
+                with open(software_file, 'w', newline='') as f:
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(rows)
+                logger.info(f"Successfully updated {software_file}")
+    except Exception as e:
+        logger.error(f"Failed to mark all software as partial: {e}")
 
 def write_cleanup_status(results: List[Dict], base_path: str):
     """Write cleanup results to status file."""
@@ -794,6 +885,16 @@ def run_module():
     os.makedirs(base_path, exist_ok=True)
     logger = setup_standard_logger(log_dir)
     
+    # Handle 'all' keyword for repositories only
+    cleanup_all_repos = cleanup_repos and len(cleanup_repos) == 1 and cleanup_repos[0].lower() == 'all'
+    #if cleanup_repos and len(cleanup_repos) == 1 and cleanup_repos[0].lower() == 'all':
+    if cleanup_all_repos:
+        logger.info("cleanup_repos='all' - fetching all repositories from Pulp")
+        cleanup_repos = get_all_repositories(logger)
+        if not cleanup_repos:
+            module.fail_json(msg="Failed to retrieve repository list from Pulp. Please check if Pulp services are running.")
+        logger.info(f"Found {len(cleanup_repos)} repositories to cleanup: {cleanup_repos}")
+
     logger.info(f"Starting cleanup - repos: {cleanup_repos}, containers: {cleanup_containers}, files: {cleanup_files}")
 
     all_results = []
@@ -803,6 +904,10 @@ def run_module():
         result = cleanup_repository(repo, base_path, logger)
         all_results.append(result)
         logger.info(f"Repository {repo}: {result['status']} - {result['message']}")
+
+    # If cleanup_repos=all, mark software with RPM dependencies as partial
+    if cleanup_all_repos and any(r['status'] == 'Success' for r in all_results if r['type'] == 'repository'):
+        mark_all_software_partial(base_path, logger)
 
     # Process containers
     for container in cleanup_containers:
