@@ -763,6 +763,10 @@ _HOSTLIST_RE = re.compile(
 def validate_config_types(conf_dict, conf_name, module):
     """Validate configuration keys and value types based on SlurmParserEnum."""
     current_conf = all_confs.get(conf_name, {})
+    if not current_conf:
+        return {'invalid_keys': [], 'type_errors': []}
+    # module.fail_json(msg=f"Invalid configuration name: {conf_name}", conf_dict=conf_dict, current_conf=current_conf)
+    module.warn(conf_name)
     invalid_keys = list(
         set(conf_dict.keys()).difference(set(current_conf.keys())))
     type_errors = []
@@ -839,6 +843,7 @@ def parse_slurm_conf(file_path, conf_name, validate):
     """Parses the slurm.conf file and returns it as a dictionary."""
     current_conf = all_confs.get(conf_name, {})
     slurm_dict = OrderedDict()
+    dup_keys = []
 
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"{file_path} not found.")
@@ -878,9 +883,11 @@ def parse_slurm_conf(file_path, conf_name, validate):
                 slurm_dict[skey] = list(slurm_dict.get(
                     skey, [])) + list(tmp_dict.values())
             else:
-                slurm_dict.update(tmp_dict)
-
-    return slurm_dict
+                if skey in slurm_dict:
+                    dup_keys.append(skey)
+                else:
+                    slurm_dict.update(tmp_dict)
+    return slurm_dict, dup_keys
 
 
 def expand_hostlist(expr):

@@ -87,3 +87,10 @@ __default_config:
     DbdPort: "{{ slurm_dbd_port }}"
   gres:
     AutoDetect: nvml
+  acct_gather: {}
+  helpers: {}
+  job_container: {}
+  mpi: {}
+  oci: {}
+  topology: {}
+  burst_buffer: {}

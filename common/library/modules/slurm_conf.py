@@ -234,7 +234,9 @@ def run_module():
         replace = module.params['replace']
         # Parse the slurm.conf file
         if module.params['op'] == 'parse':
-            s_dict = parse_slurm_conf(module.params['path'], conf_name, validate)
+            s_dict, dup_keys = parse_slurm_conf(module.params['path'], conf_name, validate)
+            if dup_keys:
+                module.fail_json(msg=f"Duplicate keys found in {module.params['path']}: {dup_keys}")
             result['conf_dict'] = s_dict
         elif module.params['op'] == 'render':
             s_list = read_dict2ini(module.params['conf_map'])
@@ -247,7 +249,9 @@ def run_module():
                 elif isinstance(conf_source, str):
                     if not os.path.exists(conf_source):
                         raise FileNotFoundError(f"File {conf_source} does not exist")
-                    s_dict = parse_slurm_conf(conf_source, conf_name, validate)
+                    s_dict, dup_keys = parse_slurm_conf(conf_source, conf_name, validate)
+                    if dup_keys:
+                        module.fail_json(msg=f"Duplicate keys found in {conf_source}: {dup_keys}")
                     conf_dict_list.append(OrderedDict(s_dict))
                 else:
                     raise TypeError(f"Invalid type for conf_source: {type(conf_source)}")

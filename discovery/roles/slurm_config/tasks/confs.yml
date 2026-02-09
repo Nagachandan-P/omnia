@@ -50,6 +50,7 @@
     - configs_input is defined
     - configs_input
     - item.value is string
+    - item.key in conf_files
 
 - name: Build parsed_configs_input dictionary from parsed files
   ansible.builtin.set_fact:
@@ -148,7 +149,7 @@
   loop_control:
     loop_var: product
 
-- name: Generate slurmd opts for Configless # TODO: Move to $SLURMD_OPTIONS
+- name: Generate slurmd opts for Configless # TODO: Move to $SLURMD_OPTIONS /etc/default/slurmd
   ansible.builtin.set_fact:
     conf_server: "--conf-server {{ ctld_list | map('regex_replace', '$', ':' ~ (slurm_conf_dict.get('SlurmctldPort', '6817') | string)) | join(',') }}"
 
@@ -162,6 +163,17 @@
     remote_src: "{{ copy_from_oim }}"
   loop: "{{ merged_conf.results }}"
   register: ctld_conf_files
+  when:
+    - item.ini_lines
+
+- name: Add extra confs which are not handled
+  ansible.builtin.include_tasks: handle_extra_confs.yml
+  when:
+    - configs_input is defined
+    - configs_input.keys() | difference(conf_files) | length > 0
+  loop: "{{ configs_input.keys() | difference(conf_files) }}"
+  loop_control:
+    loop_var: extra_conf
 
 - name: Check if cluster running
   ansible.builtin.include_tasks: check_ctld_running.yml
