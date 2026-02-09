@@ -183,8 +183,10 @@
           'OME note (mTLS):',
           '  Use ca.crt as the server certificate in OME.',
           '  Create a client certificate in .pfx format (provide a passphrase when prompted):',
+          '    cd ' ~ kafka_output_dir,
           '    openssl pkcs12 -export -out user.pfx -inkey user.key -in user.crt',
           '  Use user.pfx as the client certificate in OME.',
+          '  If you are using the OME UI from a different system than the OIM host, copy ca.crt and user.pfx from the OIM host to that system before selecting/uploading them in the UI.',
           ''
         ]
       }}

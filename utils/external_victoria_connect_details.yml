@@ -21,10 +21,11 @@
     - name: Fail if service_kube_control_plane group is missing or empty
       ansible.builtin.fail:
         msg: >-
-          Inventory must define a non-empty 'service_kube_control_plane' group.
-          Run with '-i <inventory>' and ensure at least one host is in that group.
+          Inventory must define a 'service_kube_control_plane' group with exactly one host.
+          Provide either the service kube control plane VIP or one of the service kube control plane node IPs.
+          Run with '-i <inventory>' and ensure exactly one host is in that group.
       when:
-        - groups['service_kube_control_plane'] is not defined or (groups['service_kube_control_plane'] | length) == 0
+        - groups['service_kube_control_plane'] is not defined or (groups['service_kube_control_plane'] | length) != 1
 
 - name: Fetch external Victoria connection details
   hosts: service_kube_control_plane
