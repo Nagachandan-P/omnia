@@ -112,6 +112,12 @@
     slurm_conf_dict: "{{ (merged_conf.results | selectattr('item.key', 'equalto', 'slurm') | first).conf_dict }}"
   when: "'slurm' in conf_merge_dict"
 
+- name: Extract effective path parameters from merged configs
+  ansible.builtin.include_tasks: extract_path_overrides.yml
+
+- name: Validate path parameters are absolute
+  ansible.builtin.include_tasks: validate_path_overrides.yml
+
 - name: Get nodes from normal partition and compare with cmpt_list
   ansible.builtin.set_fact:
     normal_partition: "{{ slurm_conf_dict.PartitionName | default([]) | selectattr('PartitionName', 'equalto', slurm_partition_name) | first | default({}) }}"
@@ -134,17 +140,17 @@
     - nodes_in_normal_not_in_cmpt is defined
     - nodes_in_normal_not_in_cmpt | length > 0
 
-- name: Create directories from conf values
+- name: Create directories from conf values (NFS server-side always uses defaults)
   ansible.builtin.include_tasks: exist_dir.yml
   loop:
     - "{{ ctld_list
-     | product([slurm_conf_dict.get('StateSaveLocation', '/var/spool/slurmctld'),
-      (slurm_conf_dict.get('SlurmctldLogFile', '/var/log/slurmctld.log') | dirname),
-      (slurm_conf_dict.get('SlurmctldPidFile', '/var/run/slurmctld.pid') | dirname)]) }}"
+     | product(['/var/spool/slurmctld',
+      '/var/log/slurm',
+      '/var/run']) }}"
     - "{{ (cmpt_list + login_list + compiler_login_list)
-     | product([slurm_conf_dict.get('SlurmdSpoolDir', '/var/spool/slurmd'),
-      (slurm_conf_dict.get('SlurmdLogFile', '/var/log/slurmd.log') | dirname),
-      (slurm_conf_dict.get('SlurmdPidFile', '/var/run/slurmd.pid') | dirname)]) }}"
+     | product(['/var/spool/slurmd',
+      '/var/log/slurm',
+      '/var/run']) }}"
   loop_control:
     loop_var: product
 
