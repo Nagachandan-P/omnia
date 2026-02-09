@@ -142,10 +142,7 @@ pulp_container_commands = {
     "get_repo_version": "pulp container repository show --href %s",
     "list_tags_by_version": "pulp show --href /pulp/api/v3/content/container/tags/?repository_version=%s",
     "rename_repository": "pulp container repository update --name %s --new-name %s",
-    "orphan_cleanup": "pulp orphan cleanup"
-
-
-    "update_container_remote_auth": "pulp container remote update --name %s --url %s --upstream-name %s --policy %s --include-tags '%s' --username %s --password '%s'",
+    "orphan_cleanup": "pulp orphan cleanup",
     "container_distribution_show": "pulp container distribution show --name %s | jq .repository",
     "show_repository_version": "pulp container repository show --href %s | jq .latest_version_href",
     "list_image_tags": "pulp show --href /pulp/api/v3/content/container/tags/?repository_version=%s"
