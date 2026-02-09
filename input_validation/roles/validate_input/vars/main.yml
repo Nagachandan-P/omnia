@@ -18,3 +18,6 @@ project_name: "{{ hostvars['localhost']['project_name'] }}"
 
 messages:
   validation_success: "Successfully validated Omnia input config file(s)"
+  validation_error: >
+    Input validation failed.
+    For detailed validation errors, see: {{ ansible_failed_result.log_file }}
