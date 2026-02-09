@@ -19,6 +19,14 @@
   changed_when: false
   failed_when: kubectl_check.rc != 0
 
+- name: Delete Kafka output directory (clean start)
+  ansible.builtin.file:
+    path: "{{ kafka_output_dir }}"
+    state: absent
+  delegate_to: localhost
+  connection: local
+  run_once: true
+
 - name: Get Kafka pod status
   ansible.builtin.command: >-
     kubectl get pods -n {{ kafka_namespace }}
