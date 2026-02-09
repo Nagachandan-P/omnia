@@ -474,7 +474,7 @@
         - echo "{{ cloud_init_slurm_nfs_path }} {{ client_mount_path }} nfs defaults,_netdev 0 0" >> /etc/fstab
         - mount -a
         - echo "One or more shared components (UCX / OpenMPI / LDMS) are enabled."
-        - echo "Shared NFS mount is available at: {{ client_mount_path }}"
+        # - echo "Shared NFS mount is available at: {{ client_mount_path }}"
         - /usr/local/bin/configure_ucx_openmpi_env.sh
         # - echo ""
         # - echo "IMPORTANT:"
