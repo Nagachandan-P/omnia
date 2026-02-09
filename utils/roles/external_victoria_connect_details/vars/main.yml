@@ -29,3 +29,22 @@ victoria_err_pods_not_ready: "One or more Victoria pods are not Ready."
 victoria_err_lb_missing: >-
   Failed to fetch Victoria LoadBalancer IP(s). Ensure services 'vminsert' and 'vmselect'
   exist in namespace '{{ victoria_namespace }}' and have external IPs assigned.
+
+victoria_sfm_ui_navigation: "Observability -> Settings -> Prometheus Remote Write"
+victoria_sfm_remote_write_target_name: "victoria"
+victoria_sfm_remote_write_message_version: "v1"
+victoria_sfm_remote_write_enable_value: "ON"
+
+victoria_sfm_ssh_note: "SSH to the SFM IP with admin credentials."
+victoria_sfm_hosts_scope_note: >-
+  /etc/hosts update is required only inside the SFM Prometheus pod (not on the SFM server host).
+victoria_sfm_pod_shell_command_example: >-
+  kubectl exec -it sfm-prometheus-deployment-xxxxx-xx -n sfm-1 -- /bin/sh
+victoria_sfm_hosts_restart_note: "Repeat /etc/hosts update if the SFM pod restarts."
+victoria_sfm_cross_machine_tls_note_line1: >-
+  If using the SFM UI from a different system than the OIM host,
+victoria_sfm_cross_machine_tls_note_line2: >-
+  copy ca.crt to that system before uploading it in the UI.
+
+victoria_sfm_tls_server_cert_file_label: "Server Certificate File"
+victoria_sfm_tls_server_cert_file_name: "ca.crt"

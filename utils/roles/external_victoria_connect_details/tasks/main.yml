@@ -164,8 +164,7 @@
     vminsert_port: "{{ (vminsert_lb_port.stdout | trim) | default('') }}"
     vmselect_port: "{{ (vmselect_lb_port.stdout | trim) | default('') }}"
     victoria_tls_ca: "{{ victoria_tls_cert_dir }}/ca.crt"
-    victoria_tls_cert: "{{ victoria_tls_cert_dir }}/server.crt"
-    victoria_tls_key: "{{ victoria_tls_cert_dir }}/server.key"
+    
 
 - name: Fail when LoadBalancer IPs are not available
   ansible.builtin.fail:
@@ -238,12 +237,22 @@
             query_endpoint: "https://{{ vmselect_host }}:{{ vmselect_port }}/select/0/prometheus/api/v1/query"
             ui_url: "https://{{ vmselect_host }}:{{ vmselect_port }}/select/0/vmui"
         tls:
-          server_crt: "{{ victoria_tls_cert }}"
+          ca_crt: "{{ victoria_tls_ca }}"
         notes:
           sfm:
             vminsert_write_url: "{{ victoria_vminsert_write_url }}"
             hosts_entry: "{{ victoria_sfm_hosts_entry }}"
             hosts_entry_vmselect: "{{ victoria_sfm_hosts_entry_vmselect }}"
+            ui_navigation: "{{ victoria_sfm_ui_navigation }}"
+            remote_write_target_name: "{{ victoria_sfm_remote_write_target_name }}"
+            remote_write_message_version: "{{ victoria_sfm_remote_write_message_version }}"
+            remote_write_enable_value: "{{ victoria_sfm_remote_write_enable_value }}"
+            tls_server_cert_file_name: "{{ victoria_sfm_tls_server_cert_file_name }}"
+            tls_server_cert_file_path: "{{ victoria_tls_ca }}"
+            ssh_note: "{{ victoria_sfm_ssh_note }}"
+            hosts_scope_note: "{{ victoria_sfm_hosts_scope_note }}"
+            pod_shell_command_example: "{{ victoria_sfm_pod_shell_command_example }}"
+            hosts_restart_note: "{{ victoria_sfm_hosts_restart_note }}"
 
 - name: Ensure output directory exists
   ansible.builtin.file:
@@ -273,20 +282,33 @@
           'Mode: ' ~ victoria_deployment_mode,
           '',
           'Endpoints:',
-          '  vminsert write: ' ~ victoria_vminsert_write_url,
+          '  [IMPORTANT] vminsert write: ' ~ victoria_vminsert_write_url,
           '  vmselect query: ' ~ victoria_vmselect_query_url,
           '  vmselect UI:    ' ~ victoria_vmselect_ui_url,
           '',
           'TLS:',
-          '  server.crt: ' ~ victoria_tls_cert,
+          '  ca.crt:     ' ~ victoria_tls_ca,
           '',
-          'SFM note:',
-          '  Use vminsert write URL for SFM: ' ~ victoria_vminsert_write_url,
-          '  Add these entries to /etc/hosts on the SFM server:',
-          '    ' ~ victoria_sfm_hosts_entry_vminsert_display,
-          '    ' ~ victoria_sfm_hosts_entry_vmselect_display,
-          '  If you are using the SFM UI from a different system than the OIM host,',
-          '  copy server.crt from the OIM host to that system before selecting/uploading it in the UI.'
+          'SFM steps (TLS):',
+          '  [STEP 1] ' ~ victoria_sfm_cross_machine_tls_note_line1,
+          '           ' ~ victoria_sfm_cross_machine_tls_note_line2,
+          '  [STEP 2] In the SFM UI, update the vminsert URL:',
+          '           ' ~ victoria_sfm_ui_navigation,
+          '           Edit target: ' ~ victoria_sfm_remote_write_target_name,
+          '           Set Enable to: ' ~ victoria_sfm_remote_write_enable_value,
+          '           Set URL to: ' ~ victoria_vminsert_write_url,
+          '           Set Message Version to: ' ~ victoria_sfm_remote_write_message_version,
+          '           TLS Config: Upload ' ~ victoria_sfm_tls_server_cert_file_name,
+          '                      as ' ~ victoria_sfm_tls_server_cert_file_label ~ ': ' ~ victoria_tls_ca,
+          '  [STEP 3] ' ~ victoria_sfm_ssh_note,
+          '  [STEP 4] Update /etc/hosts only inside the SFM Prometheus pod:',
+          '           ' ~ victoria_sfm_hosts_scope_note,
+          '           ' ~ victoria_sfm_pod_shell_command_example,
+          '           Add these entries inside the pod:',
+          '             ' ~ victoria_sfm_hosts_entry_vminsert_display,
+          '             ' ~ victoria_sfm_hosts_entry_vmselect_display,
+          '  [NOTE] ' ~ victoria_sfm_hosts_restart_note,
+          ''
         ]
       }}
   delegate_to: localhost
