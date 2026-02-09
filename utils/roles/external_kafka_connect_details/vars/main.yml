@@ -30,7 +30,6 @@ kafka_err_external_ip_missing: >-
   exists in namespace '{{ kafka_namespace }}' and has an external IP assigned.
 
 kafka_ome_ui_navigation_line1: "Configuration -> Remote Connectivity"
-kafka_ome_ui_navigation_line2: "Remote Telemetry Configuration -> Kafka Connectivity"
 kafka_ome_ui_enable_label: "Enable Kafka Connectivity"
 kafka_ome_auth_mode_value: "SSL"
 

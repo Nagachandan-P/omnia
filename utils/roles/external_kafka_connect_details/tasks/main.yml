@@ -196,7 +196,6 @@
           '           ' ~ kafka_ome_cross_machine_note_line2,
           '  [STEP 3] In the OME UI, navigate to:',
           '           ' ~ kafka_ome_ui_navigation_line1,
-          '           ' ~ kafka_ome_ui_navigation_line2,
           '  [STEP 4] Click: ' ~ kafka_ome_ui_enable_label,
           '  [STEP 5] Set Kafka Bootstrap Server to: ' ~ kafka_external_ip ~ ':' ~ kafka_external_port,
           '  [STEP 6] Set Authentication Mode to: ' ~ kafka_ome_auth_mode_value,
