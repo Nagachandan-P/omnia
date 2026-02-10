@@ -54,6 +54,13 @@ slurm_cluster:
     #   slurm:
     #     SlurmctldTimeout: 60
     #     SlurmdTimeout: 150
+    #     NodeName:
+    #       - NodeName: newnode1
+    #         CPUs: 16
+    #         RealMemory: 64000
+    #       - NodeName: newnode2
+    #         CPUs: 16
+    #         RealMemory: 64000
     #   cgroup:
     #     CgroupPlugin: autodetect
     #     ConstrainCores: True
