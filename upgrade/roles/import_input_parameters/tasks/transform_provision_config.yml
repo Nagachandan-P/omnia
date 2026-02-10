@@ -44,24 +44,9 @@
 
 - name: Normalize provision_config.yml values
   ansible.builtin.set_fact:
-    provision_pxe_mapping_file_path_raw: >-
-      {{
-        backup_provision_config.pxe_mapping_file_path
-        | default('/opt/omnia/input/project_default/pxe_mapping_file.csv')
-      }}
+    provision_pxe_mapping_file_path: "{{ backup_provision_config.pxe_mapping_file_path | default('pxe_mapping_file.csv') }}"
     provision_language: "{{ backup_provision_config.language | default('en_US.UTF-8') }}"
     provision_default_lease_time: "{{ backup_provision_config.default_lease_time | default('86400') }}"
-
-- name: Rewrite legacy pxe_mapping_file_path to current project input directory
-  ansible.builtin.set_fact:
-    provision_pxe_mapping_file_path: >-
-      {{
-        (
-          provision_pxe_mapping_file_path_raw
-          | string
-          | regex_replace('^/opt/omnia/input/project_default/', input_project_dir ~ '/')
-        )
-      }}
 
 - name: Fail if pxe_mapping_file_path is missing
   ansible.builtin.fail:

@@ -57,12 +57,15 @@ msg_using_backup_provision_config: "Using backup provision_config.yml (backup no
 msg_pxe_mapping_file_path_missing: "pxe_mapping_file_path is mandatory"
 
 # Storage config transformation messages
-msg_backup_storage_config_missing: "Backup storage_config.yml missing"
-msg_storage_config_missing: "storage_config.yml missing"
-msg_using_backup_storage_config: "Using backup storage_config.yml (backup not modified)"
-msg_nfs_client_params_missing: "nfs_client_params is mandatory"
-msg_nfs_client_param_entry_missing_keys: "Each entry in nfs_client_params must define server_ip, server_share_path, client_share_path, and client_mount_options"
-msg_powervault_missing_keys: "powervault_config (when present) must define ip (non-empty list), isci_initiators, and volume_id"
+msg_backup_storage_config_missing: "storage_config.yml not found in backup at {{ backup_location }}/storage_config.yml"
+msg_storage_config_missing: "storage_config.yml not found at {{ input_project_dir }}/storage_config.yml"
+msg_nfs_client_params_missing: "storage_config.yml must define nfs_client_params with at least one entry"
+msg_nfs_client_param_entry_missing_keys: "Each nfs_client_params entry must define server_ip, server_share_path, and client_share_path"
+msg_using_backup_storage_config: "Transforming storage_config.yml from backup at {{ backup_location }}/storage_config.yml"
+msg_storage_config_transform_summary: |-
+  Transformed storage_config.yml from Omnia 2.0 to 2.1:
+  - Preserved nfs_client_params from backup
+  - Applied schema defaults for missing fields
 
 # Omnia config transformation messages
 msg_backup_omnia_config_missing: "Backup omnia_config.yml missing"

@@ -45,19 +45,6 @@
 - name: Normalize storage_config.yml values
   ansible.builtin.set_fact:
     storage_nfs_client_params: "{{ backup_storage_config.nfs_client_params | default([]) }}"
-    storage_powervault_config: "{{ backup_storage_config.powervault_config | default(none) }}"
-    storage_has_powervault: "{{ backup_storage_config.powervault_config is defined }}"
-
-- name: Fail if powervault_config is present but missing mandatory keys
-  ansible.builtin.fail:
-    msg: "{{ msg_powervault_missing_keys }}"
-  when:
-    - storage_has_powervault
-    - storage_powervault_config.ip is not defined or (storage_powervault_config.ip | default([]) | length) == 0
-      or storage_powervault_config.isci_initiators is not defined
-      or (storage_powervault_config.isci_initiators | string | trim) == ''
-      or storage_powervault_config.volume_id is not defined
-      or (storage_powervault_config.volume_id | string | trim) == ''
 
 - name: Fail if nfs_client_params is missing
   ansible.builtin.fail:
@@ -80,8 +67,6 @@
     mode: "{{ default_file_mode }}"
   vars:
     storage_nfs_client_params: "{{ storage_nfs_client_params }}"
-    storage_powervault_config: "{{ storage_powervault_config }}"
-    storage_has_powervault: "{{ storage_has_powervault }}"
 
 - name: Validate YAML syntax of transformed storage_config.yml
   ansible.builtin.command:

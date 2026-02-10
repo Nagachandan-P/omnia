@@ -43,23 +43,6 @@
 #  isci_initiators: iqn.initiator.com.example:7d7d7d7d7d7
 #  volume_id: 00c0ff4343f1f1f1001c8c4e6901000000
 
-{% if storage_has_powervault %}
-powervault_config:
-{% if storage_powervault_config.ip is defined %}
-  ip:
-{% for _ip in (storage_powervault_config.ip | default([])) %}
-    - {{ _ip }}
-{% endfor %}
-{% else %}
-  ip: []
-{% endif %}
-{% if storage_powervault_config.port is defined %}
-  port: {{ storage_powervault_config.port }}
-{% endif %}
-  isci_initiators: {{ storage_powervault_config.isci_initiators | default('') }}
-  volume_id: {{ storage_powervault_config.volume_id | default('') }}
-{% endif %}
-
 # -----------------------------NFS------------------------------------------------
 
 # This variable is used for mounting NFS share on slurm_control_node, slurm_node, login_node
