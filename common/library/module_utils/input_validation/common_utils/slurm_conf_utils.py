@@ -766,7 +766,7 @@ def validate_config_types(conf_dict, conf_name, module):
     if not current_conf:
         return {'invalid_keys': [], 'type_errors': []}
     # module.fail_json(msg=f"Invalid configuration name: {conf_name}", conf_dict=conf_dict, current_conf=current_conf)
-    module.warn(conf_name)
+    # module.warn(conf_name)
     invalid_keys = list(
         set(conf_dict.keys()).difference(set(current_conf.keys())))
     type_errors = []
