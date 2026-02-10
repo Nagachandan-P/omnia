@@ -52,7 +52,7 @@
       },
       "powervault_config": {
         "type": "object",
-        "required": ["ip", "iscsi_initiators", "volume_id"],
+        "required": ["ip", "iscsi_initiator", "volume_id"],
         "properties": {
           "ip": {
             "description": "List of target controller IP addresses",
@@ -70,7 +70,7 @@
             "type": "integer"
           },
 
-          "iscsi_initiators": {
+          "iscsi_initiator": {
             "description": "iSCSI initiator IQN",
             "type": "string",
             "pattern": "^iqn\\.[a-zA-Z0-9.-]+(?::[a-zA-Z0-9._:-]+)?$"

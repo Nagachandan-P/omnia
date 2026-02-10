@@ -22,7 +22,7 @@
 # Mandatory when using PowerVault for persistent storage.
 # Below parameters are mandatory when powervault_config is defined
     # ip: A list of PowerVault controller ipv4 addresses used for iSCSI target discovery and login.
-    # iscsi_initiators: Specifies the InitiatorName used by the host when connecting to the iSCSI target. This IQN uniquely identifies the host to the storage array.
+    # iscsi_initiator: Specifies the InitiatorName used by the host when connecting to the iSCSI target. This IQN uniquely identifies the host to the storage array.
     # volume_id: This is the unique WWN/identifier for the specific volume that should be used for persistent storage. This value is used for multipath scanning to select the correct mapped device.
 
 # Below are the optional parameters when powervault_config is defined
@@ -35,7 +35,7 @@
 #  ip:
 #    - 172.1.2.3
 #  port: 3260
-#  iscsi_initiators: iqn.initiator.com.example:7d7d7d7d7d7
+#  iscsi_initiator: iqn.initiator.com.example:7d7d7d7d7d7
 #  volume_id: 00c0ff4343f1f1f1001c8c4e6901000000
 
 
