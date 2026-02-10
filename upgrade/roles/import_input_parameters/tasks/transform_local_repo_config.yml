@@ -68,9 +68,12 @@
     local_repo_user_repo_url_aarch64: "{{ backup_local_repo_config.user_repo_url_aarch64 | default([]) }}"
     local_repo_rhel_os_url_x86_64: "{{ backup_local_repo_config.rhel_os_url_x86_64 | default(backup_local_repo_config.rhel_os_url | default([])) }}"
     local_repo_rhel_os_url_aarch64: "{{ backup_local_repo_config.rhel_os_url_aarch64 | default([]) }}"
-    local_repo_omnia_repo_url_rhel_x86_64: "{{ backup_local_repo_config.omnia_repo_url_rhel_x86_64 | default(backup_local_repo_config.omnia_repo_url_rhel | default([])) }}"
-    local_repo_omnia_repo_url_rhel_aarch64: "{{ backup_local_repo_config.omnia_repo_url_rhel_aarch64 | default(backup_local_repo_config.omnia_repo_url_rhel | default([])) }}"
-    local_repo_additional_repos_x86_64: "{{ backup_local_repo_config.additional_repos_x86_64 | default(backup_local_repo_config.additional_repos | default([])) }}"
+    local_repo_omnia_repo_url_rhel_x86_64: >-
+      {{ backup_local_repo_config.omnia_repo_url_rhel_x86_64 | default(backup_local_repo_config.omnia_repo_url_rhel | default([])) }}
+    local_repo_omnia_repo_url_rhel_aarch64: >-
+      {{ backup_local_repo_config.omnia_repo_url_rhel_aarch64 | default(backup_local_repo_config.omnia_repo_url_rhel | default([])) }}
+    local_repo_additional_repos_x86_64: >-
+      {{ backup_local_repo_config.additional_repos_x86_64 | default(backup_local_repo_config.additional_repos | default([])) }}
     local_repo_additional_repos_aarch64: "{{ backup_local_repo_config.additional_repos_aarch64 | default([]) }}"
 
 - name: Fail if omnia_repo_url_rhel_x86_64 is missing
