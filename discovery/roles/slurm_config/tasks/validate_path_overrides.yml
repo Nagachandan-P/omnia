@@ -22,8 +22,16 @@
     - slurm_merged_dict is defined
     - slurm_merged_dict.get(item) is defined
     - slurm_merged_dict.get(item) is not none
-    - (slurm_merged_dict.get(item) is string and slurm_merged_dict.get(item) | length > 0) or (slurm_merged_dict.get(item) is iterable and slurm_merged_dict.get(item) | list | length > 0)
-    - not ((slurm_merged_dict.get(item) is string and slurm_merged_dict.get(item) | regex_search('^/')) or (slurm_merged_dict.get(item) is iterable and (slurm_merged_dict.get(item) | first) | regex_search('^/')))
+    - >-
+      (slurm_merged_dict.get(item) is string
+       and slurm_merged_dict.get(item) | length > 0)
+      or (slurm_merged_dict.get(item) is iterable
+          and slurm_merged_dict.get(item) | list | length > 0)
+    - >-
+      not ((slurm_merged_dict.get(item) is string
+            and slurm_merged_dict.get(item) | regex_search('^/'))
+           or (slurm_merged_dict.get(item) is iterable
+               and (slurm_merged_dict.get(item) | first) | regex_search('^/')))
   loop:
     - SlurmctldLogFile
     - SlurmdLogFile
@@ -61,8 +69,16 @@
     - slurmdbd_merged_dict is defined
     - slurmdbd_merged_dict.get(item) is defined
     - slurmdbd_merged_dict.get(item) is not none
-    - (slurmdbd_merged_dict.get(item) is string and slurmdbd_merged_dict.get(item) | length > 0) or (slurmdbd_merged_dict.get(item) is iterable and slurmdbd_merged_dict.get(item) | list | length > 0)
-    - not ((slurmdbd_merged_dict.get(item) is string and slurmdbd_merged_dict.get(item) | regex_search('^/')) or (slurmdbd_merged_dict.get(item) is iterable and (slurmdbd_merged_dict.get(item) | first) | regex_search('^/')))
+    - >-
+      (slurmdbd_merged_dict.get(item) is string
+       and slurmdbd_merged_dict.get(item) | length > 0)
+      or (slurmdbd_merged_dict.get(item) is iterable
+          and slurmdbd_merged_dict.get(item) | list | length > 0)
+    - >-
+      not ((slurmdbd_merged_dict.get(item) is string
+            and slurmdbd_merged_dict.get(item) | regex_search('^/'))
+           or (slurmdbd_merged_dict.get(item) is iterable
+               and (slurmdbd_merged_dict.get(item) | first) | regex_search('^/')))
   loop:
     - LogFile
     - PidFile
@@ -77,7 +93,15 @@
     - cgroup_merged_dict is defined
     - cgroup_merged_dict.get(item) is defined
     - cgroup_merged_dict.get(item) is not none
-    - (cgroup_merged_dict.get(item) is string and cgroup_merged_dict.get(item) | length > 0) or (cgroup_merged_dict.get(item) is iterable and cgroup_merged_dict.get(item) | list | length > 0)
-    - not ((cgroup_merged_dict.get(item) is string and cgroup_merged_dict.get(item) | regex_search('^/')) or (cgroup_merged_dict.get(item) is iterable and (cgroup_merged_dict.get(item) | first) | regex_search('^/')))
+    - >-
+      (cgroup_merged_dict.get(item) is string
+       and cgroup_merged_dict.get(item) | length > 0)
+      or (cgroup_merged_dict.get(item) is iterable
+          and cgroup_merged_dict.get(item) | list | length > 0)
+    - >-
+      not ((cgroup_merged_dict.get(item) is string
+            and cgroup_merged_dict.get(item) | regex_search('^/'))
+           or (cgroup_merged_dict.get(item) is iterable
+               and (cgroup_merged_dict.get(item) | first) | regex_search('^/')))
   loop:
     - CgroupMountpoint
