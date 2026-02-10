@@ -50,6 +50,7 @@
     - configs_input is defined
     - configs_input
     - item.value is string
+    - item.key in conf_files
 
 - name: Build parsed_configs_input dictionary from parsed files
   ansible.builtin.set_fact:
@@ -148,31 +149,9 @@
   loop_control:
     loop_var: product
 
-- name: Generate slurmd opts for Configless # TODO: Move to $SLURMD_OPTIONS
+- name: Generate slurmd opts for Configless # TODO: Move to $SLURMD_OPTIONS /etc/default/slurmd
   ansible.builtin.set_fact:
     conf_server: "--conf-server {{ ctld_list | map('regex_replace', '$', ':' ~ (slurm_conf_dict.get('SlurmctldPort', '6817') | string)) | join(',') }}"
-
-- name: Create backup directory with timestamp
-  ansible.builtin.file:
-    path: "{{ backup_dir }}"
-    state: directory
-    mode: '0755'
-    owner: "{{ slurm_user }}"
-    group: "{{ slurm_user_group }}"
-  when: ctld_list
-
-- name: Backup existing SLURM configuration files with timestamp
-  ansible.builtin.copy:
-    src: "{{ slurm_config_path }}/{{ ctld_list[0] }}/etc/slurm/{{ item.item.key }}.conf"
-    dest: "{{ backup_dir }}/{{ item.item.key }}.conf"
-    remote_src: true
-    mode: preserve
-  loop: "{{ merged_conf.results }}"
-  when:
-    - ctld_list
-    - item.item.key in conf_files
-  register: backup_results
-  failed_when: false
 
 - name: Write merged .conf
   ansible.builtin.copy:
@@ -184,6 +163,17 @@
     remote_src: "{{ copy_from_oim }}"
   loop: "{{ merged_conf.results }}"
   register: ctld_conf_files
+  when:
+    - item.ini_lines
+
+- name: Add extra confs which are not handled
+  ansible.builtin.include_tasks: handle_extra_confs.yml
+  when:
+    - configs_input is defined
+    - configs_input.keys() | difference(conf_files) | length > 0
+  loop: "{{ configs_input.keys() | difference(conf_files) }}"
+  loop_control:
+    loop_var: extra_conf
 
 - name: Check if cluster running
   ansible.builtin.include_tasks: check_ctld_running.yml
