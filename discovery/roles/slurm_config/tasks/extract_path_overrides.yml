@@ -34,21 +34,64 @@
 
 - name: Extract effective controller directories from slurm.conf
   ansible.builtin.set_fact:
-    slurm_ctld_log_dir_effective: "{{ (slurm_merged_dict.get('SlurmctldLogFile', ['/var/log/slurm/slurmctld.log']) | first if slurm_merged_dict.get('SlurmctldLogFile') is iterable and slurm_merged_dict.get('SlurmctldLogFile') is not string else slurm_merged_dict.get('SlurmctldLogFile', '/var/log/slurm/slurmctld.log')) | dirname }}"
-    slurm_state_save_location_effective: "{{ (slurm_merged_dict.get('StateSaveLocation', ['/var/spool/slurmctld']) | first if slurm_merged_dict.get('StateSaveLocation') is iterable and slurm_merged_dict.get('StateSaveLocation') is not string else slurm_merged_dict.get('StateSaveLocation', '/var/spool/slurmctld')) }}"
-    slurm_ctld_pid_dir_effective: "{{ (slurm_merged_dict.get('SlurmctldPidFile', ['/var/run/slurmctld.pid']) | first if slurm_merged_dict.get('SlurmctldPidFile') is iterable and slurm_merged_dict.get('SlurmctldPidFile') is not string else slurm_merged_dict.get('SlurmctldPidFile', '/var/run/slurmctld.pid')) | dirname }}"
-    slurm_sched_log_dir_effective: "{{ ((slurm_merged_dict.get('SlurmSchedLogFile', ['']) | first if slurm_merged_dict.get('SlurmSchedLogFile') is iterable and slurm_merged_dict.get('SlurmSchedLogFile') is not string else slurm_merged_dict.get('SlurmSchedLogFile', '')) | default('', true) | dirname | default('', true)) }}"
+    slurm_ctld_log_dir_effective: >-
+      {{ (slurm_merged_dict.get('SlurmctldLogFile', ['/var/log/slurm/slurmctld.log'])
+         | first if slurm_merged_dict.get('SlurmctldLogFile') is iterable
+         and slurm_merged_dict.get('SlurmctldLogFile') is not string
+         else slurm_merged_dict.get('SlurmctldLogFile', '/var/log/slurm/slurmctld.log'))
+         | dirname }}
+    slurm_state_save_location_effective: >-
+      {{ (slurm_merged_dict.get('StateSaveLocation', ['/var/spool/slurmctld'])
+         | first if slurm_merged_dict.get('StateSaveLocation') is iterable
+         and slurm_merged_dict.get('StateSaveLocation') is not string
+         else slurm_merged_dict.get('StateSaveLocation', '/var/spool/slurmctld')) }}
+    slurm_ctld_pid_dir_effective: >-
+      {{ (slurm_merged_dict.get('SlurmctldPidFile', ['/var/run/slurmctld.pid'])
+         | first if slurm_merged_dict.get('SlurmctldPidFile') is iterable
+         and slurm_merged_dict.get('SlurmctldPidFile') is not string
+         else slurm_merged_dict.get('SlurmctldPidFile', '/var/run/slurmctld.pid'))
+         | dirname }}
+    slurm_sched_log_dir_effective: >-
+      {{ ((slurm_merged_dict.get('SlurmSchedLogFile', [''])
+         | first if slurm_merged_dict.get('SlurmSchedLogFile') is iterable
+         and slurm_merged_dict.get('SlurmSchedLogFile') is not string
+         else slurm_merged_dict.get('SlurmSchedLogFile', ''))
+         | default('', true) | dirname | default('', true)) }}
   when: slurm_merged_dict is defined
 
 # ── slurm.conf: compute path params ──────────────────────────────────
 
 - name: Extract effective compute directories from slurm.conf
   ansible.builtin.set_fact:
-    slurm_slurmd_log_dir_effective: "{{ (slurm_merged_dict.get('SlurmdLogFile', ['/var/log/slurm/slurmd.log']) | first if slurm_merged_dict.get('SlurmdLogFile') is iterable and slurm_merged_dict.get('SlurmdLogFile') is not string else slurm_merged_dict.get('SlurmdLogFile', '/var/log/slurm/slurmd.log')) | dirname }}"
-    slurm_slurmd_spool_dir_effective: "{{ (slurm_merged_dict.get('SlurmdSpoolDir', ['/var/spool/slurmd']) | first if slurm_merged_dict.get('SlurmdSpoolDir') is iterable and slurm_merged_dict.get('SlurmdSpoolDir') is not string else slurm_merged_dict.get('SlurmdSpoolDir', '/var/spool/slurmd')) }}"
-    slurm_slurmd_pid_dir_effective: "{{ (slurm_merged_dict.get('SlurmdPidFile', ['/var/run/slurmd.pid']) | first if slurm_merged_dict.get('SlurmdPidFile') is iterable and slurm_merged_dict.get('SlurmdPidFile') is not string else slurm_merged_dict.get('SlurmdPidFile', '/var/run/slurmd.pid')) | dirname }}"
-    slurm_epilog_dir_effective: "{{ (slurm_merged_dict.get('Epilog', ['/etc/slurm/epilog.d/logout_user.sh']) | first if slurm_merged_dict.get('Epilog') is iterable and slurm_merged_dict.get('Epilog') is not string else slurm_merged_dict.get('Epilog', '/etc/slurm/epilog.d/logout_user.sh')) | dirname }}"
-    slurm_prolog_dir_effective: "{{ ((slurm_merged_dict.get('Prolog', ['']) | first if slurm_merged_dict.get('Prolog') is iterable and slurm_merged_dict.get('Prolog') is not string else slurm_merged_dict.get('Prolog', '')) | default('', true) | dirname | default('', true)) }}"
+    slurm_slurmd_log_dir_effective: >-
+      {{ (slurm_merged_dict.get('SlurmdLogFile', ['/var/log/slurm/slurmd.log'])
+         | first if slurm_merged_dict.get('SlurmdLogFile') is iterable
+         and slurm_merged_dict.get('SlurmdLogFile') is not string
+         else slurm_merged_dict.get('SlurmdLogFile', '/var/log/slurm/slurmd.log'))
+         | dirname }}
+    slurm_slurmd_spool_dir_effective: >-
+      {{ (slurm_merged_dict.get('SlurmdSpoolDir', ['/var/spool/slurmd'])
+         | first if slurm_merged_dict.get('SlurmdSpoolDir') is iterable
+         and slurm_merged_dict.get('SlurmdSpoolDir') is not string
+         else slurm_merged_dict.get('SlurmdSpoolDir', '/var/spool/slurmd')) }}
+    slurm_slurmd_pid_dir_effective: >-
+      {{ (slurm_merged_dict.get('SlurmdPidFile', ['/var/run/slurmd.pid'])
+         | first if slurm_merged_dict.get('SlurmdPidFile') is iterable
+         and slurm_merged_dict.get('SlurmdPidFile') is not string
+         else slurm_merged_dict.get('SlurmdPidFile', '/var/run/slurmd.pid'))
+         | dirname }}
+    slurm_epilog_dir_effective: >-
+      {{ (slurm_merged_dict.get('Epilog', ['/etc/slurm/epilog.d/logout_user.sh'])
+         | first if slurm_merged_dict.get('Epilog') is iterable
+         and slurm_merged_dict.get('Epilog') is not string
+         else slurm_merged_dict.get('Epilog', '/etc/slurm/epilog.d/logout_user.sh'))
+         | dirname }}
+    slurm_prolog_dir_effective: >-
+      {{ ((slurm_merged_dict.get('Prolog', [''])
+         | first if slurm_merged_dict.get('Prolog') is iterable
+         and slurm_merged_dict.get('Prolog') is not string
+         else slurm_merged_dict.get('Prolog', ''))
+         | default('', true) | dirname | default('', true)) }}
   when: slurm_merged_dict is defined
 
 # ── slurm.conf: all epilog/prolog dirs and custom file paths ─────────
@@ -56,12 +99,16 @@
 - name: Extract all epilog paths from merged Epilog list
   ansible.builtin.set_fact:
     slurm_epilog_paths_all: >-
-      {{ (slurm_merged_dict.get('Epilog', []) if slurm_merged_dict.get('Epilog') is iterable and slurm_merged_dict.get('Epilog') is not string
-          else [slurm_merged_dict.get('Epilog', '')])
+      {{ (slurm_merged_dict.get('Epilog', [])
+         if slurm_merged_dict.get('Epilog') is iterable
+         and slurm_merged_dict.get('Epilog') is not string
+         else [slurm_merged_dict.get('Epilog', '')])
          | reject('equalto', '') | list }}
     slurm_epilog_dirs_all: >-
-      {{ (slurm_merged_dict.get('Epilog', []) if slurm_merged_dict.get('Epilog') is iterable and slurm_merged_dict.get('Epilog') is not string
-          else [slurm_merged_dict.get('Epilog', '')])
+      {{ (slurm_merged_dict.get('Epilog', [])
+         if slurm_merged_dict.get('Epilog') is iterable
+         and slurm_merged_dict.get('Epilog') is not string
+         else [slurm_merged_dict.get('Epilog', '')])
          | map('dirname') | unique | reject('equalto', '') | list }}
   when: slurm_merged_dict is defined
 
@@ -74,12 +121,16 @@
 - name: Extract all prolog paths from merged Prolog list
   ansible.builtin.set_fact:
     slurm_prolog_paths_all: >-
-      {{ (slurm_merged_dict.get('Prolog', []) if slurm_merged_dict.get('Prolog') is iterable and slurm_merged_dict.get('Prolog') is not string
-          else [slurm_merged_dict.get('Prolog', '')])
+      {{ (slurm_merged_dict.get('Prolog', [])
+         if slurm_merged_dict.get('Prolog') is iterable
+         and slurm_merged_dict.get('Prolog') is not string
+         else [slurm_merged_dict.get('Prolog', '')])
          | reject('equalto', '') | list }}
     slurm_prolog_dirs_all: >-
-      {{ (slurm_merged_dict.get('Prolog', []) if slurm_merged_dict.get('Prolog') is iterable and slurm_merged_dict.get('Prolog') is not string
-          else [slurm_merged_dict.get('Prolog', '')])
+      {{ (slurm_merged_dict.get('Prolog', [])
+         if slurm_merged_dict.get('Prolog') is iterable
+         and slurm_merged_dict.get('Prolog') is not string
+         else [slurm_merged_dict.get('Prolog', '')])
          | map('dirname') | unique | reject('equalto', '') | list }}
   when: slurm_merged_dict is defined
 
@@ -93,23 +144,46 @@
 
 - name: Extract effective plugin directory from slurm.conf
   ansible.builtin.set_fact:
-    slurm_plugin_dir_effective: "{{ (slurm_merged_dict.get('PluginDir', ['/usr/lib64/slurm']) | first if slurm_merged_dict.get('PluginDir') is iterable and slurm_merged_dict.get('PluginDir') is not string else slurm_merged_dict.get('PluginDir', '/usr/lib64/slurm')) }}"
+    slurm_plugin_dir_effective: >-
+      {{ (slurm_merged_dict.get('PluginDir', ['/usr/lib64/slurm'])
+         | first if slurm_merged_dict.get('PluginDir') is iterable
+         and slurm_merged_dict.get('PluginDir') is not string
+         else slurm_merged_dict.get('PluginDir', '/usr/lib64/slurm')) }}
   when: slurm_merged_dict is defined
 
 # ── slurmdbd.conf path params ────────────────────────────────────────
 
 - name: Extract effective directories from slurmdbd.conf
   ansible.builtin.set_fact:
-    slurmdbd_log_dir_effective: "{{ (slurmdbd_merged_dict.get('LogFile', ['/var/log/slurm/slurmdbd.log']) | first if slurmdbd_merged_dict.get('LogFile') is iterable and slurmdbd_merged_dict.get('LogFile') is not string else slurmdbd_merged_dict.get('LogFile', '/var/log/slurm/slurmdbd.log')) | dirname }}"
-    slurmdbd_pid_dir_effective: "{{ (slurmdbd_merged_dict.get('PidFile', ['/var/run/slurmdbd.pid']) | first if slurmdbd_merged_dict.get('PidFile') is iterable and slurmdbd_merged_dict.get('PidFile') is not string else slurmdbd_merged_dict.get('PidFile', '/var/run/slurmdbd.pid')) | dirname }}"
-    slurmdbd_plugin_dir_effective: "{{ (slurmdbd_merged_dict.get('PluginDir', ['/usr/lib64/slurm']) | first if slurmdbd_merged_dict.get('PluginDir') is iterable and slurmdbd_merged_dict.get('PluginDir') is not string else slurmdbd_merged_dict.get('PluginDir', '/usr/lib64/slurm')) }}"
+    slurmdbd_log_dir_effective: >-
+      {{ (slurmdbd_merged_dict.get('LogFile', ['/var/log/slurm/slurmdbd.log'])
+         | first if slurmdbd_merged_dict.get('LogFile') is iterable
+         and slurmdbd_merged_dict.get('LogFile') is not string
+         else slurmdbd_merged_dict.get('LogFile', '/var/log/slurm/slurmdbd.log'))
+         | dirname }}
+    slurmdbd_pid_dir_effective: >-
+      {{ (slurmdbd_merged_dict.get('PidFile', ['/var/run/slurmdbd.pid'])
+         | first if slurmdbd_merged_dict.get('PidFile') is iterable
+         and slurmdbd_merged_dict.get('PidFile') is not string
+         else slurmdbd_merged_dict.get('PidFile', '/var/run/slurmdbd.pid'))
+         | dirname }}
+    slurmdbd_plugin_dir_effective: >-
+      {{ (slurmdbd_merged_dict.get('PluginDir', ['/usr/lib64/slurm'])
+         | first if slurmdbd_merged_dict.get('PluginDir') is iterable
+         and slurmdbd_merged_dict.get('PluginDir') is not string
+         else slurmdbd_merged_dict.get('PluginDir', '/usr/lib64/slurm')) }}
   when: slurmdbd_merged_dict is defined
 
 # ── cgroup.conf path params ──────────────────────────────────────────
 
 - name: Extract effective cgroup mountpoint from cgroup.conf
   ansible.builtin.set_fact:
-    slurm_cgroup_mountpoint_effective: "{{ ((cgroup_merged_dict.get('CgroupMountpoint', ['']) | first if cgroup_merged_dict.get('CgroupMountpoint') is iterable and cgroup_merged_dict.get('CgroupMountpoint') is not string else cgroup_merged_dict.get('CgroupMountpoint', '')) | default('', true)) }}"
+    slurm_cgroup_mountpoint_effective: >-
+      {{ ((cgroup_merged_dict.get('CgroupMountpoint', [''])
+         | first if cgroup_merged_dict.get('CgroupMountpoint') is iterable
+         and cgroup_merged_dict.get('CgroupMountpoint') is not string
+         else cgroup_merged_dict.get('CgroupMountpoint', ''))
+         | default('', true)) }}
   when: cgroup_merged_dict is defined
 
 # ── Defaults when confs are not merged ────────────────────────────────
