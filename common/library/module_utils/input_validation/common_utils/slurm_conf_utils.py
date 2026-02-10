@@ -865,7 +865,7 @@ def parse_slurm_conf(file_path, conf_name, validate):
             if validate and skey not in current_conf:
                 raise ValueError(
                     f"Invalid key while parsing {file_path}: {skey}")
-            if current_conf.get(skey) == SlurmParserEnum.S_P_ARRAY:
+            if current_conf.get(skey) == SlurmParserEnum.S_P_ARRAY or len(tmp_dict) > 1:
                 slurm_dict[list(tmp_dict.keys())[0]] = list(
                     slurm_dict.get(list(tmp_dict.keys())[0], [])) + [tmp_dict]
             elif current_conf.get(skey) == SlurmParserEnum.S_P_CSV:
