@@ -62,10 +62,6 @@ msg_storage_config_missing: "storage_config.yml not found at {{ input_project_di
 msg_nfs_client_params_missing: "storage_config.yml must define nfs_client_params with at least one entry"
 msg_nfs_client_param_entry_missing_keys: "Each nfs_client_params entry must define server_ip, server_share_path, and client_share_path"
 msg_using_backup_storage_config: "Transforming storage_config.yml from backup at {{ backup_location }}/storage_config.yml"
-msg_storage_config_transform_summary: |-
-  Transformed storage_config.yml from Omnia 2.0 to 2.1:
-  - Preserved nfs_client_params from backup
-  - Applied schema defaults for missing fields
 
 # Omnia config transformation messages
 msg_backup_omnia_config_missing: "Backup omnia_config.yml missing"
