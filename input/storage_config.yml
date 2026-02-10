@@ -35,7 +35,7 @@
 #  ip:
 #    - 172.1.2.3
 #  port: 3260
-#  iscsi_initiator: iqn.initiator.com.example:7d7d7d7d7d7
+#  iscsi_initiator: iqn.2025-01.com.dell:scontrol-node
 #  volume_id: 00c0ff4343f1f1f1001c8c4e6901000000
 
 
