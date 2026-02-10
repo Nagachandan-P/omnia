@@ -174,7 +174,6 @@
     vminsert_port: "{{ (vminsert_lb_port.stdout | trim) | default('') }}"
     vmselect_port: "{{ (vmselect_lb_port.stdout | trim) | default('') }}"
     victoria_tls_ca: "{{ victoria_tls_cert_dir }}/ca.crt"
-    
 
 - name: Fail when LoadBalancer IPs are not available
   ansible.builtin.fail:
