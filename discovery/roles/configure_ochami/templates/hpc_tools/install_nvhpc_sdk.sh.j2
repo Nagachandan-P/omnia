@@ -5,7 +5,25 @@ LOGFILE="/var/log/nvhpc_sdk_install.log"
 
 echo "===== Starting NVIDIA HPC SDK installation =====" | tee -a "$LOGFILE"
 
-NVHPC_PKG_NAME="{{ nvhpc_pkg_name | default('nvhpc_2025_2511_Linux_x86_64_cuda_13.0') }}"
+sys_arch="$(uname -m)"
+case "${sys_arch}" in
+    x86_64|amd64) arch="x86_64" ;;
+    aarch64|arm64) arch="aarch64" ;;
+    *)
+        echo "Unsupported architecture: ${sys_arch}"
+        exit 1
+        ;;
+esac
+
+NVHPC_VERSION="2025_2511"
+NVHPC_SHORT_VERSION="$(echo ${NVHPC_VERSION} | cut -d'_' -f2 | sed 's/\(..\)\(..\)/\1.\2/')"
+CUDA_VERSION="13.0"
+
+NVHPC_PKG_NAME="{{ nvhpc_pkg_name | default('') }}"
+if [ -z "${NVHPC_PKG_NAME}" ]; then
+    NVHPC_PKG_NAME="nvhpc_${NVHPC_VERSION}_Linux_${arch}_cuda_${CUDA_VERSION}"
+fi
+
 NVHPC_EXPORT="{{ cloud_init_nfs_path }}/hpc_tools/nvidia_sdk"
 NVHPC_MOUNT="/shared-nvhpc-sdk"
 NVHPC_TARBALL="$NVHPC_MOUNT/${NVHPC_PKG_NAME}.tar.gz"
@@ -47,7 +65,7 @@ else
 fi
 
 mkdir -p "$NVHPC_INSTALL_DIR_NFS"
-INSTALL_BIN_DIR="$NVHPC_INSTALL_DIR_NFS/Linux_x86_64/25.11/compilers/bin"
+INSTALL_BIN_DIR="$NVHPC_INSTALL_DIR_NFS/Linux_${arch}/${NVHPC_SHORT_VERSION}/compilers/bin"
 
 if [ -x "$INSTALL_BIN_DIR/nvc" ]; then
     echo "[INFO] NVHPC already installed. Skipping installer." | tee -a "$LOGFILE"

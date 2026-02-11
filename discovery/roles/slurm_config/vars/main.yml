@@ -158,5 +158,9 @@ parallel_copy_candidates:
   - name: nvhpc_sdk_x86_64
     src: "{{ oim_shared_path }}/omnia/{{ nvhpc_tarball_x86_64_relpath | dirname }}/"
     dest: "{{ slurm_config_path }}/hpc_tools/nvidia_sdk/"
+  
+  - name: nvhpc_sdk_aarch64
+    src: "{{ oim_shared_path }}/omnia/{{ nvhpc_tarball_aarch64_relpath | dirname }}/"
+    dest: "{{ slurm_config_path }}/hpc_tools/nvidia_sdk/"
 
 backup_dir: "{{ slurm_config_path }}/{{ ctld_list[0] }}/etc/slurm/backup_{{ ansible_date_time.date }}_{{ ansible_date_time.time | replace(':', '-') }}"

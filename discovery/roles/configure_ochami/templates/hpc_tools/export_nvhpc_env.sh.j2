@@ -5,7 +5,9 @@ CLIENT_MOUNT="{{ client_mount_path }}"
 
 NVHPC_LOCAL_MOUNT="/opt/nvidia/nvhpc"
 NVARCH="$(uname -s)_$(uname -m)"
-NVHPC_VERSION="25.11"
+
+NVHPC_LONG_VERSION="{{ nvhpc_version_long | default('2025_2511') }}"
+NVHPC_VERSION="$(echo ${NVHPC_LONG_VERSION} | cut -d'_' -f2 | sed 's/\(..\)\(..\)/\1.\2/')"
 
 NVHPC_BASE="$NVHPC_LOCAL_MOUNT/$NVARCH/$NVHPC_VERSION"
 PROFILE_FILE="/etc/profile.d/nvhpc.sh"
