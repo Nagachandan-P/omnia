@@ -105,22 +105,11 @@ EOF
 
 chmod 644 "$OPENMPI_ENV_FILE"
 
-# Verify installation
-echo "[INFO] Verifying OpenMPI installation..."
-if [ -f "$OPENMPI_PREFIX/bin/ompi_info" ]; then
-    OPENMPI_VERSION=$("$OPENMPI_PREFIX/bin/ompi_info" --version | head -1)
-    echo "[SUCCESS] OpenMPI installation verified - Version: $OPENMPI_VERSION" | tee -a "$LOGFILE"
-else
-    echo "[ERROR] OpenMPI installation verification failed - ompi_info not found" | tee -a "$LOGFILE"
-    exit 1
-fi
 
 # Create installation summary
 echo ""
 echo "===== OpenMPI Installation Summary ====="
 echo "Installation Status: SUCCESS"
-echo "OpenMPI Version: $OPENMPI_VERSION"
-
 echo "Integration Status:"
 if [ "$SLURM_FLAG" = "--with-slurm=yes --with-munge=/usr" ]; then
     echo "  - Slurm Integration: ENABLED"

@@ -11,7 +11,7 @@ NVHPC_NFS_SHARE="$PARENT_MOUNT/nvhpc"
 NVHPC_LOCAL_MOUNT="/opt/nvidia/nvhpc"
 
 mkdir -p "$PARENT_MOUNT"
-mkdir -p "$NVHPC_NFS_SHARE"
+
 
 if ! mountpoint -q "$PARENT_MOUNT"; then
     mount -t nfs "$PARENT_NFS" "$PARENT_MOUNT"
@@ -24,7 +24,7 @@ fi
 
 echo "[INFO] Parent NVHPC export mounted"
 
-
+mkdir -p "$NVHPC_NFS_SHARE"
 # 3. Ensure fstab entry exists (bind mount, NOT NFS)
 if ! grep -qF "$NVHPC_NFS_SHARE $NVHPC_LOCAL_MOUNT" /etc/fstab; then
     echo "$NVHPC_NFS_SHARE $NVHPC_LOCAL_MOUNT none bind,_netdev 0 0" >> /etc/fstab
