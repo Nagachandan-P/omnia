@@ -132,8 +132,13 @@ ssh_private_key_path: /root/.ssh/oim_rsa
 
 # nvidia sdk vars
 # Fully resolved tarball relative paths (no nested Jinja2)
-nvhpc_tarball_x86_64_relpath: "offline_repo/cluster/x86_64/rhel/10.0/tarball/nvhpc_2025_2511_Linux_x86_64_cuda_13.0/nvhpc_2025_2511_Linux_x86_64_cuda_13.0.tar.gz"
-nvhpc_tarball_aarch64_relpath: "offline_repo/cluster/aarch64/rhel/10.0/tarball/nvhpc_2025_2511_Linux_aarch64_cuda_13.0/nvhpc_2025_2511_Linux_aarch64_cuda_13.0.tar.gz"
+nvhpc_tarball_x86_64_relpath: >
+  offline_repo/cluster/x86_64/rhel/10.0/tarball/nvhpc_2025_2511_Linux_x86_64_cuda_13.0/
+  nvhpc_2025_2511_Linux_x86_64_cuda_13.0.tar.gz
+
+nvhpc_tarball_aarch64_relpath: >
+  offline_repo/cluster/aarch64/rhel/10.0/tarball/nvhpc_2025_2511_Linux_aarch64_cuda_13.0/
+  nvhpc_2025_2511_Linux_aarch64_cuda_13.0.tar.gz
 
 nvhpc_nfs_rel_dir: "hpc_tools/nvidia_sdk"
 
@@ -160,7 +165,7 @@ parallel_copy_candidates:
   - name: nvhpc_sdk_x86_64
     src: "{{ oim_shared_path }}/omnia/{{ nvhpc_tarball_x86_64_relpath | dirname }}/"
     dest: "{{ slurm_config_path }}/hpc_tools/nvidia_sdk/"
-  
+
   - name: nvhpc_sdk_aarch64
     src: "{{ oim_shared_path }}/omnia/{{ nvhpc_tarball_aarch64_relpath | dirname }}/"
     dest: "{{ slurm_config_path }}/hpc_tools/nvidia_sdk/"
