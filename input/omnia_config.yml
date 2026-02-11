@@ -32,13 +32,19 @@
 # <conf name>: 
 #    <mapping> or <filepath>
 # <mapping> Supply the configuration values directly as a key–value map
-# <filepath> Supply the absolute path to a custom configuration file on the OIM server
+# <filepath> Supply the absolute path to a custom configuration file
 # The conf files supported by slurm are
 # slurm
 # cgroup
 # slurmdbd
 # gres
+# acct_gather
+# helpers
+# job_container
 # mpi
+# oci
+# topology
+# burst_buffer
 # Thes files will be written into the slurm_config directory with .conf suffix
 
 slurm_cluster:
@@ -48,6 +54,13 @@ slurm_cluster:
     #   slurm:
     #     SlurmctldTimeout: 60
     #     SlurmdTimeout: 150
+    #     NodeName:
+    #       - NodeName: newnode1
+    #         CPUs: 16
+    #         RealMemory: 64000
+    #       - NodeName: newnode2
+    #         CPUs: 16
+    #         RealMemory: 64000
     #   cgroup:
     #     CgroupPlugin: autodetect
     #     ConstrainCores: True
@@ -62,7 +75,6 @@ slurm_cluster:
     #   cgroup: /path/to/custom_cgroup.conf
     #   slurmdbd: /path/to/custom_slurmdbd.conf
     #   gres: /path/to/custom_gres.conf
-    #   mpi: /path/to/custom_mpi.conf
   
 # ----------------------------SERVICE K8S------------------------------------------------------
 # For service k8s cluster below parameters are required,(List)

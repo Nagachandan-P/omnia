@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ---
-- name: Initialize ctld_state dict
-  ansible.builtin.set_fact:
-    ctld_state: "{{ ctld_state | default({}) | combine({item: false}) }}"
-
 - name: Check if remote host is reachable via SSH
   ansible.builtin.wait_for:
     host: "{{ item }}"
@@ -24,38 +20,69 @@
     state: started
   delegate_to: localhost
   register: ssh_check
+  ignore_errors: true
+  ignore_unreachable: true
 
-- name: Check if slurmctld is running on remote host
-  ansible.builtin.service_facts:
-  delegate_to: "{{ item }}"
-  register: service_facts
+- name: Block when ssh_check is success
   when: ssh_check is success
+  block:
+    - name: Initialize ctld_state dict
+      ansible.builtin.set_fact:
+        ctld_state: "{{ ctld_state | default({}) | combine({item: false}) }}"
 
-- name: Update ctld_state if slurmctld is running
-  ansible.builtin.set_fact:
-    ctld_state: "{{ ctld_state | combine({item: true}) }}"
-  when:
-    - ssh_check is success
-    - service_facts is success
-    - ansible_facts.services['slurmctld.service'] is defined
-    - ansible_facts.services['slurmctld.service'].state == 'running'
+    - name: Check if slurmctld is running on remote host
+      ansible.builtin.service_facts:
+      delegate_to: "{{ item }}"
+      register: service_facts
 
-- name: Update /etc/hosts with controller hostname and IP
-  ansible.builtin.lineinfile:
-    path: /etc/hosts
-    regexp: '^{{ ip.value }}\s+{{ ip.key }}'
-    line: "{{ ip.value }} {{ ip.key }}"
-    state: present
-  loop: "{{ ip_name_map | dict2items }}"
-  loop_control:
-    loop_var: ip
-  delegate_to: "{{ item }}"
-  when: ssh_check is success
+    - name: Update ctld_state if slurmctld is running
+      ansible.builtin.set_fact:
+        ctld_state: "{{ ctld_state | combine({item: true}) }}"
+      when:
+        - service_facts is success
+        - ansible_facts.services['slurmctld.service'] is defined
+        - ansible_facts.services['slurmctld.service'].state == 'running'
 
-- name: Trigger the scontrol reconfigure
-  ansible.builtin.command: scontrol reconfigure
-  changed_when: scontrol_reconfig.rc == 0
-  failed_when: false
-  register: scontrol_reconfig
-  delegate_to: "{{ item }}"
-  when: ctld_state[item] is true
+    - name: Check reachability of hosts in ip_name_map
+      ansible.builtin.wait_for:
+        host: "{{ host }}"
+        port: 22
+        timeout: 10
+        state: started
+      delegate_to: localhost
+      loop: "{{ ip_name_map.values() | list }}"
+      loop_control:
+        loop_var: host
+      register: ip_map_ssh_check
+      ignore_errors: true
+      ignore_unreachable: true
+
+    - name: Build list of reachable hosts from ip_name_map
+      ansible.builtin.set_fact:
+        reachable_hosts: "{{ ip_map_ssh_check.results | rejectattr('failed', 'true') | map(attribute='host') | list }}"
+
+    - name: Update /etc/hosts with controller hostname and IP
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '^{{ host_entry.value }}\s+{{ host_entry.key }}'
+        line: "{{ host_entry.value }} {{ host_entry.key }}"
+        state: present
+      loop: "{{ reachable_hosts | product(ip_name_map | dict2items) | list }}"
+      loop_control:
+        loop_var: host_combo
+      vars:
+        target_host: "{{ host_combo[0] }}"
+        host_entry: "{{ host_combo[1] }}"
+      delegate_to: "{{ target_host }}"
+      when: reachable_hosts | length > 0
+      ignore_unreachable: true
+      failed_when: true
+
+    - name: Trigger the scontrol reconfigure
+      ansible.builtin.command: scontrol reconfigure
+      changed_when: scontrol_reconfig.rc == 0
+      failed_when: false
+      register: scontrol_reconfig
+      delegate_to: "{{ item }}"
+      when:
+        - ctld_state[item] is true

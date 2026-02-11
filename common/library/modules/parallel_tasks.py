@@ -1,4 +1,4 @@
-# Copyright 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +28,8 @@ from ansible.module_utils.local_repo.download_common import (
     process_shell,
     process_ansible_galaxy_collection,
     process_iso,
-    process_pip
+    process_pip,
+    process_rpm_file
 )
 from ansible.module_utils.local_repo.download_image import process_image
 from ansible.module_utils.local_repo.download_rpm import process_rpm
@@ -53,8 +54,6 @@ from ansible.module_utils.local_repo.config import (
     SOFTWARE_CSV_HEADER,
     STATUS_CSV_HEADER,
     LOCAL_REPO_CONFIG_PATH_DEFAULT,
-    USER_REG_CRED_INPUT,
-    USER_REG_KEY_PATH,
     OMNIA_CREDENTIALS_YAML_PATH,
     OMNIA_CREDENTIALS_VAULT_PATH
 )
@@ -177,6 +176,8 @@ def determine_function(task, repo_store_path, csv_file_path, user_data, version_
             return process_pip, [task, repo_store_path, status_file, cluster_os_type, cluster_os_version, arc]
         if task_type == "image":
             return process_image, [task, status_file, version_variables, user_registries, docker_username, docker_password]
+        if task_type == "rpm_file":
+            return process_rpm_file, [task, repo_store_path, status_file, cluster_os_type, cluster_os_version, arc]
         if task_type == "rpm":
             return process_rpm, [task, repo_store_path, status_file,
                                  cluster_os_type, cluster_os_version, repo_config_value, arc]
@@ -253,13 +254,13 @@ def generate_software_status_table(status_dict,slogger):
             table.field_names = ["Name", "Status"]
             for name, status in items:
                 table.add_row([name, status.lower()])
-            
+
             tables.append(table.get_string())
             slogger.info(f"Completed table for {arch}")
-            
+
         slogger.info("Software status table generation completed successfully")
         return "\n\n".join(tables)
-    
+
     except Exception as e:
         slogger.error(f"Error occurred while generating software status table: {e}")
         return f"Error: {e}"
@@ -302,6 +303,27 @@ def main():
     Raises:
         Exception: If an error occurs during execution.
     """
+    # module_args = {
+    #     "tasks": {"type": "list", "required": True},
+    #     "nthreads": {"type": "int", "required": False, "default": DEFAULT_NTHREADS},
+    #     "timeout": {"type": "int", "required": False, "default": DEFAULT_TIMEOUT},
+    #     "log_dir": {"type": "str", "required": False, "default": LOG_DIR_DEFAULT},
+    #     "log_file": {"type": "str", "required": False, "default": DEFAULT_LOG_FILE},
+    #     "slog_file": {"type": "str", "required": False, "default": DEFAULT_SLOG_FILE},
+    #     "csv_file_path": {"type": "str", "required": False, "default": CSV_FILE_PATH_DEFAULT},
+    #     "repo_store_path": {"type": "str", "required": False, "default": DEFAULT_REPO_STORE_PATH},
+    #     "software": {"type": "list", "elements": "str", "required": True},
+    #     "user_json_file": {"type": "str", "required": False, "default": USER_JSON_FILE_DEFAULT},
+    #     "show_softwares_status": {"type": "bool", "required": False, "default": False},
+    #     "overall_status_dict": {"type": "dict","required": True},
+    #     "local_repo_config_path": {"type": "str", "required": False, "default": LOCAL_REPO_CONFIG_PATH_DEFAULT},
+    #     "arch": {"type": "str", "required": False},
+    #     "user_reg_cred_input": {"type": "str", "required": False, "default": USER_REG_CRED_INPUT},
+    #     "user_reg_key_path": {"type": "str", "required": False, "default": USER_REG_KEY_PATH},
+    #     "omnia_credentials_yaml_path": {"type": "str", "required": False, "default": OMNIA_CREDENTIALS_YAML_PATH},
+    #     "omnia_credentials_vault_path": {"type": "str", "required": False, "default": OMNIA_CREDENTIALS_VAULT_PATH}
+    # }
+
     module_args = {
         "tasks": {"type": "list", "required": True},
         "nthreads": {"type": "int", "required": False, "default": DEFAULT_NTHREADS},
@@ -317,8 +339,6 @@ def main():
         "overall_status_dict": {"type": "dict","required": True},
         "local_repo_config_path": {"type": "str", "required": False, "default": LOCAL_REPO_CONFIG_PATH_DEFAULT},
         "arch": {"type": "str", "required": False},
-        "user_reg_cred_input": {"type": "str", "required": False, "default": USER_REG_CRED_INPUT},
-        "user_reg_key_path": {"type": "str", "required": False, "default": USER_REG_KEY_PATH},
         "omnia_credentials_yaml_path": {"type": "str", "required": False, "default": OMNIA_CREDENTIALS_YAML_PATH},
         "omnia_credentials_vault_path": {"type": "str", "required": False, "default": OMNIA_CREDENTIALS_VAULT_PATH}
     }
@@ -337,8 +357,8 @@ def main():
     overall_status_dict = module.params["overall_status_dict"]
     local_repo_config_path = module.params["local_repo_config_path"]
     arc = module.params["arch"]
-    user_reg_cred_input = module.params["user_reg_cred_input"]
-    user_reg_key_path = module.params["user_reg_key_path"]
+    # user_reg_cred_input = module.params["user_reg_cred_input"]
+    # user_reg_key_path = module.params["user_reg_key_path"]
     omnia_credentials_yaml_path = module.params["omnia_credentials_yaml_path"]
     omnia_credentials_vault_path = module.params["omnia_credentials_vault_path"]
 
@@ -370,20 +390,20 @@ def main():
         version_variables = set_version_variables(user_data, software_names, cluster_os_version,slogger)
         slogger.info(f"Cluster OS: {cluster_os_type}")
         slogger.info(f"Version Variables: {version_variables}")
-        gen_result = {}
-        if not os.path.isfile(user_reg_key_path):
-            gen_result = generate_vault_key(user_reg_key_path)
-        if gen_result is None:
-            module.fail_json(msg=f"Unable to generate local_repo key at path: {user_reg_key_path}")
+        # gen_result = {}
+        # if not os.path.isfile(user_reg_key_path):
+        #     gen_result = generate_vault_key(user_reg_key_path)
+        # if gen_result is None:
+        #     module.fail_json(msg=f"Unable to generate local_repo key at path: {user_reg_key_path}")
 
         overall_status, task_results = execute_parallel(
             tasks, determine_function, nthreads, repo_store_path, csv_file_path,
-            log_dir, user_data, version_variables, arc, slogger, local_repo_config_path, user_reg_cred_input, user_reg_key_path,
+            log_dir, user_data, version_variables, arc, slogger, local_repo_config_path,
             omnia_credentials_yaml_path, omnia_credentials_vault_path, timeout
         )
 
-        if not is_encrypted(user_reg_cred_input):
-            process_file(user_reg_cred_input,user_reg_key_path,'encrypt')
+        # if not is_encrypted(user_reg_cred_input):
+        #     process_file(user_reg_cred_input,user_reg_key_path,'encrypt')
 
         end_time = datetime.now()
         formatted_end_time = end_time.strftime("%I:%M:%S %p")
