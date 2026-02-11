@@ -76,7 +76,7 @@
       delegate_to: "{{ target_host }}"
       when: reachable_hosts | length > 0
       ignore_unreachable: true
-      failed_when: true
+      failed_when: false
 
     - name: Trigger the scontrol reconfigure
       ansible.builtin.command: scontrol reconfigure

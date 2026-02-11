@@ -67,7 +67,6 @@ __default_config:
     PartitionName:
       - PartitionName: DEFAULT
         Nodes: ALL
-        Default: true
         MaxTime: INFINITE
         State: UP
     # S_P_ARRAY type paramater to be provided this way
