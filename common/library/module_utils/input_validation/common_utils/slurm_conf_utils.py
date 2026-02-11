@@ -109,7 +109,7 @@ slurm_nodeset_options = {
 
 
 slurm_partitionname_options = {
-    "Partition": S_P_STRING,
+    "PartitionName": S_P_STRING,
     "AllocNodes": S_P_CSV,
     "AllowAccounts": S_P_CSV,
     "AllowGroups": S_P_CSV,
@@ -765,8 +765,6 @@ def validate_config_types(conf_dict, conf_name, module):
     current_conf = all_confs.get(conf_name, {})
     if not current_conf:
         return {'invalid_keys': [], 'type_errors': []}
-    # module.fail_json(msg=f"Invalid configuration name: {conf_name}", conf_dict=conf_dict, current_conf=current_conf)
-    # module.warn(conf_name)
     invalid_keys = list(
         set(conf_dict.keys()).difference(set(current_conf.keys())))
     type_errors = []
@@ -811,8 +809,7 @@ def validate_config_types(conf_dict, conf_name, module):
 
             elif expected_type == "array":
                 if not isinstance(value, list):
-                    error = f"Expected array (list), got {
-                        type(value).__name__}"
+                    error = f"Expected array (list), got {type(value).__name__}"
                 elif value:
                     if not all(isinstance(item, dict) for item in value):
                         error = "Expected array of dicts, got mixed types"
