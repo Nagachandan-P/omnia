@@ -125,6 +125,7 @@ partition_params:
   Nodes: "{{ cmpt_list | join(',') }}"
   MaxTime: "INFINITE"
   State: "UP"
+  Default: "YES"
 openldap_dir_name: "openldap/"
 software_config_file: "{{ input_project_dir }}/software_config.json"
 omnia_run_tags: "{{ hostvars['localhost']['omnia_run_tags'] }}"
