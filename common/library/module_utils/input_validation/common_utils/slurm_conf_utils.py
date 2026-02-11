@@ -811,8 +811,7 @@ def validate_config_types(conf_dict, conf_name, module):
 
             elif expected_type == "array":
                 if not isinstance(value, list):
-                    error = f"Expected array (list), got {
-                        type(value).__name__}"
+                    error = f"Expected array (list), got {type(value).__name__}"
                 elif value:
                     if not all(isinstance(item, dict) for item in value):
                         error = "Expected array of dicts, got mixed types"
