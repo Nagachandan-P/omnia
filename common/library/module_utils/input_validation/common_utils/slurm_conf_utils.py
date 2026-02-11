@@ -109,7 +109,7 @@ slurm_nodeset_options = {
 
 
 slurm_partitionname_options = {
-    "Partition": S_P_STRING,
+    "PartitionName": S_P_STRING,
     "AllocNodes": S_P_CSV,
     "AllowAccounts": S_P_CSV,
     "AllowGroups": S_P_CSV,
