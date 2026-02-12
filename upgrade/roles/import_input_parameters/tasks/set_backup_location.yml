@@ -15,7 +15,7 @@
 
 - name: Read oim_metadata.yml to get upgrade_backup_dir
   ansible.builtin.slurp:
-    src: /opt/omnia/.data/oim_metadata.yml
+    src: "{{ oim_metadata_path }}"
   register: oim_metadata_slurp
 
 - name: Parse oim_metadata.yml

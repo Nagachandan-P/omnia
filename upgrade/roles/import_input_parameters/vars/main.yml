@@ -15,7 +15,10 @@
 
 # backup_location will be set from oim_metadata.yml upgrade_backup_dir
 # Format: /opt/omnia/backups/upgrade/version_2.0.0.0/input/project_default
-backup_location: ""
+# Set dynamically from metadata, no static variable needed
+
+# Path to oim_metadata.yml
+oim_metadata_path: "/opt/omnia/.data/oim_metadata.yml"
 
 backup_dir_mode: '0755'
 default_file_mode: '0644'
