@@ -66,8 +66,8 @@ gpu_slurm_conf:
   SelectType: select/cons_tres
   SelectTypeParameters: CR_Core_Memory
   SlurmdParameters: l3cache_as_socket
-innodb_buffer_pool_size: 1G
-innodb_lock_wait_timeout: 120
+innodb_buffer_pool_size: 4G
+innodb_lock_wait_timeout: 900
 # TODO tmp
 nodes_yaml: "{{ hostvars['localhost']['oim_shared_path'] }}/omnia/openchami/workdir/nodes/nodes.yaml"
 bmc_username: "{{ hostvars['localhost']['bmc_username'] }}"

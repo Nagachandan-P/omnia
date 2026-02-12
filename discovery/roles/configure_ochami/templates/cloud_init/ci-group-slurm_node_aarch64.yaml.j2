@@ -115,6 +115,7 @@
                     bash /gpu-runfile/{{ cuda_runfile_aarch64 }} --silent --driver --no-opengl-libs --kernel-source-path=/lib/modules/$(uname -r)/build
                     if [ $? -eq 0 ] && command -v nvidia-smi &>/dev/null; then
                         echo "[SUCCESS] NVIDIA driver installed successfully."
+                        nvidia-smi -pm 1
                     else
                         echo "[ERROR] NVIDIA driver installation failed."
                     fi
