@@ -20,13 +20,11 @@
            UPGRADE WARNINGS SUMMARY
       =================================
 
-      {% if upgrade_warnings | length > 0 %}
       {{ upgrade_warnings | length }} warning{{ 's' if upgrade_warnings | length > 1 else '' }} detected.
       You will now be shown the detailed list.
-      {% else %}
-      No warnings detected. Upgrade completed successfully!
-      {% endif %}
-  when: upgrade_warnings is defined
+  when:
+    - upgrade_warnings is defined
+    - upgrade_warnings | length > 0
 
 
 - name: Pause for user to review warnings
@@ -36,7 +34,6 @@
       ║       ⚠️  UPGRADE WARNINGS REVIEW  ⚠️        ║
       ╚════════════════════════════════════════════╝
 
-      {% if upgrade_warnings | length > 0 %}
       {{ upgrade_warnings | length }} warning{{ 's' if upgrade_warnings | length > 1 else '' }} detected:
 
       {% for warning in upgrade_warnings %}
@@ -45,9 +42,6 @@
 
       Please review these warnings carefully.
       Press ENTER to continue or CTRL+C to abort.
-      {% else %}
-      No warnings detected. Upgrade completed successfully!
-
-      Press ENTER to continue...
-      {% endif %}
-  when: upgrade_warnings is defined
+  when:
+    - upgrade_warnings is defined
+    - upgrade_warnings | length > 0

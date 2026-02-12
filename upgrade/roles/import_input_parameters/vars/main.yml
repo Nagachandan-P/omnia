@@ -31,14 +31,16 @@ msg_upgrade_backup_dir_missing: "upgrade_backup_dir not found in /opt/omnia/.dat
 msg_restore_item_name_missing: "restore_item must define 'name'"
 msg_validation_failed: "Validation failed for {{ restore_item.name }}"
 msg_backup_file_missing: "Backup file missing: {{ restore_item.name }}"
-msg_user_registry_credential_missing: |- 
-  \033[93mWARNING: user_registry_credential.yml not found in backup at {{ backup_location }}/user_registry_credential.yml\033[0m
+msg_user_registry_credential_missing: |-
+  [93mWARNING:[0m user_registry_credential.yml not found in backup at
+  {{ backup_location }}/user_registry_credential.yml
   This might be due to complete Omnia execution not being completed.
   Skipping restoration of this file.
 
 # Omnia config credentials messages
-msg_omnia_config_credentials_missing: |- 
-  WARNING: omnia_config_credentials.yml not found in backup at {{ backup_location }}/omnia_config_credentials.yml.
+msg_omnia_config_credentials_missing: |-
+  WARNING: omnia_config_credentials.yml not found in backup at
+  {{ backup_location }}/omnia_config_credentials.yml.
   This might be due to complete Omnia execution not being completed.
   Skipping restoration of this file.
 
