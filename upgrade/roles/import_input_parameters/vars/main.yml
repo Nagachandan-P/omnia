@@ -32,7 +32,7 @@ msg_restore_item_name_missing: "restore_item must define 'name'"
 msg_validation_failed: "Validation failed for {{ restore_item.name }}"
 msg_backup_file_missing: "Backup file missing: {{ restore_item.name }}"
 msg_user_registry_credential_missing: |-
-  [93mWARNING:[0m user_registry_credential.yml not found in backup at
+  WARNING: user_registry_credential.yml not found in backup at
   {{ backup_location }}/user_registry_credential.yml
   This might be due to complete Omnia execution not being completed.
   Skipping restoration of this file.
