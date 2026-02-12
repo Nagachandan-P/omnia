@@ -558,4 +558,6 @@
 
          - /root/ldms_sampler.sh
 {% endif %}
+         - systemctl restart slurmdbd
+         - systemctl restart slurmctld
          - echo "Cloud-Init has completed successfully."
