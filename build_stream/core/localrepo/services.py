@@ -85,9 +85,6 @@ class InputFileService:
             raise InputFilesMissingError(
                 job_id=job_id,
                 input_path=str(source_path),
-   
-
-                
                 correlation_id=correlation_id,
             )
 
