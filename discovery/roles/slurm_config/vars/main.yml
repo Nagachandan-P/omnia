@@ -117,6 +117,9 @@ munge_dir_mode: "0700"
 common_mode: "0755"
 slurm_dbd_mode: "0600"
 slurm_db_cnf_mode: "0600"
+node_drain_timeout: 900
+node_drain_delay: 30
+force_scancel_node: false
 dbd_slurm_conf:
   AccountingStoragePort: "{{ slurm_dbd_port }}"
   AccountingStorageType: accounting_storage/slurmdbd
