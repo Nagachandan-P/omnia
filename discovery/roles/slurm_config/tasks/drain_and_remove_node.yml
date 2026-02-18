@@ -34,7 +34,10 @@
   ignore_unreachable: true
   block:
     - name: Get current job count on node
-      ansible.builtin.shell: squeue -w {{ node_to_remove }} -h | wc -l
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          squeue -w {{ node_to_remove }} -h | wc -l
       register: current_jobs
       changed_when: false
       delegate_to: "{{ ctld }}"
@@ -52,7 +55,10 @@
       delegate_to: "{{ ctld }}"
 
     - name: Wait for all jobs to complete on the node
-      ansible.builtin.shell: squeue -w {{ node_to_remove }} -h | wc -l
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          squeue -w {{ node_to_remove }} -h | wc -l
       register: job_count_check
       until: job_count_check.stdout | int == 0
       retries: "{{ (node_drain_timeout / node_drain_delay) | int }}"
@@ -75,10 +81,11 @@
       ansible.builtin.debug:
         msg: "Failed to drain node {{ node_to_remove }}"
 
-    - name: Prompt for node with running job after timeout
+    - name: Remove slurm node with running job after timeout
       ansible.builtin.pause:
         prompt: |
-          Jobs are still running on {{ node_to_remove }}.
+          Node {{ node_to_remove }} has been DRAINED to prevent new job assignments.
+          Jobs are still running on {{ node_to_remove }} after wait of {{ node_drain_timeout }} seconds.
           Options:
             1. Press Ctrl+C then 'A' to abort
             2. Press Enter to force removal (jobs will be killed)
