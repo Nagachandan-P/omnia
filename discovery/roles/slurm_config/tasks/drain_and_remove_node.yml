@@ -34,7 +34,7 @@
   ignore_unreachable: true
   block:
     - name: Get current job count on node
-      ansible.builtin.command: squeue -w {{ node_to_remove }} -h | wc -l
+      ansible.builtin.shell: squeue -w {{ node_to_remove }} -h | wc -l
       register: current_jobs
       changed_when: false
       delegate_to: "{{ ctld }}"
@@ -52,7 +52,7 @@
       delegate_to: "{{ ctld }}"
 
     - name: Wait for all jobs to complete on the node
-      ansible.builtin.command: squeue -w {{ node_to_remove }} -h | wc -l
+      ansible.builtin.shell: squeue -w {{ node_to_remove }} -h | wc -l
       register: job_count_check
       until: job_count_check.stdout | int == 0
       retries: "{{ (node_drain_timeout / node_drain_delay) | int }}"
