@@ -60,6 +60,7 @@
   ansible.builtin.set_fact:
     cluster_name: "{{ slurm_cluster[0].cluster_name }}"
     configs_input: "{{ slurm_cluster[0].config_sources | default({}) | dict2items | rejectattr('value', 'falsy') | list | items2dict }}"
+    force_conf: "{{ slurm_cluster[0].force_conf | default(false) }}"
     slurm_config_path: "{{ share_path }}/{{ slurm_dir_name }}"
     controller_trackfile_path: "{{ share_path }}/ctld_track"
 
