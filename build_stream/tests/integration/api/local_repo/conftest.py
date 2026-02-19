@@ -15,18 +15,14 @@
 """Shared fixtures for Local Repository API integration tests."""
 
 import os
-import shutil
-import tempfile
-import uuid
 from pathlib import Path
 from typing import Dict
-from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
+from api.dependencies import verify_token
 
 from main import app
-from container import container
 from infra.id_generator import UUIDv4Generator
 
 
@@ -34,23 +30,20 @@ from infra.id_generator import UUIDv4Generator
 def client():
     """Create test client with fresh container for each test."""
     os.environ["ENV"] = "dev"
-    
-    # Mock authentication for integration tests
-    from api.dependencies import verify_token
-    
+
     def mock_verify_token():
         return {
             "sub": "test-client-123",
             "client_id": "test-client-123",
             "scopes": ["job:write", "job:read"]
         }
-    
+
     app.dependency_overrides[verify_token] = mock_verify_token
-    
-    client = TestClient(app)
-    
-    yield client
-    
+
+    test_client = TestClient(app)
+
+    yield test_client
+
     # Cleanup
     app.dependency_overrides.clear()
 
@@ -61,8 +54,8 @@ def uuid_generator_fixture():
     return UUIDv4Generator()
 
 
-@pytest.fixture
-def auth_headers(uuid_generator) -> Dict[str, str]:
+@pytest.fixture(name="auth_headers")
+def auth_headers_fixture(uuid_generator) -> Dict[str, str]:
     """Standard authentication headers for testing."""
     return {
         "Authorization": "Bearer test-client-123",
@@ -109,9 +102,9 @@ def input_dir(tmp_path):
     return base
 
 
-def setup_input_files(input_dir: Path, job_id: str) -> Path:
+def setup_input_files(input_dir_path: Path, job_id: str) -> Path:
     """Create input files for a given job_id."""
-    job_input = input_dir / job_id / "input"
+    job_input = input_dir_path / job_id / "input"
     job_input.mkdir(parents=True, exist_ok=True)
     (job_input / "config.json").write_text('{"cluster_os": "rhel9.2"}')
     return job_input

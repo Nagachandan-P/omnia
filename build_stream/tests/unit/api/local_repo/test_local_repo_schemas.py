@@ -46,23 +46,23 @@ class TestCreateLocalRepoResponse:
     def test_valid_response(self, valid_response_data):
         """Test creating valid response."""
         response = CreateLocalRepoResponse(**valid_response_data)
-        
+
         assert response.job_id == valid_response_data["job_id"]
         assert response.stage == valid_response_data["stage"]
         assert response.status == valid_response_data["status"]
         assert response.submitted_at == valid_response_data["submitted_at"]
         assert response.correlation_id == valid_response_data["correlation_id"]
 
-    
-    
-    
+
+
+
     def test_accepts_string_values(self, valid_response_data):
         """Test that schema accepts string values without validation."""
         # Schema accepts strings, validation happens at API layer
         valid_response_data["job_id"] = "any-string"
         valid_response_data["stage"] = "any-stage"
         valid_response_data["status"] = "any-status"
-        
+
         response = CreateLocalRepoResponse(**valid_response_data)
         assert response.job_id == "any-string"
         assert response.stage == "any-stage"
@@ -72,7 +72,7 @@ class TestCreateLocalRepoResponse:
         """Test that datetime field accepts string format."""
         # Schema accepts string, actual validation happens at API layer
         valid_response_data["submitted_at"] = "2026-02-10T07:00:00Z"
-        
+
         response = CreateLocalRepoResponse(**valid_response_data)
         assert response.submitted_at == "2026-02-10T07:00:00Z"
 
@@ -80,7 +80,7 @@ class TestCreateLocalRepoResponse:
         """Test that missing required fields raise validation error."""
         with pytest.raises(ValidationError) as exc_info:
             CreateLocalRepoResponse()
-        
+
         errors = exc_info.value.errors()
         assert len(errors) == 5  # All 5 fields are required
         field_names = {error["loc"][0] for error in errors}
@@ -89,9 +89,9 @@ class TestCreateLocalRepoResponse:
     def test_response_serialization(self, valid_response_data):
         """Test response serialization to JSON."""
         response = CreateLocalRepoResponse(**valid_response_data)
-        
+
         json_data = response.model_dump_json()
-        
+
         assert isinstance(json_data, str)
         assert "job_id" in json_data
         assert "stage" in json_data
@@ -100,10 +100,10 @@ class TestCreateLocalRepoResponse:
     def test_response_deserialization(self, valid_response_data):
         """Test response deserialization from JSON."""
         response = CreateLocalRepoResponse(**valid_response_data)
-        
+
         json_data = response.model_dump_json()
         restored_response = CreateLocalRepoResponse.model_validate_json(json_data)
-        
+
         assert restored_response.job_id == response.job_id
         assert restored_response.stage == response.stage
         assert restored_response.status == response.status
@@ -122,7 +122,7 @@ class TestLocalRepoErrorResponse:
             correlation_id=str(uuid.uuid4()),
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
-        
+
         assert error_response.error == "VALIDATION_ERROR"
         assert error_response.message == "Invalid input provided"
         assert error_response.correlation_id is not None
@@ -136,9 +136,9 @@ class TestLocalRepoErrorResponse:
             correlation_id=str(uuid.uuid4()),
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
-        
+
         json_data = error_response.model_dump_json()
-        
+
         assert isinstance(json_data, str)
         assert "error" in json_data
         assert "message" in json_data
@@ -151,5 +151,5 @@ class TestLocalRepoErrorResponse:
             correlation_id=str(uuid.uuid4()),
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
-        
+
         assert error_response.message == "Error with special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?"

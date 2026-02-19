@@ -15,7 +15,6 @@
 """Unit tests for CreateLocalRepoCommand."""
 
 import uuid
-from unittest.mock import MagicMock
 
 import pytest
 

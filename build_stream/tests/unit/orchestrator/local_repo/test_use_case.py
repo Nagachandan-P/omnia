@@ -27,7 +27,6 @@ from core.jobs.value_objects import (
     CorrelationId,
     JobId,
     StageName,
-    StageState,
     StageType,
 )
 from core.localrepo.exceptions import InputFilesMissingError

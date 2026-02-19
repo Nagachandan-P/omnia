@@ -151,5 +151,3 @@ class TestPlaybookResult:
         )
         with pytest.raises(AttributeError):
             result.status = "failed"
-
-
