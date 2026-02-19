@@ -33,7 +33,7 @@ class TestBuildImageRequest:
         return BuildImageRequest(
             job_id="job-123",
             stage_name="build-image",
-            playbook_path=PlaybookPath("/omnia/build_image_x86_64/build_image_x86_64.yml"),
+            playbook_path=PlaybookPath("build_image_x86_64.yml"),
             extra_vars=ExtraVars(
                 {
                     "job_id": "job-123",
@@ -62,7 +62,7 @@ class TestBuildImageRequest:
         request = BuildImageRequest(
             job_id="job-123",
             stage_name="build-image",
-            playbook_path=PlaybookPath("/omnia/build_image_x86_64/build_image_x86_64.yml"),
+            playbook_path=PlaybookPath("build_image_x86_64.yml"),
             extra_vars=ExtraVars(
                 {
                     "job_id": "job-123",
@@ -83,7 +83,7 @@ class TestBuildImageRequest:
         assert result["extra_vars"]["job_id"] == "job-123"
         assert result["extra_vars"]["image_key"] == "test-image"
         assert result["extra_vars"]["functional_groups"] == list(functional_groups)
-        assert result["playbook_path"] == "/omnia/build_image_x86_64/build_image_x86_64.yml"
+        assert result["playbook_path"] == "build_image_x86_64.yml"
         assert result["correlation_id"] == "corr-456"
         assert result["timeout_minutes"] == 60
         assert result["submitted_at"] == "2026-02-12T18:30:00.000Z"
@@ -99,7 +99,7 @@ class TestBuildImageRequest:
         request = BuildImageRequest(
             job_id="job-123",
             stage_name="build-image",
-            playbook_path=PlaybookPath("/omnia/build_image_aarch64/build_image_aarch64.yml"),
+            playbook_path=PlaybookPath("build_image_aarch64.yml"),
             extra_vars=ExtraVars(
                 {
                     "job_id": "job-123",
@@ -130,7 +130,7 @@ class TestBuildImageRequest:
         command = sample_request.get_playbook_command()
         
         assert "ansible-playbook" in command
-        assert "/omnia/build_image_x86_64/build_image_x86_64.yml" in command
+        assert "build_image_x86_64.yml" in command
         assert '-e job_id="job-123"' in command
         assert '-e image_key="test-image"' in command
         assert '-e functional_groups=\'["group1", "group2"]\'' in command
@@ -156,7 +156,7 @@ class TestBuildImageRequest:
         request = BuildImageRequest(
             job_id=job_id_value,
             stage_name="build-image",
-            playbook_path=PlaybookPath("/omnia/build_image_aarch64/build_image_aarch64.yml"),
+            playbook_path=PlaybookPath("build_image_aarch64.yml"),
             extra_vars=ExtraVars(
                 {
                     "job_id": job_id_value,
@@ -174,7 +174,7 @@ class TestBuildImageRequest:
         command = request.get_playbook_command()
         
         assert "ansible-playbook" in command
-        assert "/omnia/build_image_aarch64/build_image_aarch64.yml" in command
+        assert "build_image_aarch64.yml" in command
         assert f"-i {inventory_host_value}" in command
         assert f'-e job_id="{job_id_value}"' in command
         assert f'-e image_key="{image_key_value}"' in command
