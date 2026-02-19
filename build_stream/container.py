@@ -35,7 +35,6 @@ from infra.repositories import (
     NfsPlaybookQueueRequestRepository,
     NfsPlaybookQueueResultRepository,
 )
-from infra.repositories.nfs_build_image_inventory_repository import NfsBuildImageInventoryRepository
 from orchestrator.catalog.use_cases.generate_input_files import GenerateInputFilesUseCase
 from orchestrator.catalog.use_cases.parse_catalog import ParseCatalogUseCase
 from orchestrator.jobs.use_cases import CreateJobUseCase
