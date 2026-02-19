@@ -56,9 +56,9 @@ class TestPlaybookQueueResultService:
         callback = MagicMock()
         mock_result_repo.is_available.return_value = True
         mock_result_repo.get_unprocessed_results.return_value = []
-        
+
         count = result_service.poll_results(callback=callback)
-        
+
         assert count == 0
         callback.assert_not_called()
         mock_result_repo.get_unprocessed_results.assert_called_once()
@@ -68,20 +68,20 @@ class TestPlaybookQueueResultService:
         # Setup mock
         result_path1 = Path("/queue/result1.json")
         result_path2 = Path("/queue/result2.json")
-        
+
         mock_result_repo.is_available.return_value = True
         mock_result_repo.get_unprocessed_results.return_value = [result_path1, result_path2]
-        
+
         # Create mock results
         result1 = PlaybookResult(**result_file_content)
         result2 = PlaybookResult(**result_file_content)
-        
+
         mock_result_repo.read_result.side_effect = [result1, result2]
-        
+
         callback = MagicMock()
-        
+
         count = result_service.poll_results(callback=callback)
-        
+
         assert count == 2
         assert callback.call_count == 2
         callback.assert_any_call(result1)
@@ -93,9 +93,9 @@ class TestPlaybookQueueResultService:
         """Test polling when repository is unavailable."""
         callback = MagicMock()
         mock_result_repo.is_available.return_value = False
-        
+
         count = result_service.poll_results(callback=callback)
-        
+
         assert count == 0
         callback.assert_not_called()
         mock_result_repo.get_unprocessed_results.assert_not_called()
@@ -103,34 +103,34 @@ class TestPlaybookQueueResultService:
     def test_poll_results_callback_exception(self, result_service, mock_result_repo, result_file_content):
         """Test polling when callback raises exception."""
         result_path = Path("/queue/result1.json")
-        
+
         mock_result_repo.is_available.return_value = True
         mock_result_repo.get_unprocessed_results.return_value = [result_path]
-        
+
         result = PlaybookResult(**result_file_content)
         mock_result_repo.read_result.return_value = result
-        
+
         callback = MagicMock(side_effect=Exception("Callback error"))
-        
+
         # Should not raise exception
         count = result_service.poll_results(callback=callback)
-        
+
         assert count == 0  # No files processed due to error
         mock_result_repo.archive_result.assert_not_called()
 
     def test_poll_results_read_exception(self, result_service, mock_result_repo):
         """Test polling when reading result fails."""
         result_path = Path("/queue/result1.json")
-        
+
         mock_result_repo.is_available.return_value = True
         mock_result_repo.get_unprocessed_results.return_value = [result_path]
         mock_result_repo.read_result.side_effect = Exception("Read error")
-        
+
         callback = MagicMock()
-        
+
         # Should not raise exception
         count = result_service.poll_results(callback=callback)
-        
+
         assert count == 0  # No files processed due to error
         callback.assert_not_called()
         mock_result_repo.archive_result.assert_not_called()

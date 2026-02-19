@@ -83,19 +83,19 @@ class TestInputFileService:
         """Should copy only software_config.json and config directory."""
         source = tmp_path / "source"
         source.mkdir()
-        
+
         # Create the files that should be copied
         (source / "software_config.json").write_text('{"software": "config"}')
         config_dir = source / "config"
         config_dir.mkdir()
         (config_dir / "nested.txt").write_text("nested content")
-        
+
         # Create files that should NOT be copied
         (source / "other_file.txt").write_text("should not be copied")
         other_dir = source / "other_dir"
         other_dir.mkdir()
         (other_dir / "ignored.txt").write_text("should be ignored")
-        
+
         dest = tmp_path / "dest"
 
         repo = MagicMock()
@@ -109,7 +109,7 @@ class TestInputFileService:
         # Should exist - these are copied
         assert (dest / "software_config.json").exists()
         assert (dest / "config" / "nested.txt").exists()
-        
+
         # Should NOT exist - these are ignored
         assert not (dest / "other_file.txt").exists()
         assert not (dest / "other_dir").exists()
@@ -118,13 +118,13 @@ class TestInputFileService:
         """Should succeed even when software_config.json or config directory don't exist."""
         source = tmp_path / "source"
         source.mkdir()
-        
+
         # Create only files that should NOT be copied
         (source / "other_file.txt").write_text("should not be copied")
         other_dir = source / "other_dir"
         other_dir.mkdir()
         (other_dir / "ignored.txt").write_text("should be ignored")
-        
+
         dest = tmp_path / "dest"
 
         repo = MagicMock()
@@ -137,7 +137,7 @@ class TestInputFileService:
 
         # Should still succeed
         assert result is True
-        
+
         # Destination should be empty (no specific files copied)
         assert not any(dest.iterdir())
 

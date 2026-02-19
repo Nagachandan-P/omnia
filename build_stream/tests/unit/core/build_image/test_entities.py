@@ -77,7 +77,7 @@ class TestBuildImageRequest:
         )
 
         result = request.to_dict()
-        
+
         assert result["job_id"] == "job-123"
         assert result["stage_name"] == "build-image"
         assert result["extra_vars"]["job_id"] == "job-123"
@@ -113,7 +113,7 @@ class TestBuildImageRequest:
             submitted_at="2026-02-12T18:30:00.000Z",
             request_id="req-789",
         )
-        
+
         result = request.to_dict()
         assert result["extra_vars"]["inventory_host"] == inventory_host_value
 
@@ -128,7 +128,7 @@ class TestBuildImageRequest:
     def test_get_playbook_command_x86_64(self, sample_request):
         """Test playbook command generation for x86_64."""
         command = sample_request.get_playbook_command()
-        
+
         assert "ansible-playbook" in command
         assert "build_image_x86_64.yml" in command
         assert '-e job_id="job-123"' in command
@@ -170,9 +170,9 @@ class TestBuildImageRequest:
             submitted_at="2026-02-12T18:30:00.000Z",
             request_id="req-789",
         )
-        
+
         command = request.get_playbook_command()
-        
+
         assert "ansible-playbook" in command
         assert "build_image_aarch64.yml" in command
         assert f"-i {inventory_host_value}" in command
