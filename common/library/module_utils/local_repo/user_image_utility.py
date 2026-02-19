@@ -58,9 +58,11 @@ def check_image_in_registry(
     """
 
     if not host.startswith(("http://", "https://")):
-        protocol = "https" if (cacert and key) else "http"
-        host = f"{protocol}://{host}"
-    image_url = f"{host}/v2/{image}/manifests/{tag}"
+        if cacert and key:
+            image_url = f"https://{host}/v2/{image}/manifests/{tag}"
+        else:
+            image_url = f"http://{host}/v2/{image}/manifests/{tag}"
+
     logger.info(f"Checking image existence at: {image_url}")
 
     try:
