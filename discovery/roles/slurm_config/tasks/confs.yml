@@ -17,11 +17,11 @@
     apply_config: "{{ __default_config }}"
   no_log: true
 
-- name: Remove keys from conf_files if they have string values in configs_input (when force_conf is true)
+- name: Remove keys from conf_files if they have string values in configs_input (when skip_merge is true)
   ansible.builtin.set_fact:
     conf_files: "{{ conf_files | difference(configs_input | dict2items | selectattr('value', 'string') | map(attribute='key') | list) }}"
   when:
-    - force_conf | default(false)
+    - skip_merge | default(false)
     - configs_input is defined
 
 - name: Build slurm.conf
