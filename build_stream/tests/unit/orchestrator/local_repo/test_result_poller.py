@@ -81,7 +81,7 @@ class TestLocalRepoResultPoller:
     async def test_start_starts_polling(self, result_poller, mock_result_service_fixture):
         """Test that start() begins the polling loop."""
         mock_result_service_fixture.poll_results.return_value = 0
-        
+
         await result_poller.start()
         assert result_poller._running
         await result_poller.stop()
@@ -90,7 +90,7 @@ class TestLocalRepoResultPoller:
     async def test_stop_stops_polling(self, result_poller, mock_result_service_fixture):
         """Test that stop() stops the polling loop."""
         mock_result_service_fixture.poll_results.return_value = 0
-        
+
         await result_poller.start()
         await result_poller.stop()
         assert not result_poller._running
@@ -99,15 +99,15 @@ class TestLocalRepoResultPoller:
     async def test_poll_loop_calls_poll_results(self, result_poller, mock_result_service_fixture):
         """Test that poll loop calls poll_results with callback."""
         mock_result_service_fixture.poll_results.return_value = 1
-        
+
         # Start and let it run once
         await result_poller.start()
-        
+
         # Give it a moment to poll
         await asyncio.sleep(0.1)
-        
+
         await result_poller.stop()
-        
+
         # Verify poll_results was called with a callback
         mock_result_service_fixture.poll_results.assert_called()
         callback_arg = mock_result_service_fixture.poll_results.call_args[1]["callback"]
@@ -124,7 +124,7 @@ class TestLocalRepoResultPoller:
             stage_state=StageState.IN_PROGRESS,
         )
         mock_stage_repo_fixture.find_by_job_and_name.return_value = stage
-        
+
         # Create result
         result = PlaybookResult(
             job_id=job_id,
@@ -134,14 +134,14 @@ class TestLocalRepoResultPoller:
             exit_code=0,
             duration_seconds=30,
         )
-        
+
         # Handle result
         result_poller._on_result_received(result)
-        
+
         # Verify stage was completed
         assert stage.stage_state == StageState.COMPLETED
         mock_stage_repo_fixture.save.assert_called_once_with(stage)
-        
+
         # Verify audit event was created
         mock_audit_repo_fixture.save.assert_called_once()
         audit_event = mock_audit_repo_fixture.save.call_args[0][0]
@@ -159,7 +159,7 @@ class TestLocalRepoResultPoller:
             stage_state=StageState.IN_PROGRESS,
         )
         mock_stage_repo_fixture.find_by_job_and_name.return_value = stage
-        
+
         # Create failed result
         result = PlaybookResult(
             job_id=job_id,
@@ -171,16 +171,16 @@ class TestLocalRepoResultPoller:
             error_summary="Playbook execution failed",
             duration_seconds=30,
         )
-        
+
         # Handle result
         result_poller._on_result_received(result)
-        
+
         # Verify stage was failed
         assert stage.stage_state == StageState.FAILED
         assert stage.error_code == "PLAYBOOK_FAILED"
         assert stage.error_summary == "Playbook execution failed"
         mock_stage_repo_fixture.save.assert_called_once_with(stage)
-        
+
         # Verify audit event was created
         mock_audit_repo_fixture.save.assert_called_once()
         audit_event = mock_audit_repo_fixture.save.call_args[0][0]
@@ -190,7 +190,7 @@ class TestLocalRepoResultPoller:
         """Test handling result when stage is not found."""
         # Setup stage not found
         mock_stage_repo_fixture.find_by_job_and_name.return_value = None
-        
+
         # Create result
         result = PlaybookResult(
             job_id=str(uuid.uuid4()),
@@ -199,10 +199,10 @@ class TestLocalRepoResultPoller:
             status="success",
             exit_code=0,
         )
-        
+
         # Handle result
         result_poller._on_result_received(result)
-        
+
         # Verify nothing was saved
         mock_stage_repo_fixture.save.assert_not_called()
         mock_audit_repo_fixture.save.assert_not_called()
@@ -211,7 +211,7 @@ class TestLocalRepoResultPoller:
         """Test that exceptions in result handling are caught."""
         # Setup stage to raise exception
         mock_stage_repo_fixture.find_by_job_and_name.side_effect = Exception("Database error")
-        
+
         # Create result
         result = PlaybookResult(
             job_id=str(uuid.uuid4()),
@@ -220,10 +220,10 @@ class TestLocalRepoResultPoller:
             status="success",
             exit_code=0,
         )
-        
+
         # Should not raise exception
         result_poller._on_result_received(result)
-        
+
         # Verify nothing was saved due to exception
         mock_stage_repo_fixture.save.assert_not_called()
         mock_audit_repo_fixture.save.assert_not_called()
@@ -233,12 +233,12 @@ class TestLocalRepoResultPoller:
         """Test that exceptions in poll loop are caught."""
         # Setup poll_results to raise exception
         mock_result_service_fixture.poll_results.side_effect = Exception("Queue error")
-        
+
         # Should not raise exception
         await result_poller.start()
-        
+
         # Give it a moment to poll and encounter error
         await asyncio.sleep(0.1)
-        
+
         await result_poller.stop()
         assert not result_poller._running

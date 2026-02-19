@@ -39,7 +39,7 @@ class TestLocalRepoResponse:
     def test_create_response_with_valid_data(self, valid_response_data):
         """Test creating response with valid data."""
         response = LocalRepoResponse(**valid_response_data)
-        
+
         assert response.job_id == valid_response_data["job_id"]
         assert response.stage_name == valid_response_data["stage_name"]
         assert response.status == valid_response_data["status"]
@@ -49,41 +49,41 @@ class TestLocalRepoResponse:
     def test_response_is_immutable(self, valid_response_data):
         """Test that response is immutable."""
         response = LocalRepoResponse(**valid_response_data)
-        
+
         # Attempting to modify should raise AttributeError
         with pytest.raises(AttributeError):
             response.job_id = str(uuid.uuid4())
-        
+
         with pytest.raises(AttributeError):
             response.stage_name = "other-stage"
-        
+
         with pytest.raises(AttributeError):
             response.status = "completed"
-        
+
         with pytest.raises(AttributeError):
             response.submitted_at = datetime.now(timezone.utc).isoformat()
-        
+
         with pytest.raises(AttributeError):
             response.correlation_id = str(uuid.uuid4())
 
-    
+
     def test_response_equality(self, valid_response_data):
         """Test response equality."""
         response1 = LocalRepoResponse(**valid_response_data)
         response2 = LocalRepoResponse(**valid_response_data)
-        
+
         assert response1 == response2
         assert hash(response1) == hash(response2)
 
     def test_response_inequality(self, valid_response_data):
         """Test response inequality."""
         response1 = LocalRepoResponse(**valid_response_data)
-        
+
         # Different job_id
         different_data = valid_response_data.copy()
         different_data["job_id"] = str(uuid.uuid4())
         response2 = LocalRepoResponse(**different_data)
-        
+
         assert response1 != response2
         assert hash(response1) != hash(response2)
 
@@ -94,7 +94,7 @@ class TestLocalRepoResponse:
         status = "accepted"
         submitted_at = datetime.now(timezone.utc).isoformat()
         correlation_id = str(uuid.uuid4())
-        
+
         response = LocalRepoResponse(
             job_id=job_id,
             stage_name=stage_name,
@@ -102,7 +102,7 @@ class TestLocalRepoResponse:
             submitted_at=submitted_at,
             correlation_id=correlation_id,
         )
-        
+
         assert isinstance(response.job_id, str)
         assert isinstance(response.stage_name, str)
         assert isinstance(response.status, str)
@@ -119,7 +119,7 @@ class TestLocalRepoResponse:
     def test_response_repr(self, valid_response_data):
         """Test response string representation."""
         response = LocalRepoResponse(**valid_response_data)
-        
+
         repr_str = repr(response)
         assert "LocalRepoResponse" in repr_str
         assert valid_response_data["job_id"] in repr_str

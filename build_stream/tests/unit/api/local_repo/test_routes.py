@@ -264,7 +264,7 @@ class TestCreateLocalRepositoryRoute:
     def test_correlation_id_header_propagated(self, mock_use_case, job_id):
         """Test that X-Correlation-Id header is propagated."""
         correlation_id = str(uuid.uuid4())
-        
+
         # Setup mock
         mock_use_case.execute.return_value = LocalRepoResponse(
             job_id=job_id,

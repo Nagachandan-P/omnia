@@ -37,7 +37,7 @@ class TestCreateLocalRepoCommand:
     def test_create_command_with_valid_data(self, valid_command_data):
         """Test creating command with valid data."""
         command = CreateLocalRepoCommand(**valid_command_data)
-        
+
         assert command.job_id == valid_command_data["job_id"]
         assert command.client_id == valid_command_data["client_id"]
         assert command.correlation_id == valid_command_data["correlation_id"]
@@ -45,14 +45,14 @@ class TestCreateLocalRepoCommand:
     def test_command_is_immutable(self, valid_command_data):
         """Test that command is immutable."""
         command = CreateLocalRepoCommand(**valid_command_data)
-        
+
         # Attempting to modify should raise AttributeError
         with pytest.raises(AttributeError):
             command.job_id = JobId(str(uuid.uuid4()))
-        
+
         with pytest.raises(AttributeError):
             command.client_id = ClientId("other-client")
-        
+
         with pytest.raises(AttributeError):
             command.correlation_id = CorrelationId(str(uuid.uuid4()))
 
@@ -60,26 +60,26 @@ class TestCreateLocalRepoCommand:
         """Test command equality."""
         command1 = CreateLocalRepoCommand(**valid_command_data)
         command2 = CreateLocalRepoCommand(**valid_command_data)
-        
+
         assert command1 == command2
         assert hash(command1) == hash(command2)
 
     def test_command_inequality(self, valid_command_data):
         """Test command inequality."""
         command1 = CreateLocalRepoCommand(**valid_command_data)
-        
+
         # Different job_id
         different_data = valid_command_data.copy()
         different_data["job_id"] = JobId(str(uuid.uuid4()))
         command2 = CreateLocalRepoCommand(**different_data)
-        
+
         assert command1 != command2
         assert hash(command1) != hash(command2)
 
     def test_command_repr(self, valid_command_data):
         """Test command string representation."""
         command = CreateLocalRepoCommand(**valid_command_data)
-        
+
         repr_str = repr(command)
         assert "CreateLocalRepoCommand" in repr_str
         assert str(valid_command_data["job_id"]) in repr_str
@@ -93,13 +93,13 @@ class TestCreateLocalRepoCommand:
             client_id=ClientId("test-client"),
             correlation_id=None,
         )
-        
+
         assert command.correlation_id is None
 
     def test_command_accepts_valid_value_objects(self, valid_command_data):
         """Test that command accepts properly validated value objects."""
         command = CreateLocalRepoCommand(**valid_command_data)
-        
+
         assert command.job_id == valid_command_data["job_id"]
         assert command.client_id == valid_command_data["client_id"]
         assert command.correlation_id == valid_command_data["correlation_id"]
