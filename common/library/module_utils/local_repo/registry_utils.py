@@ -27,14 +27,21 @@ def is_https(host, timeout=1):
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
 
+    sock = None
+    wrapped_sock = None
     try:
-        with socket.create_connection((ip, port), timeout=timeout) as sock:
-            with context.wrap_socket(sock, server_hostname=ip):
-                return True
+        sock = socket.create_connection((ip, port), timeout=timeout)
+        wrapped_sock = context.wrap_socket(sock, server_hostname=ip)
+        return True
     except ssl.SSLError:
         return False
     except Exception:
         return False
+    finally:
+        if wrapped_sock:
+            wrapped_sock.close()
+        if sock:
+            sock.close()
 
 def validate_user_registry(user_registry):
     """
