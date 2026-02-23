@@ -58,8 +58,17 @@ RPM_LABEL_TEMPLATE = "RPMs for {key}"
 RHEL_OS_URL = "rhel_os_url"
 SOFTWARES_KEY = "softwares"
 USER_REPO_URL = "user_repo_url"
-REPO_CONFIG = { "always": "on_demand", "partial": "on_demand", "never": "streamed" }
 ARCH_SUFFIXES = {"x86_64", "aarch64"}
+DEFAULT_POLICY = "on_demand"
+DEFAULT_CACHING = True
+POLICY_CACHING_MAP = {
+    ("always", False): "immediate",
+    ("always", True): "on_demand",
+    ("partial", False): "streamed",
+    ("partial", True): "on_demand",
+    ("never", False): "streamed",
+    ("never", True): "streamed"
+}
 DNF_COMMANDS = {
     "x86_64": ["dnf", "download", "--resolve", "--alldeps", "--arch=x86_64,noarch"],
     "aarch64": ["dnf", "download", "--forcearch", "aarch64", "--resolve", "--alldeps", "--exclude=*.x86_64"]
