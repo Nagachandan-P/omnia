@@ -73,7 +73,6 @@
     - name: Log SSH directory adjustments
       ansible.builtin.debug:
         msg: "{{ ssh_dir_log_msg }}"
-      when: ssh_dir_result.changed | default(false)
       changed_when: false
 
     - name: Validate SSH permission state
