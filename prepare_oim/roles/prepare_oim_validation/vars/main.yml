@@ -84,15 +84,3 @@ functional_groups_config_syntax_fail_msg: "Failed. Syntax errors present in func
 telemetry_config_file: "telemetry_config.yml"
 fail_msg_telemetry_config_file: "telemetry_config.yml file doesn't exist in the input folder."
 telemetry_config_syntax_fail_msg: "Failed. Syntax errors present in telemetry_config.yml. Fix errors and re-run playbook again. Common syntax Errors:"
-
-# Usage: validate_ssh_permissions.yml
-ssh_dir_log_msg: "Ensured SSH directory {{ ssh_dir_result.path | default('/root/.ssh') }} mode 0700 owner root:root"
-ssh_file_log_msg: "Adjusted SSH permissions for {{ item.item.path }} to mode {{ item.item.mode }} with owner root:root"
-ssh_permission_fail_msg: >-
-  SSH path {{ item.item.path }} has invalid ownership or mode.
-  Expected root:root with mode {{ item_mode_expected[item.item.path] }}
-  {% if item.item.path == '/root/.ssh/known_hosts' %} (or 0600/0644 for known_hosts){% endif %}.
-  Fix manually or rerun prepare_oim.
-ssh_validation_fail_msg: >-
-  SSH permission validation failed: {{ ansible_failed_result.msg | default('Unknown error') }}.
-  Correct SSH file permissions/ownership and rerun prepare_oim.

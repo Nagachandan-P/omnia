@@ -13,9 +13,6 @@
 # limitations under the License.
 ---
 
-- name: Validate SSH permissions and ownership
-  ansible.builtin.include_tasks: validate_ssh_permissions.yml
-
 - name: Validate passwordless ssh host
   ansible.builtin.include_tasks: validate_passwordless_ssh_oim.yml
 

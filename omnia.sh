@@ -1156,17 +1156,13 @@ validate_nfs_server() {
     fi
 }
 
-refresh_known_hosts() {
+init_ssh_config() {
     local ssh_port=2222
 
     mkdir -p "$HOME/.ssh"
     touch "$HOME/.ssh/known_hosts"
     ssh-keygen -R "[localhost]:$ssh_port" >/dev/null 2>&1 || true
     ssh-keyscan -p "$ssh_port" localhost 2>/dev/null | grep -v "^#" >> "$HOME/.ssh/known_hosts" || true
-}
-
-init_ssh_config() {
-    refresh_known_hosts
 }
 
 remove_container_omnia_sh() {
@@ -1235,14 +1231,15 @@ install_omnia_core() {
             exit 1
         fi
     fi
-
+    
     local omnia_core_tag="2.1"
     local omnia_core_registry=""
     
     # Check if local omnia_core image exists using validate function
-    if validate_container_image "" "$omnia_core_tag" "install"; then
-        echo -e "${GREEN}✓ Omnia core image (omnia_core:${omnia_core_tag}) found locally.${NC}"
+    if ! validate_container_image "" "$omnia_core_tag" "install"; then
+        exit 1
     fi
+    echo -e "${GREEN}✓ Omnia core image (omnia_core:${omnia_core_tag}) found locally.${NC}"
 
     # Check if any other containers with 'omnia' in their name are running
     other_containers=$(podman ps -a --format '{{.Names}}' | grep -E 'omnia' | grep -v 'omnia_core')
