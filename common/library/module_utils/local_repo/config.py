@@ -79,6 +79,11 @@ DNF_INFO_COMMANDS = {
 }
 
 # ----------------------------
+# Cleanup File Types
+# Used by pulp_cleanup.py
+# ----------------------------
+CLEANUP_FILE_TYPES = ["iso", "manifest", "pip_module", "tarball", "git", "ansible_galaxy_collection"]
+# ----------------------------
 # Used by download_common.py
 # ----------------------------
 # Pulp command templates
@@ -116,9 +121,9 @@ pulp_python_commands = {
 
 CLI_FILE_PATH = "/root/.config/pulp/cli.toml"
 POST_TIMEOUT = 3600  # seconds
-TAR_POLL_VAL = 25    # minutes
+TAR_POLL_VAL = 45    # minutes
 FILE_POLL_VAL = 1    # minutes
-ISO_POLL_VAL = 15    # minutes
+ISO_POLL_VAL = 45    # minutes
 FILE_URI = "/pulp/api/v3/content/file/files/"
 PULP_SSL_CA_CERT = "/etc/pki/ca-trust/source/anchors/pulp_webserver.crt"
 # ----------------------------
