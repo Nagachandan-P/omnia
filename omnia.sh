@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright © 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -299,7 +299,18 @@ update_metadata_upgrade_backup_dir() {
     "
 }
 
-
+# Resolve the upgrade guard lock path (container or host shared path)
+get_upgrade_guard_lock_path() {
+    local upgrade_guard_lock_container="/opt/omnia/.data/upgrade_in_progress.lock"
+    local upgrade_guard_lock_host
+    upgrade_guard_lock_host=$(podman exec -u root omnia_core grep '^oim_shared_path:' /opt/omnia/.data/oim_metadata.yml 2>/dev/null | cut -d':' -f2- | tr -d ' \t\n\r')
+    if [ -n "$upgrade_guard_lock_host" ]; then
+        upgrade_guard_lock_host="$upgrade_guard_lock_host/omnia/.data/upgrade_in_progress.lock"
+    else
+        upgrade_guard_lock_host="$upgrade_guard_lock_container"
+    fi
+    echo "$upgrade_guard_lock_host"
+}
 
 check_internal_nfs_export() {
     nfs_server_ip=$1
@@ -370,6 +381,8 @@ setup_omnia_core() {
     # Post container setup configuration
     post_setup_config
 
+    remove_container_omnia_sh
+
     # Start the container
     start_container_session
 }
@@ -397,6 +410,11 @@ cleanup_omnia_core() {
 
         # Fetch the configuration from the Omnia core container.
         fetch_config
+
+        # Clear upgrade guard lock if present (shared path visible to container and host)
+        local upgrade_guard_lock_path=$(get_upgrade_guard_lock_path)
+        rm -f "$upgrade_guard_lock_path" >/dev/null 2>&1 || true
+        echo "[INFO] [CLEANUP] Cleared upgrade guard lock (if present): $upgrade_guard_lock_path"
 
         # Remove the container
         remove_container
@@ -1086,8 +1104,6 @@ EOF
     firewall-cmd --permanent --zone=public --add-port=2222/tcp
     firewall-cmd --reload
 }
-
-# This function sets up the configuration for the Omnia core.
 #  post_setup_config is a function that sets up the configuration for the Omnia core.
 #  It creates the necessary directories and files, copies input files from the Omnia container,
 #  and creates the oim_metadata.yml file.
@@ -1101,7 +1117,6 @@ post_setup_config() {
     mkdir -p "$OMNIA_INPUT_DIR/"
 
     # Create the default.yml file if it does not exist.
-    # This file contains the name of the project.
     if [ ! -f "$OMNIA_INPUT_DIR/default.yml" ]; then
         echo -e "${BLUE} Creating default.yml file.${NC}"
         {
@@ -1124,33 +1139,34 @@ post_setup_config() {
 }
 
 validate_nfs_server() {
-
-    # Validate NFS server permission
     if [ "$share_option" = "NFS" ]; then
-        # Create a temporary file inside $omnia_path
-        temp_file="$omnia_path/temp_file"
+        local temp_file="$omnia_path/temp_file"
         touch "$temp_file"
-        # Check if the file can be chown to root
         if chown root:root "$temp_file"; then
-            rm "$temp_file"
+            rm -f "$temp_file"
         else
             echo "Error: Unable to chown file to root in $omnia_path. NFS server permission validation failed. Please ensure no_root_squash option is enabled in the NFS export configuration."
             exit 1
         fi
+
         if [ "`ls -ld $omnia_path/omnia/ssh_config/.ssh/id_rsa | awk '{print $3 ":" $4}'`" != "root:root" ]; then
             echo "Error: The $omnia_path/omnia/ssh_config/.ssh/id_rsa file should be owned by root:root. NFS server permission validation failed. Please verify the NFS export configuration."
             exit 1
         fi
     fi
-
 }
 
 init_ssh_config() {
+    local ssh_port=2222
+
     mkdir -p "$HOME/.ssh"
-    touch $HOME/.ssh/known_hosts
-    # Add entry to /root/.ssh/known_hosts file to prevent errors caused by Known host
-    ssh-keygen -R "[localhost]:2222" >/dev/null 2>&1  # Remove existing entry if it exists
-    ssh-keyscan -p 2222 localhost 2>/dev/null | grep -v "^#" >> $HOME/.ssh/known_hosts  # Scan and add the new key
+    touch "$HOME/.ssh/known_hosts"
+    ssh-keygen -R "[localhost]:$ssh_port" >/dev/null 2>&1 || true
+    ssh-keyscan -p "$ssh_port" localhost 2>/dev/null | grep -v "^#" >> "$HOME/.ssh/known_hosts" || true
+}
+
+remove_container_omnia_sh() {
+    podman exec -u root omnia_core bash -c 'if [ -f /omnia/omnia.sh ]; then rm -f /omnia/omnia.sh; fi' >/dev/null 2>&1 || true
 }
 
 start_container_session() {
@@ -1197,8 +1213,8 @@ show_help() {
     echo "Usage: $0 [--install | --uninstall | --upgrade | --rollback | --version | --help]"
     echo "  -i, --install     Install and start the Omnia core container"
     echo "  -u, --uninstall   Uninstall the Omnia core container and clean up configuration"
-    echo "      --upgrade     Upgrade the Omnia core container to newer version
-    echo "      --rollback    Rollback the Omnia core container to previous version
+    echo "      --upgrade     Upgrade the Omnia core container to newer version"
+    echo "      --rollback    Rollback the Omnia core container to previous version"
     echo "  -v, --version     Display Omnia version information"
     echo "  -h, --help        More information about usage"
 }
@@ -1215,14 +1231,15 @@ install_omnia_core() {
             exit 1
         fi
     fi
-
+    
     local omnia_core_tag="2.1"
     local omnia_core_registry=""
     
     # Check if local omnia_core image exists using validate function
-    if validate_container_image "" "$omnia_core_tag" "install"; then
-        echo -e "${GREEN}✓ Omnia core image (omnia_core:${omnia_core_tag}) found locally.${NC}"
+    if ! validate_container_image "" "$omnia_core_tag" "install"; then
+        exit 1
     fi
+    echo -e "${GREEN}✓ Omnia core image (omnia_core:${omnia_core_tag}) found locally.${NC}"
 
     # Check if any other containers with 'omnia' in their name are running
     other_containers=$(podman ps -a --format '{{.Names}}' | grep -E 'omnia' | grep -v 'omnia_core')
@@ -1837,6 +1854,16 @@ upgrade_omnia_core() {
     touch "$lock_file"
     trap 'rm -f "$lock_file"' EXIT
 
+    # Create upgrade guard lock in shared path so other playbooks can block during upgrade
+    local upgrade_guard_lock_path
+    upgrade_guard_lock_path=$(get_upgrade_guard_lock_path)
+
+    mkdir -p "$(dirname "$upgrade_guard_lock_path")" 2>/dev/null || true
+    echo "Upgrade in progress. Complete upgrade_omnia.yml or rollback to clear." > "$upgrade_guard_lock_path" || {
+        echo -e "${RED}ERROR: Failed to create upgrade guard lock: $upgrade_guard_lock_path${NC}"
+        exit 1
+    }
+
     # Run upgrade phases
     if ! phase1_validate; then
         echo "[ERROR] [ORCHESTRATOR] Upgrade failed in Phase 1"
@@ -1874,10 +1901,13 @@ upgrade_omnia_core() {
     echo "[INFO] [ORCHESTRATOR] Upgrade completed successfully"
     echo "[INFO] [ORCHESTRATOR] Backup location (inside omnia_core container): $backup_base"
 
+    # Seed inputs and defaults after upgrade
+    post_setup_config
+
     show_post_upgrade_instructions "$TARGET_OMNIA_VERSION"
-    
     # Initialize SSH config and start container session
     init_ssh_config
+    remove_container_omnia_sh
     start_container_session
     exit 0
 }
@@ -1885,15 +1915,15 @@ upgrade_omnia_core() {
 # Validate backup directory structure and files
 validate_backup_directory() {
     local backup_path="$1"
-    
+
     echo "[INFO] [ROLLBACK] Validating backup directory: $backup_path"
-    
+
     # Check if backup directory exists
     if ! podman exec -u root omnia_core test -d "$backup_path"; then
         echo "[ERROR] [ROLLBACK] Backup directory does not exist: $backup_path"
         return 1
     fi
-    
+
     # Check for required subdirectories
     for subdir in input metadata configs; do
         if ! podman exec -u root omnia_core test -d "$backup_path/$subdir"; then
@@ -1901,24 +1931,24 @@ validate_backup_directory() {
             return 1
         fi
     done
-    
+
     # Check for required files
     if ! podman exec -u root omnia_core test -f "$backup_path/metadata/oim_metadata.yml"; then
         echo "[ERROR] [ROLLBACK] Missing metadata file: $backup_path/metadata/oim_metadata.yml"
         return 1
     fi
-    
+
     if ! podman exec -u root omnia_core test -f "$backup_path/configs/omnia_core.container"; then
         echo "[ERROR] [ROLLBACK] Missing container config: $backup_path/configs/omnia_core.container"
         return 1
     fi
-    
+
     # Verify metadata contains version information
     if ! podman exec -u root omnia_core grep -q "^omnia_version:" "$backup_path/metadata/oim_metadata.yml"; then
         echo "[ERROR] [ROLLBACK] Metadata file does not contain version information"
         return 1
     fi
-    
+
     echo "[INFO] [ROLLBACK] Backup validation successful"
     return 0
 }
@@ -1927,15 +1957,15 @@ validate_backup_directory() {
 stop_container_gracefully() {
     local container_name="$1"
     local timeout="${2:-30}"
-    
+
     echo "[INFO] [ROLLBACK] Stopping $container_name container gracefully..."
-    
+
     # Try graceful stop first
     if podman stop -t "$timeout" "$container_name" >/dev/null 2>&1; then
         echo "[INFO] [ROLLBACK] Container stopped gracefully"
         return 0
     fi
-    
+
     # Check if container is still running
     if podman ps --format '{{.Names}}' | grep -qw "$container_name"; then
         echo "[WARN] [ROLLBACK] Graceful stop failed, force stopping container..."
@@ -1947,16 +1977,16 @@ stop_container_gracefully() {
             return 1
         fi
     fi
-    
+
     return 0
 }
 
 # Restore files from backup
 restore_from_backup() {
     local backup_path="$1"
-    
+
     echo "[INFO] [ROLLBACK] Restoring from backup: $backup_path"
-    
+
     # Restore input files
     if ! podman exec -u root omnia_core bash -c "
         set -e
@@ -1966,19 +1996,19 @@ restore_from_backup() {
         echo "[ERROR] [ROLLBACK] Failed to restore input files"
         return 1
     fi
-    
+
     # Restore metadata
     if ! podman exec -u root omnia_core cp -a "$backup_path/metadata/oim_metadata.yml" /opt/omnia/.data/; then
         echo "[ERROR] [ROLLBACK] Failed to restore metadata"
         return 1
     fi
-    
+
     # Restore container config on host
     if ! podman cp "omnia_core:$backup_path/configs/omnia_core.container" /etc/containers/systemd/; then
         echo "[ERROR] [ROLLBACK] Failed to restore container config"
         return 1
     fi
-    
+
     echo "[INFO] [ROLLBACK] Files restored successfully"
     return 0
 }
@@ -2006,8 +2036,8 @@ display_cleanup_instructions() {
     echo -e "${YELLOW}1. Remove all container definitions: cd /etc/containers/systemd${NC}"
     echo -e "${YELLOW}2. Delete all container files: rm -rf *${NC}"
     echo -e "${YELLOW}3. Reload systemd daemon: systemctl daemon-reload${NC}"
-    echo -e "${YELLOW}4. Stop all containers: podman stop \$(podman ps -aq)${NC}"
-    echo -e "${YELLOW}5. Remove all containers: podman rm -f \$(podman ps -aq)${NC}"
+    echo -e "${YELLOW}4. Stop all containers: podman stop $(podman ps -aq)${NC}"
+    echo -e "${YELLOW}5. Remove all containers: podman rm -f $(podman ps -aq)${NC}"
     echo -e "${YELLOW}6. Clean shared path: rm -rf <omnia_shared_path>${NC}"
     echo -e "${YELLOW}7. Install required version: ./omnia.sh --install${NC}"
     echo ""
@@ -2015,7 +2045,6 @@ display_cleanup_instructions() {
     echo ""
 }
 
-# Main rollback function
 rollback_omnia_core() {
     echo -e "${GREEN}================================================================================${NC}"
     echo -e "${GREEN}                         OMNIA CORE ROLLBACK${NC}"
@@ -2287,9 +2316,17 @@ rollback_omnia_core() {
     # Clean up lock file before starting long-running ssh session
     rm -f "$lock_file" >/dev/null 2>&1 || true
     echo "[INFO] Rollback lock file removed before starting container session"
-    
+
+    # Clear upgrade guard lock if it exists (shared path visible to container and host)
+    local upgrade_guard_lock_path
+    upgrade_guard_lock_path=$(get_upgrade_guard_lock_path)
+
+    rm -f "$upgrade_guard_lock_path" >/dev/null 2>&1 || true
+    echo "[INFO] [ROLLBACK] Cleared upgrade guard lock: $upgrade_guard_lock_path"
+
     # Initialize SSH config and start container session
     init_ssh_config
+    remove_container_omnia_sh
     start_container_session
 }
 

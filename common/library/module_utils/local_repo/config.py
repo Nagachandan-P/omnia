@@ -58,13 +58,31 @@ RPM_LABEL_TEMPLATE = "RPMs for {key}"
 RHEL_OS_URL = "rhel_os_url"
 SOFTWARES_KEY = "softwares"
 USER_REPO_URL = "user_repo_url"
-REPO_CONFIG = { "always": "on_demand", "partial": "on_demand", "never": "streamed" }
 ARCH_SUFFIXES = {"x86_64", "aarch64"}
+DEFAULT_POLICY = "on_demand"
+DEFAULT_CACHING = True
+POLICY_CACHING_MAP = {
+    ("always", False): "immediate",
+    ("always", True): "on_demand",
+    ("partial", False): "streamed",
+    ("partial", True): "on_demand",
+    ("never", False): "streamed",
+    ("never", True): "streamed"
+}
 DNF_COMMANDS = {
     "x86_64": ["dnf", "download", "--resolve", "--alldeps", "--arch=x86_64,noarch"],
     "aarch64": ["dnf", "download", "--forcearch", "aarch64", "--resolve", "--alldeps", "--exclude=*.x86_64"]
 }
+DNF_INFO_COMMANDS = {
+    "x86_64": ["dnf", "info", "--quiet"],
+    "aarch64": ["dnf", "info", "--quiet", "--forcearch=aarch64"]
+}
 
+# ----------------------------
+# Cleanup File Types
+# Used by pulp_cleanup.py
+# ----------------------------
+CLEANUP_FILE_TYPES = ["iso", "manifest", "pip_module", "tarball", "git", "ansible_galaxy_collection"]
 # ----------------------------
 # Used by download_common.py
 # ----------------------------
@@ -103,9 +121,9 @@ pulp_python_commands = {
 
 CLI_FILE_PATH = "/root/.config/pulp/cli.toml"
 POST_TIMEOUT = 3600  # seconds
-TAR_POLL_VAL = 25    # minutes
+TAR_POLL_VAL = 45    # minutes
 FILE_POLL_VAL = 1    # minutes
-ISO_POLL_VAL = 15    # minutes
+ISO_POLL_VAL = 45    # minutes
 FILE_URI = "/pulp/api/v3/content/file/files/"
 PULP_SSL_CA_CERT = "/etc/pki/ca-trust/source/anchors/pulp_webserver.crt"
 # ----------------------------
@@ -222,7 +240,7 @@ CLEANUP_LOG_FILE_PATH = "/opt/omnia/log/local_repo/cleanup.log"
 # Naming convention: <arch>_omnia-additional to match existing filter patterns
 # ----------------------------
 ADDITIONAL_REPOS_KEY = "additional_repos"
-AGGREGATED_REPO_NAME_TEMPLATE = "{arch}_omnia-additional-repo"
+AGGREGATED_REPO_NAME_TEMPLATE = "{arch}_omnia-additional"
 AGGREGATED_REMOTE_NAME_TEMPLATE = "{arch}_omnia-additional-{name}"
 AGGREGATED_DISTRIBUTION_NAME_TEMPLATE = "{arch}_omnia-additional"
 AGGREGATED_BASE_PATH_TEMPLATE = "opt/omnia/offline_repo/cluster/{arch}/rhel/10.0/rpms/omnia-additional"
