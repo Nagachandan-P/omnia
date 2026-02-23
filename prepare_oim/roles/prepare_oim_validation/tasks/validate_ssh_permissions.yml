@@ -1,0 +1,93 @@
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+
+- name: Ensure SSH critical paths have safe ownership and permissions
+  block:
+    - name: Define SSH critical paths
+      ansible.builtin.set_fact:
+        ssh_critical_paths:
+          - { path: "/root/.ssh", state: "directory", mode: "0700" }
+          - { path: "/root/.ssh/authorized_keys", state: "file", mode: "0600" }
+          - { path: "/root/.ssh/id_rsa", state: "file", mode: "0600" }
+          - { path: "/root/.ssh/id_rsa.pub", state: "file", mode: "0644" }
+          - { path: "/root/.ssh/known_hosts", state: "file", mode: "0644" }
+          - { path: "/root/.ssh/config", state: "file", mode: "0600" }
+
+    - name: Ensure SSH directory exists with secure mode
+      ansible.builtin.file:
+        path: "/root/.ssh"
+        state: directory
+        mode: "0700"
+        owner: root
+        group: root
+      register: ssh_dir_result
+
+    - name: Stat SSH critical paths
+      ansible.builtin.stat:
+        path: "{{ item.path }}"
+        get_checksum: false
+      register: ssh_path_stats
+      loop: "{{ ssh_critical_paths }}"
+      loop_control:
+        label: "{{ item.path }}"
+
+    - name: Enforce SSH ownership and permissions for existing files
+      ansible.builtin.file:
+        path: "{{ item.item.path }}"
+        state: "{{ item.item.state }}"
+        mode: "{{ item.item.mode }}"
+        owner: root
+        group: root
+      loop: "{{ ssh_path_stats.results }}"
+      loop_control:
+        label: "{{ item.item.path }}"
+      when:
+        - item.stat.exists | default(false)
+        - item.item.state == 'file'
+      register: ssh_path_fixes
+
+    - name: Log SSH permission adjustments
+      ansible.builtin.debug:
+        msg: "Adjusted SSH permissions for {{ item.item.path }} to mode {{ item.item.mode }} with owner root:root"
+      loop: "{{ (ssh_path_fixes.results | default([]))\
+                | selectattr('item', 'defined')\
+                | selectattr('changed', 'defined')\
+                | selectattr('changed')\
+                | list }}"
+      loop_control:
+        label: "{{ item.item.path | default('unknown path') }}"
+
+    - name: Log SSH directory adjustments
+      ansible.builtin.debug:
+        msg: "Ensured SSH directory {{ ssh_dir_result.path | default('/root/.ssh') }} mode 0700 owner root:root"
+      when: ssh_dir_result.changed | default(false)
+
+    - name: Validate SSH permission state
+      ansible.builtin.assert:
+        that:
+          - not (item.stat.exists | default(false)) or (item.stat.pw_name == 'root' and item.stat.gr_name == 'root')
+          - not (item.stat.exists | default(false)) or (item.stat.mode | string)[-4:] == item_mode_expected[item.item.path]
+        fail_msg: "SSH path {{ item.item.path }} has invalid ownership or mode. Expected root:root with mode {{ item_mode_expected[item.item.path] }}. Fix manually or rerun prepare_oim."
+      vars:
+        item_mode_expected: "{{ dict(ssh_critical_paths | map(attribute='path') | zip(ssh_critical_paths | map(attribute='mode'))) }}"
+      loop: "{{ ssh_path_stats.results }}"
+      loop_control:
+        label: "{{ item.item.path }}"
+      when: item.stat.exists | default(false)
+
+  rescue:
+    - name: Fail upgrade due to SSH permission issues
+      ansible.builtin.fail:
+        msg: "SSH permission validation failed: {{ ansible_failed_result.msg | default('Unknown error') }}. Correct SSH file permissions/ownership and rerun prepare_oim."
