@@ -39,8 +39,9 @@ from orchestrator.catalog.use_cases.generate_input_files import GenerateInputFil
 from orchestrator.catalog.use_cases.parse_catalog import ParseCatalogUseCase
 from orchestrator.jobs.use_cases import CreateJobUseCase
 from orchestrator.local_repo.use_cases import CreateLocalRepoUseCase
-from orchestrator.local_repo.result_poller import LocalRepoResultPoller
+from orchestrator.common.result_poller import ResultPoller
 from orchestrator.build_image.use_cases import CreateBuildImageUseCase
+from orchestrator.validate.use_cases import ValidateImageOnTestUseCase
 
 from core.localrepo.services import (
     InputFileService,
@@ -50,6 +51,7 @@ from core.localrepo.services import (
 from core.build_image.services import (
     BuildImageConfigService,
 )
+from core.validate.services import ValidateQueueService
 from core.catalog.adapter_policy import _DEFAULT_POLICY_PATH, _DEFAULT_SCHEMA_PATH
 from core.artifacts.value_objects import SafePath
 from common.config import load_config
@@ -111,6 +113,8 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
             "api.local_repo.dependencies",
             "api.build_image.routes",
             "api.build_image.dependencies",
+            "api.validate.routes",
+            "api.validate.dependencies",
         ]
     )
 
@@ -170,9 +174,15 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         result_repo=playbook_queue_result_repository,
     )
 
+    # --- Validate services ---
+    validate_queue_service = providers.Factory(
+        ValidateQueueService,
+        queue_repo=playbook_queue_request_repository,
+    )
+
     # --- Result poller ---
     result_poller = providers.Singleton(
-        LocalRepoResultPoller,
+        ResultPoller,
         result_service=playbook_queue_result_service,
         stage_repo=stage_repository,
         audit_repo=audit_repository,
@@ -228,7 +238,7 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         default_policy_path=default_policy_path,
         policy_schema_path=policy_schema_path,
     )
-    
+
     create_build_image_use_case = providers.Factory(
         CreateBuildImageUseCase,
         job_repo=job_repository,
@@ -237,6 +247,15 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         config_service=build_image_config_service,
         queue_service=playbook_queue_request_service,
         inventory_repo=input_repository,
+        uuid_generator=uuid_generator,
+    )
+
+    validate_image_on_test_use_case = providers.Factory(
+        ValidateImageOnTestUseCase,
+        job_repo=job_repository,
+        stage_repo=stage_repository,
+        audit_repo=audit_repository,
+        queue_service=validate_queue_service,
         uuid_generator=uuid_generator,
     )
 
@@ -258,6 +277,8 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
             "api.local_repo.dependencies",
             "api.build_image.routes",
             "api.build_image.dependencies",
+            "api.validate.routes",
+            "api.validate.dependencies",
         ]
     )
 
@@ -316,10 +337,15 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         config_repo=input_repository,
     )
 
+    # --- Validate services ---
+    validate_queue_service = providers.Factory(
+        ValidateQueueService,
+        queue_repo=playbook_queue_request_repository,
+    )
 
     # --- Result poller ---
     result_poller = providers.Singleton(
-        LocalRepoResultPoller,
+        ResultPoller,
         result_service=playbook_queue_result_service,
         stage_repo=stage_repository,
         audit_repo=audit_repository,
@@ -374,6 +400,14 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         uuid_generator=uuid_generator,
     )
 
+    validate_image_on_test_use_case = providers.Factory(
+        ValidateImageOnTestUseCase,
+        job_repo=job_repository,
+        stage_repo=stage_repository,
+        audit_repo=audit_repository,
+        queue_service=validate_queue_service,
+        uuid_generator=uuid_generator,
+    )
 
     generate_input_files_use_case = providers.Factory(
         GenerateInputFilesUseCase,
