@@ -61,10 +61,11 @@
     - name: Log SSH permission adjustments
       ansible.builtin.debug:
         msg: "Adjusted SSH permissions for {{ item.item.path }} to mode {{ item.item.mode }} with owner root:root"
-      loop: "{{ (ssh_path_fixes.results | default([]))\
-                | selectattr('item', 'defined')\
-                | selectattr('changed', 'defined')\
-                | selectattr('changed')\
+      loop: "{{ (ssh_path_fixes.results | default([]))
+                | selectattr('item', 'defined')
+                | selectattr('item.path', 'defined')
+                | selectattr('changed', 'defined')
+                | selectattr('changed')
                 | list }}"
       loop_control:
         label: "{{ item.item.path | default('unknown path') }}"
@@ -73,13 +74,20 @@
       ansible.builtin.debug:
         msg: "Ensured SSH directory {{ ssh_dir_result.path | default('/root/.ssh') }} mode 0700 owner root:root"
       when: ssh_dir_result.changed | default(false)
+      changed_when: false
 
     - name: Validate SSH permission state
       ansible.builtin.assert:
         that:
           - not (item.stat.exists | default(false)) or (item.stat.pw_name == 'root' and item.stat.gr_name == 'root')
-          - not (item.stat.exists | default(false)) or (item.stat.mode | string)[-4:] == item_mode_expected[item.item.path]
-        fail_msg: "SSH path {{ item.item.path }} has invalid ownership or mode. Expected root:root with mode {{ item_mode_expected[item.item.path] }}. Fix manually or rerun prepare_oim."
+          - >-
+            not (item.stat.exists | default(false)) or
+            (item.item.path == '/root/.ssh/known_hosts' and (item.stat.mode | string)[-4:] in ['0600', '0644']) or
+            (item.item.path != '/root/.ssh/known_hosts' and (item.stat.mode | string)[-4:] == item_mode_expected[item.item.path])
+        fail_msg: >-
+          SSH path {{ item.item.path }} has invalid ownership or mode.
+          Expected root:root with mode {{ item_mode_expected[item.item.path] }}{% if item.item.path == '/root/.ssh/known_hosts' %} (or 0600/0644 for known_hosts){% endif %}.
+          Fix manually or rerun prepare_oim.
       vars:
         item_mode_expected: "{{ dict(ssh_critical_paths | map(attribute='path') | zip(ssh_critical_paths | map(attribute='mode'))) }}"
       loop: "{{ ssh_path_stats.results }}"
@@ -90,4 +98,6 @@
   rescue:
     - name: Fail upgrade due to SSH permission issues
       ansible.builtin.fail:
-        msg: "SSH permission validation failed: {{ ansible_failed_result.msg | default('Unknown error') }}. Correct SSH file permissions/ownership and rerun prepare_oim."
+        msg: >-
+          SSH permission validation failed: {{ ansible_failed_result.msg | default('Unknown error') }}.
+          Correct SSH file permissions/ownership and rerun prepare_oim.
