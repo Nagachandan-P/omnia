@@ -15,7 +15,7 @@
 - name: Slurm dict ops
   ansible.builtin.set_fact:
     apply_config: "{{ __default_config }}"
-  no_log: true
+  no_log: "{{ _no_log }}"
 
 - name: Remove keys from conf_files if they have string values in configs_input (when skip_merge is true)
   ansible.builtin.set_fact:
@@ -34,7 +34,7 @@
      | combine({'slurmdbd': (apply_config['slurmdbd']
      | combine({'DbdHost': ctld_list[0], 'StorageHost': ctld_list[0]}))}) }}"
   when: ctld_list
-  no_log: true
+  no_log: "{{ _no_log }}"
 
 - name: Check .conf files existence
   ansible.builtin.stat:
@@ -51,7 +51,7 @@
   delegate_to: localhost
   loop: "{{ configs_input | default({}) | dict2items }}"
   register: parsed_configs_input_results
-  no_log: true
+  no_log: "{{ _no_log }}"
   when:
     - configs_input is defined
     - configs_input
@@ -62,7 +62,7 @@
   ansible.builtin.set_fact:
     parsed_configs_input: "{{ parsed_configs_input | default({}) | combine({item.item.key: item.conf_dict}) }}"
   loop: "{{ parsed_configs_input_results.results }}"
-  no_log: true
+  no_log: "{{ _no_log }}"
   when:
     - parsed_configs_input_results is defined
     - not item.skipped | default(false)
@@ -71,7 +71,7 @@
   ansible.builtin.set_fact:
     parsed_configs_input: "{{ parsed_configs_input | default({}) | combine({item.key: item.value}) }}"
   loop: "{{ configs_input | default({}) | dict2items }}"
-  no_log: true
+  no_log: "{{ _no_log }}"
   when:
     - configs_input is defined
     - configs_input
@@ -94,7 +94,7 @@
   loop_control:
     loop_var: existing_conf_set
   register: prepared_conf_lists
-  no_log: true
+  no_log: "{{ _no_log }}"
 
 # All the updates to the confs follow after this point before merge
 - name: Prepend ClusterName and SlurmctldHost to slurm conf sources
@@ -102,14 +102,14 @@
     conf_merge_dict: "{{ conf_merge_dict
      | combine({'slurm': [{'ClusterName': cluster_name, 'AccountingStorageHost': dbd_list[0], 'SlurmctldHost': ctld_list}] + conf_merge_dict['slurm']}) }}"
   when: "'slurm' in conf_merge_dict"
-  no_log: true
+  no_log: "{{ _no_log }}"
 
 - name: Slurm dbd - DbdHost and StorageHost
   ansible.builtin.set_fact:
     conf_merge_dict: "{{ conf_merge_dict
      | combine({'slurmdbd': [{'DbdHost': ctld_list[0], 'StorageHost': ctld_list[0]}] + conf_merge_dict['slurmdbd']}) }}"
   when: "'slurmdbd' in conf_merge_dict"
-  no_log: true
+  no_log: "{{ _no_log }}"
 
 - name: Merge the confs
   slurm_conf:
@@ -118,7 +118,7 @@
     conf_name: "{{ item.key }}"
   loop: "{{ conf_merge_dict | dict2items }}"
   register: merged_conf
-  no_log: true
+  no_log: "{{ _no_log }}"
 
 - name: Update slurm_conf_dict with merged configuration for cloud_init read. # TODO: Remove cloud init dependency
   ansible.builtin.set_fact:
@@ -182,7 +182,7 @@
     remote_src: "{{ copy_from_oim }}"
   loop: "{{ merged_conf.results }}"
   register: ctld_conf_files
-  no_log: true
+  no_log: "{{ _no_log }}"
   when:
     - item.ini_lines
 
