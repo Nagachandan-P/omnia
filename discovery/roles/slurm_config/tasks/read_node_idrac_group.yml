@@ -219,13 +219,16 @@
 
 - name: Use default values for all nodes in group (iDRAC failed)
   ansible.builtin.set_fact:
-    node_params: "{{ node_params + [{
-      'NodeName': hostname,
-      'Sockets': default_corespersocket,
-      'CoresPerSocket': default_corespersocket,
-      'ThreadsPerCore': default_threadspercore,
-      'RealMemory': default_real_memory
-    }] }}"
+    node_params: >-
+      {{
+        node_params + [{
+          'NodeName': hostname,
+          'Sockets': default_corespersocket,
+          'CoresPerSocket': default_corespersocket,
+          'ThreadsPerCore': default_threadspercore,
+          'RealMemory': default_real_memory
+        }]
+      }}
   loop: "{{ group_nodes }}"
   loop_control:
     loop_var: hostname

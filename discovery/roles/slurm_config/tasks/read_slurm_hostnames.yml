@@ -23,7 +23,13 @@
 
 - name: Build hostname to GROUP_NAME mapping from existing PXE mapping
   ansible.builtin.set_fact:
-    name_hardware_group_map: "{{ dict(hostvars['localhost']['pxe_mapping_dict'].dict.values() | map(attribute='HOSTNAME') | list | zip(hostvars['localhost']['pxe_mapping_dict'].dict.values() | map(attribute='GROUP_NAME') | list)) }}"
+    name_hardware_group_map: >-
+      {{
+        dict(
+          hostvars['localhost']['pxe_mapping_dict'].dict.values() | map(attribute='HOSTNAME') | list
+          | zip(hostvars['localhost']['pxe_mapping_dict'].dict.values() | map(attribute='GROUP_NAME') | list)
+        )
+      }}
   when: hostvars['localhost']['pxe_mapping_dict'] is defined
 
 - name: Set empty mapping if PXE mapping not available
