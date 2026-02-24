@@ -18,7 +18,7 @@
   failed_when: false
   ignore_unreachable: true
   changed_when: false
-  delegate_to: "{{ ctld }}"
+  delegate_to: "{{ ctld_list[0] }}"
 
 - name: Skip if node does not exist
   ansible.builtin.debug:
@@ -40,7 +40,7 @@
           squeue -w {{ node_to_remove }} -h | wc -l
       register: current_jobs
       changed_when: false
-      delegate_to: "{{ ctld }}"
+      delegate_to: "{{ ctld_list[0] }}"
 
     - name: Display job information
       ansible.builtin.debug:
@@ -86,7 +86,7 @@
       changed_when: true
       register: scancel_result
       failed_when: scancel_result.rc != 0
-      delegate_to: "{{ ctld }}"
+      delegate_to: "{{ ctld_list[0] }}"
 
     - name: Set node to DOWN state
       ansible.builtin.command: >
@@ -95,7 +95,7 @@
         Reason="Node removed from cluster via OMNIA discovery.yml"
       changed_when: true
       failed_when: false
-      delegate_to: "{{ ctld }}"
+      delegate_to: "{{ ctld_list[0] }}"
       when: node_exists_check.rc == 0
 
     - name: Stop the slurmd service on node
