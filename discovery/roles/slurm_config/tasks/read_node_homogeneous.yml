@@ -29,7 +29,7 @@
 
 - name: Build node parameters from user specs (no iDRAC)
   ansible.builtin.set_fact:
-    proc_params: "{{ {'NodeName': item} 
+    proc_params: "{{ {'NodeName': item}
      | combine({'Sockets': group_specs.sockets})
      | combine({'CoresPerSocket': group_specs.cores_per_socket})
      | combine({'ThreadsPerCore': group_specs.threads_per_core})

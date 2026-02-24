@@ -55,7 +55,7 @@
       - "Groups with specs: {{ groups_with_specs }}"
       - "Is in specs: {{ name_hardware_group_map.get(item, '') in groups_with_specs }}"
   loop: "{{ cmpt_list }}"
-  when: 
+  when:
     - discovery_mode == 'homogeneous'
     - name_hardware_group_map | length > 0
 
@@ -68,7 +68,7 @@
         else homogeneous_nodes
       }}
   loop: "{{ cmpt_list }}"
-  when: 
+  when:
     - discovery_mode == 'homogeneous'
     - name_hardware_group_map | length > 0
 
@@ -92,7 +92,7 @@
   loop: "{{ homogeneous_nodes }}"
   loop_control:
     loop_var: item
-  when: 
+  when:
     - discovery_mode == 'homogeneous'
     - homogeneous_nodes | length > 0
 
@@ -106,7 +106,7 @@
         })
       }}
   loop: "{{ cmpt_list }}"
-  when: 
+  when:
     - discovery_mode == 'homogeneous'
     - name_hardware_group_map | length > 0
     - name_hardware_group_map.get(item, '') not in groups_with_specs
@@ -114,7 +114,7 @@
 - name: Process homogeneous groups with user specs (no iDRAC)
   ansible.builtin.include_tasks: read_node_homogeneous.yml
   loop: "{{ homogeneous_nodes }}"
-  when: 
+  when:
     - discovery_mode == 'homogeneous'
     - homogeneous_nodes | length > 0
 
@@ -123,14 +123,14 @@
   loop: "{{ sample_idrac_groups | dict2items }}"
   loop_control:
     loop_var: group_item
-  when: 
+  when:
     - discovery_mode == 'homogeneous'
     - sample_idrac_groups | default({}) | length > 0
 
 - name: Process heterogeneous nodes (individual iDRAC)
   ansible.builtin.include_tasks: read_node_idrac.yml
   loop: "{{ cmpt_list }}"
-  when: 
+  when:
     - discovery_mode == 'heterogeneous'
 
 - name: DEBUG - Show final node_params before building slurm.conf

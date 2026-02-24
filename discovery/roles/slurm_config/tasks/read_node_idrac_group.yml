@@ -36,7 +36,6 @@
       OData-Version: "4.0"
     status_code:
       - 200
-  register: idrac_test
   loop: "{{ group_nodes }}"
   when: responsive_node == ""
   register: idrac_results
@@ -45,7 +44,7 @@
   ansible.builtin.set_fact:
     responsive_node: "{{ item.item }}"
   loop: "{{ idrac_results.results }}"
-  when: 
+  when:
     - responsive_node == ""
     - item.status == 200
 
