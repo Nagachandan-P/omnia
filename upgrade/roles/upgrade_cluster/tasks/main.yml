@@ -58,7 +58,8 @@
 
       Optional: NFS cleanup (only if you are reprovisioning the cluster)
 
-      If you choose to reprovision the cluster and your setup uses an NFS share for Kubernetes and/or Slurm, you may optionally perform an NFS   cleanup beforehand:
+      If you choose to reprovision the cluster and your setup uses an NFS share for Kubernetes and/or Slurm, you may optionally perform an NFS
+      cleanup beforehand:
 
         Detected NFS share paths from storage_config.yml:
 
