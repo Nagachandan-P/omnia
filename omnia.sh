@@ -255,19 +255,17 @@ show_post_upgrade_instructions() {
     echo -e "${YELLOW}                    IMPORTANT POST-UPGRADE STEP${NC}"
     echo -e "${YELLOW}================================================================================${NC}"
     echo ""
-    echo -e "${GREEN}✓ Omnia core container has been successfully upgraded${NC}"
-    echo -e "${GREEN}✓ Version updated to: $upgraded_version${NC}"
-    echo ""
     echo -e "${BLUE}NEXT REQUIRED ACTION:${NC}"
     echo -e "${YELLOW}You must now run the upgrade playbook inside the omnia_core container:${NC}"
     echo ""
-    echo -e "${GREEN}podman exec -it omnia_core ansible-playbook /omnia/upgrade/upgrade_omnia.yml${NC}"
+    echo -e "${GREEN}ansible-playbook /omnia/upgrade/upgrade_omnia.yml${NC}"
     echo ""
     echo -e "${BLUE}This playbook will:${NC}"
-    echo -e "• Update input files"
-    echo -e "• Update internal configurations"
+    echo -e "• Update input files based on the previous version inputs"
+    echo -e "• Provide further steps to follow"
+    echo -e "• Provide user guidance for provisioning nodes"
     echo ""
-    echo -e "${YELLOW}Note: Run this command after the container is fully healthy and stable${NC}"
+    echo -e "${YELLOW}Note: Run the above command after the container is fully healthy and stable${NC}"
     echo -e "${YELLOW}================================================================================${NC}"
     echo ""
 }
@@ -1167,6 +1165,7 @@ init_ssh_config() {
 
 remove_container_omnia_sh() {
     podman exec -u root omnia_core bash -c 'if [ -f /omnia/omnia.sh ]; then rm -f /omnia/omnia.sh; fi' >/dev/null 2>&1 || true
+    podman exec -u root omnia_core bash -c 'if [ -d /omnia/input ]; then rm -rf /omnia/input; fi' >/dev/null 2>&1 || true
 }
 
 start_container_session() {
@@ -1904,6 +1903,16 @@ upgrade_omnia_core() {
     # Seed inputs and defaults after upgrade
     post_setup_config
 
+    echo ""
+    echo -e "${GREEN}================================================================================${NC}"
+    echo -e "${GREEN}                    UPGRADE COMPLETED SUCCESSFULLY${NC}"
+    echo -e "${GREEN}================================================================================${NC}"
+    echo ""
+    echo -e "${GREEN}✓ Omnia core has been upgraded to version $TARGET_OMNIA_VERSION${NC}"
+    echo -e "${GREEN}✓ Container is running and healthy${NC}"
+    echo -e "${GREEN}✓ Configuration backed up to: $backup_base${NC}"
+    echo ""
+
     show_post_upgrade_instructions "$TARGET_OMNIA_VERSION"
     # Initialize SSH config and start container session
     init_ssh_config
@@ -2184,26 +2193,9 @@ rollback_omnia_core() {
         exit 1
     fi
     
-    echo ""
-    echo "Available backups for version $selected_version:"
-    for i in "${!backup_dirs[@]}"; do
-        local backup_path="${backup_dirs[$i]}"
-        local backup_date=$(podman exec -u root omnia_core stat -c '%y' "$backup_path" 2>/dev/null | cut -d' ' -f1,2 | cut -d'.' -f1)
-        echo "  $((i+1)). Backup created: $backup_date"
-    done
-    
-    # Prompt for backup selection
-    echo ""
-    echo -n "Select backup to restore from (1-${#backup_dirs[@]}): "
-    read -r backup_selection
-    
-    # Validate backup selection
-    if ! [[ "$backup_selection" =~ ^[0-9]+$ ]] || [ "$backup_selection" -lt 1 ] || [ "$backup_selection" -gt ${#backup_dirs[@]} ]; then
-        echo -e "${RED}ERROR: Invalid backup selection.${NC}"
-        exit 1
-    fi
-    
-    local selected_backup="${backup_dirs[$((backup_selection-1))]}"
+    # Auto-select the most recent backup (first in sorted list)
+    local selected_backup="${backup_dirs[0]}"
+    echo "Auto-selecting backup: $selected_backup"
     
     # Validate selected backup exists
     if ! podman exec -u root omnia_core test -d "$selected_backup" 2>/dev/null; then
