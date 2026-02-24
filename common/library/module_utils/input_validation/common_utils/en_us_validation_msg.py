@@ -1,4 +1,4 @@
-# Copyright 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -384,6 +384,8 @@ BMC_VIRTUAL_IP_NOT_VALID = ("should be outside any bmc static and dynamic ranges
                             "roles_config.yml")
 FEILD_MUST_BE_EMPTY = "feild must be empty."
 DUPLICATE_VIRTUAL_IP = "is already used. Please give unique virtual ip address"
+VIRTUAL_IP_SAME_AS_PRIMARY_OIM_ADMIN_IP = ("virtual_ip_address provided in high_availability_config.yml must not be the same as primary_oim_admin_ip in network_spec.yml. "
+                                           "Please provide a different virtual IP address.")
 INVALID_PASSIVE_NODE_SERVICE_TAG = "active node and passive node service tag cannot be same."
 GROUP_NOT_FOUND = "is not defined in the roles_config.yml. Please define the group in roles_config.yml"
 ROLE_NODE_FOUND = "is not defined in roles_config.yml. Please define the role in roles_config.yml"

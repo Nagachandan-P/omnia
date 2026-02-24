@@ -1,4 +1,4 @@
-# Copyright 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -310,6 +310,16 @@ def validate_vip_address(
         - None: The function does not return any value, it only appends
             error messages to the errors list.
     """
+
+    if vip_address == oim_admin_ip:
+        errors.append(
+            create_error_msg(
+                f"{config_type} virtual_ip_address",
+                vip_address,
+                en_us_validation_msg.VIRTUAL_IP_SAME_AS_PRIMARY_OIM_ADMIN_IP,
+            )
+        )
+
     # virtual_ip_address is mutually exclusive with admin dynamic ranges
     vip_within_dynamic_range = validation_utils.is_ip_within_range(
         admin_network["dynamic_range"], vip_address
