@@ -14,8 +14,12 @@
 ---
 - name: Gather NFS share paths from storage_config.yml
   ansible.builtin.set_fact:
-    nfs_slurm_server_share_path: "{{ nfs_params | selectattr('nfs_name', 'equalto', 'nfs_slurm') | map(attribute='server_share_path') | first | default('not specified') }}"
-    nfs_k8s_server_share_path: "{{ nfs_params | selectattr('nfs_name', 'equalto', 'nfs_k8s') | map(attribute='server_share_path') | first | default('not specified') }}"
+    nfs_slurm_server_share_path: >-
+      {{ nfs_params | selectattr('nfs_name', 'equalto', 'nfs_slurm')
+      | map(attribute='server_share_path') | first | default('not specified') }}
+    nfs_k8s_server_share_path: >-
+      {{ nfs_params | selectattr('nfs_name', 'equalto', 'nfs_k8s')
+      | map(attribute='server_share_path') | first | default('not specified') }}
 
 
 - name: Display cluster reprovision guidance
