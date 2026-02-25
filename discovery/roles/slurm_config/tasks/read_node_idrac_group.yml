@@ -205,13 +205,17 @@
 
 - name: Apply discovered specs to all nodes in group
   ansible.builtin.set_fact:
-    node_params: "{{ node_params + [{
-      'NodeName': hostname,
-      'Sockets': discovered_specs.sockets,
-      'CoresPerSocket': discovered_specs.cores_per_socket,
-      'ThreadsPerCore': discovered_specs.threads_per_core,
-      'RealMemory': discovered_specs.real_memory
-    } | combine({'Gres': discovered_specs.gres} if discovered_specs.gres != '' else {})] }}"
+    node_params: >-
+      {{
+        node_params + [
+          {'NodeName': hostname,
+           'Sockets': discovered_specs.sockets,
+           'CoresPerSocket': discovered_specs.cores_per_socket,
+           'ThreadsPerCore': discovered_specs.threads_per_core,
+           'RealMemory': discovered_specs.real_memory}
+          | combine({'Gres': discovered_specs.gres} if discovered_specs.gres != '' else {})
+        ]
+      }}
   loop: "{{ group_nodes }}"
   loop_control:
     loop_var: hostname
