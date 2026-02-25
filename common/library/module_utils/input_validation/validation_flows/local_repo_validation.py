@@ -208,6 +208,8 @@ def validate_local_repo_config(input_file_path, data,
                     )
 
     os_ver_path = f"/{software_config_json['cluster_os_type']}/{software_config_json['cluster_os_version']}/"
+    supported_subgroups = config.ADDITIONAL_PACKAGES_SUPPORTED_SUBGROUPS
+
     for software in software_config_json["softwares"]:
         sw = software["name"]
         arch_list = software.get("arch")
@@ -221,10 +223,24 @@ def validate_local_repo_config(input_file_path, data,
             else:
                 curr_json = load_json(json_path)
                 pkg_list = curr_json[sw]['cluster']
+                # For additional_packages, check for unsupported subgroups in the JSON
+                if sw == "additional_packages":
+                    arch_supported = supported_subgroups.get(arch, [])
+                    for json_key in curr_json:
+                        if json_key not in arch_supported:
+                            errors.append(
+                                create_error_msg(sw + '/' + arch,
+                                                json_path,
+                                                f"Subgroup '{json_key}' is not supported for architecture {arch}."))
                 if sw in software_config_json:
                     for sub_pkg in software_config_json[sw]:
                         sub_sw = sub_pkg.get('name')
                         if sub_sw not in curr_json:
+                            # For additional_packages, skip subgroups that
+                            # are not supported for this arch
+                            if sw == "additional_packages":
+                                if sub_sw not in supported_subgroups.get(arch, []):
+                                    continue
                             errors.append(
                                 create_error_msg(sw + '/' + arch,
                                                 json_path,

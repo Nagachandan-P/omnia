@@ -246,14 +246,14 @@ def validate_software_config(
                     )
                 )
 
+    supported_subgroups = config.ADDITIONAL_PACKAGES_SUPPORTED_SUBGROUPS
+
     for software_pkg in data['softwares']:
         software = software_pkg['name']
         arch_list = software_pkg.get('arch')
-        json_paths = []
         for arch in arch_list:
-            json_paths.append(get_json_file_path(
-                software, cluster_os_type, cluster_os_version, input_file_path, arch))
-        for json_path in json_paths:
+            json_path = get_json_file_path(
+                software, cluster_os_type, cluster_os_version, input_file_path, arch)
             # Check if json_path is None or if the JSON syntax is invalid
             if not json_path:
                 errors.append(
@@ -266,7 +266,24 @@ def validate_software_config(
                 try:
                     subgroup_softwares = subgroup_dict.get(software, None)
                     json_data = load_json(json_path)
+                    # For additional_packages, check for unsupported subgroups in the JSON
+                    if software == "additional_packages":
+                        arch_supported = supported_subgroups.get(arch, [])
+                        for json_key in json_data:
+                            if json_key not in arch_supported:
+                                errors.append(
+                                    create_error_msg(
+                                        software + '/' + arch,
+                                        json_path,
+                                        f"Subgroup '{json_key}' is not supported for architecture {arch}."
+                                    )
+                                )
                     for subgroup_software in subgroup_softwares:
+                        # For additional_packages, skip subgroups that are
+                        # not supported for this arch
+                        if software == "additional_packages":
+                            if subgroup_software not in supported_subgroups.get(arch, []):
+                                continue
                         _, fail_data = validation_utils.validate_softwaresubgroup_entries(
                             subgroup_software, json_path, json_data, validation_results, failures
                         )
