@@ -246,14 +246,14 @@ def validate_software_config(
                     )
                 )
 
+    supported_subgroups = config.ADDITIONAL_PACKAGES_SUPPORTED_SUBGROUPS
+
     for software_pkg in data['softwares']:
         software = software_pkg['name']
         arch_list = software_pkg.get('arch')
-        json_paths = []
         for arch in arch_list:
-            json_paths.append(get_json_file_path(
-                software, cluster_os_type, cluster_os_version, input_file_path, arch))
-        for json_path in json_paths:
+            json_path = get_json_file_path(
+                software, cluster_os_type, cluster_os_version, input_file_path, arch)
             # Check if json_path is None or if the JSON syntax is invalid
             if not json_path:
                 errors.append(
@@ -266,7 +266,43 @@ def validate_software_config(
                 try:
                     subgroup_softwares = subgroup_dict.get(software, None)
                     json_data = load_json(json_path)
+                    # For additional_packages, validate subgroup keys in the JSON
+                    if software == "additional_packages":
+                        if "additional_packages" not in json_data:
+                            errors.append(
+                                create_error_msg(
+                                    software + '/' + arch,
+                                    json_path,
+                                    f"Required key 'additional_packages' is missing from the JSON file."
+                                )
+                            )
+                        arch_supported = supported_subgroups.get(arch, [])
+                        user_subgroups = [p.get('name') for p in data.get(software, [])]
+                        for json_key in json_data:
+                            if json_key == "additional_packages":
+                                continue
+                            if json_key not in arch_supported:
+                                errors.append(
+                                    create_error_msg(
+                                        software + '/' + arch,
+                                        json_path,
+                                        f"Subgroup '{json_key}' is not supported for architecture {arch}."
+                                    )
+                                )
+                            elif json_key not in user_subgroups:
+                                errors.append(
+                                    create_error_msg(
+                                        software + '/' + arch,
+                                        json_path,
+                                        f"Subgroup '{json_key}' is present in JSON but not listed under additional_packages in software_config.json."
+                                    )
+                                )
                     for subgroup_software in subgroup_softwares:
+                        # For additional_packages, skip subgroups that are
+                        # not supported for this arch
+                        if software == "additional_packages":
+                            if subgroup_software not in supported_subgroups.get(arch, []):
+                                continue
                         _, fail_data = validation_utils.validate_softwaresubgroup_entries(
                             subgroup_software, json_path, json_data, validation_results, failures
                         )
