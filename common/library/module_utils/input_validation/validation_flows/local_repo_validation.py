@@ -225,6 +225,11 @@ def validate_local_repo_config(input_file_path, data,
                 pkg_list = curr_json[sw]['cluster']
                 # For additional_packages, validate subgroup keys in the JSON
                 if sw == "additional_packages":
+                    if "additional_packages" not in curr_json:
+                        errors.append(
+                            create_error_msg(sw + '/' + arch,
+                                            json_path,
+                                            f"Required key 'additional_packages' is missing from the JSON file."))
                     arch_supported = supported_subgroups.get(arch, [])
                     user_subgroups = [p.get('name') for p in software_config_json.get(sw, [])]
                     for json_key in curr_json:

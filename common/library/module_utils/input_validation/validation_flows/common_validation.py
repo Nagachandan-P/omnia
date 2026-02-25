@@ -268,6 +268,14 @@ def validate_software_config(
                     json_data = load_json(json_path)
                     # For additional_packages, validate subgroup keys in the JSON
                     if software == "additional_packages":
+                        if "additional_packages" not in json_data:
+                            errors.append(
+                                create_error_msg(
+                                    software + '/' + arch,
+                                    json_path,
+                                    f"Required key 'additional_packages' is missing from the JSON file."
+                                )
+                            )
                         arch_supported = supported_subgroups.get(arch, [])
                         user_subgroups = [p.get('name') for p in data.get(software, [])]
                         for json_key in json_data:
