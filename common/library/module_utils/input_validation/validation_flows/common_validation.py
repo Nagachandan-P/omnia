@@ -266,16 +266,27 @@ def validate_software_config(
                 try:
                     subgroup_softwares = subgroup_dict.get(software, None)
                     json_data = load_json(json_path)
-                    # For additional_packages, check for unsupported subgroups in the JSON
+                    # For additional_packages, validate subgroup keys in the JSON
                     if software == "additional_packages":
                         arch_supported = supported_subgroups.get(arch, [])
+                        user_subgroups = [p.get('name') for p in data.get(software, [])]
                         for json_key in json_data:
+                            if json_key == "additional_packages":
+                                continue
                             if json_key not in arch_supported:
                                 errors.append(
                                     create_error_msg(
                                         software + '/' + arch,
                                         json_path,
                                         f"Subgroup '{json_key}' is not supported for architecture {arch}."
+                                    )
+                                )
+                            elif json_key not in user_subgroups:
+                                errors.append(
+                                    create_error_msg(
+                                        software + '/' + arch,
+                                        json_path,
+                                        f"Subgroup '{json_key}' is present in JSON but not listed under additional_packages in software_config.json."
                                     )
                                 )
                     for subgroup_software in subgroup_softwares:

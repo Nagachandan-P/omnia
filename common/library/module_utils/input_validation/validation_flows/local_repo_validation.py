@@ -223,15 +223,23 @@ def validate_local_repo_config(input_file_path, data,
             else:
                 curr_json = load_json(json_path)
                 pkg_list = curr_json[sw]['cluster']
-                # For additional_packages, check for unsupported subgroups in the JSON
+                # For additional_packages, validate subgroup keys in the JSON
                 if sw == "additional_packages":
                     arch_supported = supported_subgroups.get(arch, [])
+                    user_subgroups = [p.get('name') for p in software_config_json.get(sw, [])]
                     for json_key in curr_json:
+                        if json_key == "additional_packages":
+                            continue
                         if json_key not in arch_supported:
                             errors.append(
                                 create_error_msg(sw + '/' + arch,
                                                 json_path,
                                                 f"Subgroup '{json_key}' is not supported for architecture {arch}."))
+                        elif json_key not in user_subgroups:
+                            errors.append(
+                                create_error_msg(sw + '/' + arch,
+                                                json_path,
+                                                f"Subgroup '{json_key}' is present in JSON but not listed under additional_packages in software_config.json."))
                 if sw in software_config_json:
                     for sub_pkg in software_config_json[sw]:
                         sub_sw = sub_pkg.get('name')
