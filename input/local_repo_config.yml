@@ -39,7 +39,7 @@
 # Fields:
 #   url         : Base URL of the repository
 #   gpgkey      : GPG key URL (leave empty to disable gpgcheck; Omnia will trust this repo and user is responsible for its security)
-#   name        : Name of the repository
+#   name        : Name of the repository (must start with 'x86_64_', e.g., 'x86_64_my_repo')
 #   sslcacert   : Path to SSL CA certificate (if using SSL)
 #   sslclientkey: Path to SSL client key (if using SSL)
 #   sslclientcert: Path to SSL client certificate (if using SSL)
@@ -55,6 +55,7 @@
 # 3. user_repo_url_aarch64
 #---------------------------
 #    Same as above but for aarch64 architecture.
+#    Note: name must start with 'aarch64_' (e.g., 'aarch64_my_repo').
 #
 # 4. rhel_os_url_x86_64
 #-----------------------------
