@@ -57,7 +57,7 @@
 
             - New variable: node_discovery_mode: 'Homogeneous' or 'Heterogeneous'
 
-            - New variable: node_hardware_defaults: 
+            - New variable: node_hardware_defaults:
 
               | Mode | What happens | iDRAC calls for 500 nodes |
 
