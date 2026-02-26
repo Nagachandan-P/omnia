@@ -208,6 +208,8 @@ def validate_local_repo_config(input_file_path, data,
                     )
 
     os_ver_path = f"/{software_config_json['cluster_os_type']}/{software_config_json['cluster_os_version']}/"
+    supported_subgroups = config.ADDITIONAL_PACKAGES_SUPPORTED_SUBGROUPS
+
     for software in software_config_json["softwares"]:
         sw = software["name"]
         arch_list = software.get("arch")
@@ -221,10 +223,37 @@ def validate_local_repo_config(input_file_path, data,
             else:
                 curr_json = load_json(json_path)
                 pkg_list = curr_json[sw]['cluster']
+                # For additional_packages, validate subgroup keys in the JSON
+                if sw == "additional_packages":
+                    if "additional_packages" not in curr_json:
+                        errors.append(
+                            create_error_msg(sw + '/' + arch,
+                                            json_path,
+                                            f"Required key 'additional_packages' is missing from the JSON file."))
+                    arch_supported = supported_subgroups.get(arch, [])
+                    user_subgroups = [p.get('name') for p in software_config_json.get(sw, [])]
+                    for json_key in curr_json:
+                        if json_key == "additional_packages":
+                            continue
+                        if json_key not in arch_supported:
+                            errors.append(
+                                create_error_msg(sw + '/' + arch,
+                                                json_path,
+                                                f"Subgroup '{json_key}' is not supported for architecture {arch}."))
+                        elif json_key not in user_subgroups:
+                            errors.append(
+                                create_error_msg(sw + '/' + arch,
+                                                json_path,
+                                                f"Subgroup '{json_key}' is present in JSON but not listed under additional_packages in software_config.json."))
                 if sw in software_config_json:
                     for sub_pkg in software_config_json[sw]:
                         sub_sw = sub_pkg.get('name')
                         if sub_sw not in curr_json:
+                            # For additional_packages, skip subgroups that
+                            # are not supported for this arch
+                            if sw == "additional_packages":
+                                if sub_sw not in supported_subgroups.get(arch, []):
+                                    continue
                             errors.append(
                                 create_error_msg(sw + '/' + arch,
                                                 json_path,
