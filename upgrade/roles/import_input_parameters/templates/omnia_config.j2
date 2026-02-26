@@ -108,22 +108,21 @@ slurm_cluster:
 {% endfor %}
 {% endif %}
 
-# node_discovery_mode: "Homogeneous"
-#     node_discovery_mode: "heterogeneous"
-#     # Specify hardware specs for groups (optional - will use group iDRAC if not specified)
+    # node_discovery_mode: "homogeneous"
+    # # Specify hardware specs for groups (optional - will use group iDRAC if not specified)
     # node_hardware_defaults:
-    #  grp12:
-    #    sockets: 5
-    #    cores_per_socket: 6
-    #    threads_per_core: 3
-    #    real_memory: 117968
-    # #     gres: "gpu:4"  # optional
+    #   grp12:
+    #     sockets: 5
+    #     cores_per_socket: 6
+    #     threads_per_core: 3
+    #     real_memory: 117968
+    #     gres: "gpu:4"  # optional
 
-    #  grp13:
-    #    sockets: 13
-    #    cores_per_socket: 13
-    #    threads_per_core: 13
-    #    real_memory: 117913
+    #   grp13:
+    #     sockets: 13
+    #     cores_per_socket: 13
+    #     threads_per_core: 13
+    #     real_memory: 117913
 
 # ----------------------------SERVICE K8S------------------------------------------------------
 # For service k8s cluster below parameters are required,(List)
