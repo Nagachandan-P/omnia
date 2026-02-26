@@ -66,12 +66,10 @@
               Heterogeneous (default) | Each node queried individually 500
 
               Homogeneous with specs provided | Specs applied directly, no querying 0
-              
+
               Homogeneous without specs | One node per group queried, specs shared 1 per group
 
               also provide node_hardware_defaults for groups where you want to apply specs
-
-
 
       Optional: NFS cleanup (only if you are reprovisioning the cluster)
 
