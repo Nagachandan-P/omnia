@@ -166,6 +166,10 @@ LDMS_REQUIRES_SERVICE_K8S_MSG = (
 LDMS_REQUIRES_SLURM_MSG = (
     "requires Slurm package 'slurm_custom' to be present in the 'softwares' list in software_config.json."
 )
+USER_REPO_NAME_PREFIX_FAIL_MSG = (
+    "Repository name '{repo_name}' in {repo_key} must start with '{expected_prefix}'. "
+    "Please update the name to '{expected_prefix}{repo_name}'."
+)
 
 # omnia_config.yml
 INVALID_PASSWORD_MSG = ("Provided password is invalid. Password must meet the specified "
