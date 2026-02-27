@@ -1110,7 +1110,30 @@ def validate_omnia_config(
                     "slurm NFS not provided",
                     f"NFS name {', '.join(diff_set)} required for slurm is not defined in {storage_config}"
                     ))
-
+        
+        # Validate node_hardware_defaults requires node_discovery_mode=homogeneous
+        for clst in data.get('slurm_cluster', []):
+            node_hardware_defaults = clst.get('node_hardware_defaults')
+            node_discovery_mode = clst.get('node_discovery_mode')
+            
+            # Normalize mode to lowercase for case-insensitive comparison
+            if node_discovery_mode and isinstance(node_discovery_mode, str):
+                node_discovery_mode = node_discovery_mode.lower()
+            
+            if node_hardware_defaults and len(node_hardware_defaults) > 0:
+                if not node_discovery_mode or node_discovery_mode != 'homogeneous':
+                    group_names = list(node_hardware_defaults.keys())
+                    errors.append(
+                        create_error_msg(
+                            input_file_path,
+                            "slurm_cluster configuration inconsistency",
+                            f"'node_hardware_defaults' is specified for groups {group_names}, but 'node_discovery_mode' is not set to 'homogeneous'. "
+                            f"Current mode: {node_discovery_mode if node_discovery_mode else 'not set (defaults to heterogeneous)'}. "
+                            f"Either set 'node_discovery_mode: \"homogeneous\"' to use the hardware specifications, "
+                            f"or remove 'node_hardware_defaults' to use heterogeneous discovery."
+                        ))
+        
+        cnfg_src = [clst.get('config_sources', {}) for clst in data.get('slurm_cluster')]
         skip_conf_validation = os.path.exists("/opt/omnia/input/.skip_slurm_conf_validation")
         cnfg_src = [clst.get('config_sources', {}) for clst in data.get('slurm_cluster')]
         skip_merge_list = [clst.get('skip_merge', False) for clst in data.get('slurm_cluster')]
