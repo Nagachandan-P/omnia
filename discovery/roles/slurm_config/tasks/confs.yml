@@ -34,11 +34,7 @@
      | combine({'slurmdbd': (apply_config['slurmdbd']
      | combine({'DbdHost': ctld_list[0], 'StorageHost': ctld_list[0]}))}) }}"
   when: ctld_list
-<<<<<<< .mine
   no_log: "{{ _no_log }}"
-=======
-  no_log: true
->>>>>>> .theirs
 
 - name: Check .conf files existence
   ansible.builtin.stat:
@@ -47,7 +43,6 @@
   loop: "{{ ctld_list | product(conf_files | default([])) }}"
   register: ctld_conf_files
 
-<<<<<<< .mine
 - name: Parse configs_input files from localhost (if they are paths)
   slurm_conf:
     op: parse
@@ -82,42 +77,6 @@
     - configs_input
     - item.value is mapping
 
-=======
-- name: Parse configs_input files from localhost (if they are paths)
-  slurm_conf:
-    op: parse
-    conf_name: "{{ item.key }}"
-    path: "{{ item.value }}"
-  delegate_to: localhost
-  loop: "{{ configs_input | default({}) | dict2items }}"
-  register: parsed_configs_input_results
-  no_log: true
-  when:
-    - configs_input is defined
-    - configs_input
-    - item.value is string
-    - item.key in conf_files
-
-- name: Build parsed_configs_input dictionary from parsed files
-  ansible.builtin.set_fact:
-    parsed_configs_input: "{{ parsed_configs_input | default({}) | combine({item.item.key: item.conf_dict}) }}"
-  loop: "{{ parsed_configs_input_results.results }}"
-  no_log: true
-  when:
-    - parsed_configs_input_results is defined
-    - not item.skipped | default(false)
-
-- name: Add configs_input dicts that are already parsed
-  ansible.builtin.set_fact:
-    parsed_configs_input: "{{ parsed_configs_input | default({}) | combine({item.key: item.value}) }}"
-  loop: "{{ configs_input | default({}) | dict2items }}"
-  no_log: true
-  when:
-    - configs_input is defined
-    - configs_input
-    - item.value is mapping
-
->>>>>>> .theirs
 - name: Create lists for conf_merge
   ansible.builtin.set_fact:
     conf_merge_dict: "{{
@@ -135,11 +94,7 @@
   loop_control:
     loop_var: existing_conf_set
   register: prepared_conf_lists
-<<<<<<< .mine
   no_log: "{{ _no_log }}"
-=======
-  no_log: true
->>>>>>> .theirs
 
 # All the updates to the confs follow after this point before merge
 - name: Prepend ClusterName and SlurmctldHost to slurm conf sources
@@ -147,13 +102,8 @@
     conf_merge_dict: "{{ conf_merge_dict
      | combine({'slurm': [{'ClusterName': cluster_name, 'AccountingStorageHost': dbd_list[0], 'SlurmctldHost': ctld_list}] + conf_merge_dict['slurm']}) }}"
   when: "'slurm' in conf_merge_dict"
-<<<<<<< .mine
   no_log: "{{ _no_log }}"
-=======
-  no_log: true
->>>>>>> .theirs
 
-<<<<<<< .mine
 - name: Slurm dbd - DbdHost and StorageHost
   ansible.builtin.set_fact:
     conf_merge_dict: "{{ conf_merge_dict
@@ -161,15 +111,6 @@
   when: "'slurmdbd' in conf_merge_dict"
   no_log: "{{ _no_log }}"
 
-=======
-- name: Slurm dbd - DbdHost and StorageHost
-  ansible.builtin.set_fact:
-    conf_merge_dict: "{{ conf_merge_dict
-     | combine({'slurmdbd': [{'DbdHost': ctld_list[0], 'StorageHost': ctld_list[0]}] + conf_merge_dict['slurmdbd']}) }}"
-  when: "'slurmdbd' in conf_merge_dict"
-  no_log: true
-
->>>>>>> .theirs
 - name: Merge the confs
   slurm_conf:
     op: merge
@@ -177,11 +118,7 @@
     conf_name: "{{ item.key }}"
   loop: "{{ conf_merge_dict | dict2items }}"
   register: merged_conf
-<<<<<<< .mine
   no_log: "{{ _no_log }}"
-=======
-  no_log: true
->>>>>>> .theirs
 
 - name: Update slurm_conf_dict with merged configuration for cloud_init read. # TODO: Remove cloud init dependency
   ansible.builtin.set_fact:
@@ -305,17 +242,10 @@
     remote_src: "{{ copy_from_oim }}"
   loop: "{{ merged_conf.results }}"
   register: ctld_conf_files
-<<<<<<< .mine
   no_log: "{{ _no_log }}"
   when:
     - item.ini_lines
-=======
-  no_log: true
-  when:
-    - item.ini_lines
->>>>>>> .theirs
 
-<<<<<<< .mine
 - name: Add extra confs which are not handled
   ansible.builtin.include_tasks: handle_extra_confs.yml
   when:
@@ -328,27 +258,12 @@
 - name: Backup Slurm configuration files when changed
   ansible.builtin.include_tasks: backup_conf.yml
 
-=======
-- name: Add extra confs which are not handled
-  ansible.builtin.include_tasks: handle_extra_confs.yml
-  when:
-    - configs_input is defined
-    - configs_input.keys() | difference(conf_files) | length > 0
-  loop: "{{ configs_input.keys() | difference(conf_files) }}"
-  loop_control:
-    loop_var: extra_conf
-
-
-
-
->>>>>>> .theirs
 - name: Check if cluster running
   ansible.builtin.include_tasks: check_ctld_running.yml
   when:
     - ctld_list
     - ctld_conf_files is changed
   loop: "{{ ctld_list }}"
-<<<<<<< .mine
   loop_control:
     loop_var: ctld
 
@@ -379,35 +294,3 @@
     - busy_nodes | length > 0
     - not force_scancel_node
     - user_input.user_input | default('') | trim | upper in ['A']
-=======
-  loop_control:
-    loop_var: ctld
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
->>>>>>> .theirs

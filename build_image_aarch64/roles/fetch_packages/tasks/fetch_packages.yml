@@ -23,7 +23,7 @@
         software_config_path: "{{ software_config_file_path }}"
       register: base_image_output
 
-    - name: Set base_image_packages
+    - name: Set aarch_64_base_image_packages
       ansible.builtin.set_fact:
         aarch64_base_image_packages: "{{ base_image_output.base_image_packages }}"
 

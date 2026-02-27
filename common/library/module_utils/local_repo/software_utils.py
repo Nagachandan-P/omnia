@@ -558,23 +558,9 @@ def get_failed_software(file_path):
     ]
     return failed_software
 
-<<<<<<< .mine
 def _sanitize_shell_arg(value, logger, field_name="value"):
     """
     Sanitize a value before using it in a shell command to prevent argument injection.
-
-
-
-
-=======
-def check_additional_image_in_pulp(image_entry, logger):
-    """
-    Checks if image present in additional_packages.json is configured in Pulp.
-    """
-    image_name = image_entry.get("package")
-    image_tag = image_entry.get("tag", None)
-    image_digest = image_entry.get("digest", None)
->>>>>>> .theirs
 
     Validates the value against a strict allowlist of characters that are safe
     for shell interpolation, then applies shlex.quote for safe shell escaping.
