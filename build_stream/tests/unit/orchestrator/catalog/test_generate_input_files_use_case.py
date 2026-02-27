@@ -383,3 +383,118 @@ class TestHappyPath:
         event_types = [e.event_type for e in events]
         assert "STAGE_STARTED" in event_types
         assert "STAGE_COMPLETED" in event_types
+
+
+class TestIdempotency:
+    """Tests for idempotent behavior when artifacts already exist."""
+
+    def test_idempotent_artifact_storage_returns_existing_artifact(
+        self, job_repo, stage_repo, audit_repo,
+        artifact_store, artifact_metadata_repo, uuid_generator,
+        in_progress_job, completed_parse_catalog_stage,
+        generate_input_files_stage, tmp_path,
+    ) -> None:
+        """When artifact already exists, return existing record instead of failing."""
+        job_repo.save(in_progress_job)
+        stage_repo.save(completed_parse_catalog_stage)
+        stage_repo.save(generate_input_files_stage)
+        _seed_upstream_artifacts(
+            artifact_store, artifact_metadata_repo, uuid_generator
+        )
+
+        # Pre-create the output artifact that would normally be created
+        # This simulates a previous run that stored artifacts but may have failed later
+        hint = StoreHint(
+            namespace="input-files",
+            label="omnia-configs",
+            tags={"job_id": VALID_JOB_ID},
+        )
+        existing_ref = artifact_store.store(
+            hint=hint,
+            kind=ArtifactKind.ARCHIVE,
+            file_map={"test.json": b'{"test": "data"}'},
+            content_type="application/zip",
+        )
+        existing_record = ArtifactRecord(
+            id=str(uuid_generator.generate()),
+            job_id=JobId(VALID_JOB_ID),
+            stage_name=StageName(StageType.GENERATE_INPUT_FILES.value),
+            label="omnia-configs",
+            artifact_ref=existing_ref,
+            kind=ArtifactKind.ARCHIVE,
+            content_type="application/zip",
+            tags={"job_id": VALID_JOB_ID},
+        )
+        artifact_metadata_repo.save(existing_record)
+
+        # Mock config generation
+        def mock_generate(input_dir, output_dir, policy_path, schema_path, **kwargs):
+            arch_dir = os.path.join(output_dir, "x86_64", "rhel", "9.5")
+            os.makedirs(arch_dir, exist_ok=True)
+            with open(os.path.join(arch_dir, "config.json"), "w") as f:
+                json.dump({"config": "new"}, f)
+
+        policy_file = tmp_path / "policy.json"
+        policy_file.write_text(json.dumps({"targets": {}}))
+        schema_file = tmp_path / "schema.json"
+        schema_file.write_text(json.dumps({}))
+
+        uc = _build_use_case(
+            job_repo, stage_repo, audit_repo,
+            artifact_store, artifact_metadata_repo, uuid_generator,
+            default_policy_path=SafePath(policy_file),
+            policy_schema_path=SafePath(schema_file),
+        )
+
+        with patch(
+            "orchestrator.catalog.use_cases.generate_input_files"
+            ".generate_configs_from_policy",
+            side_effect=mock_generate,
+        ):
+            result = uc.execute(_make_command())
+
+        # Should succeed and return the existing artifact
+        assert result.stage_state == "COMPLETED"
+        assert result.configs_ref.key == existing_ref.key
+
+        # Stage should be COMPLETED
+        stage = stage_repo.find_by_job_and_name(
+            JobId(VALID_JOB_ID), StageName(StageType.GENERATE_INPUT_FILES.value)
+        )
+        assert stage.stage_state == StageState.COMPLETED
+
+        # Should still have only one artifact record (the existing one)
+        record = artifact_metadata_repo.find_by_job_stage_and_label(
+            job_id=JobId(VALID_JOB_ID),
+            stage_name=StageName(StageType.GENERATE_INPUT_FILES.value),
+            label="omnia-configs",
+        )
+        assert record is not None
+        assert record.id == existing_record.id
+
+    def test_stage_already_completed_prevents_rerun(
+        self, job_repo, stage_repo, audit_repo,
+        artifact_store, artifact_metadata_repo, uuid_generator,
+        in_progress_job, completed_parse_catalog_stage,
+        generate_input_files_stage,
+    ) -> None:
+        """Stage guard should prevent execution if stage already COMPLETED."""
+        # Complete the generate-input-files stage
+        generate_input_files_stage.start()
+        generate_input_files_stage.complete()
+        
+        job_repo.save(in_progress_job)
+        stage_repo.save(completed_parse_catalog_stage)
+        stage_repo.save(generate_input_files_stage)
+
+        uc = _build_use_case(
+            job_repo, stage_repo, audit_repo,
+            artifact_store, artifact_metadata_repo, uuid_generator,
+        )
+
+        # Should raise StageAlreadyCompletedError
+        with pytest.raises(StageAlreadyCompletedError) as exc_info:
+            uc.execute(_make_command())
+        
+        assert "generate-input-files" in str(exc_info.value)
+        assert VALID_JOB_ID in str(exc_info.value)
