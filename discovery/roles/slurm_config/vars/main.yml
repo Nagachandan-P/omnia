@@ -127,7 +127,7 @@ dbd_slurm_conf:
   AccountingStorageType: accounting_storage/slurmdbd
 partition_params:
   PartitionName: "{{ slurm_partition_name }}"
-  Nodes: "{{ cmpt_list | join(',') if cmpt_list else 'ALL' }}"
+  Nodes: "{{ cmpt_list | join(',') if cmpt_list else slurm_partition_name }}"
   MaxTime: "INFINITE"
   State: "UP"
   Default: "YES"
