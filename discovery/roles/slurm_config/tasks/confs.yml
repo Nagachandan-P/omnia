@@ -146,6 +146,66 @@
     - normal_partition is defined
     - normal_partition | length > 0
 
+- name: Detect busy nodes
+  ansible.builtin.include_tasks: detect_busy_nodes.yml
+  loop: "{{ nodes_in_normal_not_in_cmpt }}"
+  loop_control:
+    loop_var: node_to_remove
+  when:
+    - not force_scancel_node
+    - "'slurm' in conf_merge_dict"
+    - nodes_in_normal_not_in_cmpt is defined
+    - nodes_in_normal_not_in_cmpt | length > 0
+
+- name: Prompt for user input when jobs are running
+  ansible.builtin.pause:
+    prompt: |
+      ================================================================================
+      WARNING: ACTIVE JOBS DETECTED ON THE FOLLOWING NODES
+      ================================================================================
+
+      Busy Nodes:
+      {% for node, jobs in busy_nodes.items() %}
+        - {{ node }}: {{ jobs }} running job(s)
+      {% endfor %}
+
+      These nodes has active running jobs.
+      All other nodes without jobs will be removed.
+
+      To view job details, run:
+      {% for node in busy_nodes.keys() %}
+        squeue -w {{ node }}
+      {% endfor %}
+
+      Available Options:
+        A. ABORT (Recommended)
+            - Remove the IDLE nodes from the cluster and abort this playbook
+            - Manually cancel jobs or wait for them to complete
+            - Then re-run this playbook to remove these nodes
+
+        F. FORCE REMOVAL (Destructive)
+            - All running jobs will be forcefully terminated
+            - Users will lose any unsaved work
+
+      ================================================================================
+      Enter 'A' to abort, or 'F' to force remove:
+  register: user_input
+  until: user_input.user_input | default('') | trim | upper in ['A', 'F']
+  retries: 10
+  delay: 1
+  when:
+    - busy_nodes is defined
+    - busy_nodes | length > 0
+    - not force_scancel_node
+
+- name: Remove busy_nodes from nodes_in_normal_not_in_cmpt
+  ansible.builtin.set_fact:
+    nodes_in_normal_not_in_cmpt: "{{ nodes_in_normal_not_in_cmpt | difference(busy_nodes.keys() | list) }}"
+  when:
+    - busy_nodes is defined
+    - busy_nodes | length > 0
+    - user_input.user_input | default('') | trim | upper == 'A'
+
 - name: Remove nodes
   ansible.builtin.include_tasks: remove_node.yml
   when:
@@ -196,61 +256,7 @@
     loop_var: extra_conf
 
 - name: Backup Slurm configuration files when changed
-  when:
-    - ctld_conf_files is changed
-    - ctld_list is defined
-    - ctld_list | length > 0
-  block:
-    - name: Set backup timestamp
-      ansible.builtin.set_fact:
-        backup_timestamp: "{{ ansible_date_time.date }}_{{ ansible_date_time.time | replace(':', '-') }}"
-        backup_base_name: "auto_backup_discovery"
-
-    - name: Set backup name suffix
-      ansible.builtin.set_fact:
-        backup_name_suffix: "{{ backup_base_name ~ '_' ~ backup_timestamp }}"
-
-    - name: Set backup directories
-      ansible.builtin.set_fact:
-        slurm_backups_root: "{{ share_path }}/slurm_backups"
-        backup_dir: "{{ share_path }}/slurm_backups/{{ backup_base_name ~ '_' ~ backup_timestamp }}"
-
-    - name: Ensure slurm backups root exists
-      ansible.builtin.file:
-        path: "{{ slurm_backups_root }}"
-        state: directory
-        mode: '0755'
-
-    - name: Create backup directory
-      ansible.builtin.file:
-        path: "{{ backup_dir }}"
-        state: directory
-        mode: '0755'
-
-    - name: Create backup config directories
-      ansible.builtin.file:
-        path: "{{ backup_dir }}/{{ ctld_list[0] }}/{{ item }}"
-        state: directory
-        mode: '0755'
-      loop:
-        - etc/slurm
-        - etc/munge
-        - etc/my.cnf.d
-
-    - name: Backup controller config directories
-      ansible.builtin.command: >-
-        cp -a "{{ slurm_config_path }}/{{ ctld_list[0] }}/{{ item }}/." "{{ backup_dir }}/{{ ctld_list[0] }}/{{ item }}/"
-      loop:
-        - etc/slurm
-        - etc/munge
-        - etc/my.cnf.d
-      changed_when: true
-      failed_when: false
-
-    - name: Display backup location
-      ansible.builtin.debug:
-        msg: "Slurm config backup created at: {{ backup_dir }}/{{ ctld_list[0] }}"
-
+  ansible.builtin.include_tasks: backup_conf.yml
 
 - name: Check if cluster running
   ansible.builtin.include_tasks: check_ctld_running.yml
@@ -260,3 +266,31 @@
   loop: "{{ ctld_list }}"
   loop_control:
     loop_var: ctld
+
+- name: Handle user choice - ABORT
+  ansible.builtin.fail:
+    msg: |
+      ================================================================================
+      PLAYBOOK ABORTED BY USER
+      ================================================================================
+
+      You chose to abort the playbook (Option A).
+
+      Next Steps:
+        1. Cancel running jobs manually:
+      {% for node in busy_nodes.keys() %}
+           scancel -w {{ node }}
+      {% endfor %}
+
+        2. Or wait for jobs to complete naturally
+
+        3. Re-run this playbook to remove the nodes
+
+      Idle nodes (if any) have already been removed from the cluster.
+
+      ================================================================================
+  when:
+    - busy_nodes is defined
+    - busy_nodes | length > 0
+    - not force_scancel_node
+    - user_input.user_input | default('') | trim | upper in ['A']

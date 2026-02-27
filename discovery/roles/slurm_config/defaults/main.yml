@@ -61,6 +61,9 @@ __default_config:
     SlurmdTimeout: 300
     Epilog: "/etc/slurm/epilog.d/logout_user.sh"
     PluginDir: "{{ plugin_slurm_dir }}"
+    NodeSet:
+      - NodeSet: "{{ slurm_partition_name }}"
+        Feature: "{{ slurm_partition_name }}"
     NodeName:
       - NodeName: DEFAULT
         State: UNKNOWN

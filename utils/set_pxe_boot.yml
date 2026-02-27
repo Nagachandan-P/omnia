@@ -26,6 +26,17 @@
 #    boot image must be reachable by the target nodes once the iDRAC
 #    is set to PXE mode.
 # -------------------------------------------------------------------------
+- name: Validate BMC group exists in inventory
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Check if bmc group exists in inventory
+      ansible.builtin.fail:
+        msg: "Failed. 'bmc' group not found in inventory or has no hosts.
+         Please ensure the inventory file contains a 'bmc' group with at least one BMC IP address."
+      when: groups['bmc'] is not defined or groups['bmc'] | length | int == 0
+
 - name: Set_fact for fetch omnia config credentials
   hosts: localhost
   connection: local
@@ -47,11 +58,6 @@
   hosts: bmc
   connection: local
   gather_facts: false
-  pre_tasks:
-    - name: Validate bmc group
-      ansible.builtin.assert:
-        that: groups['bmc'] | length | int >= 1
-        fail_msg: "Failed. bmc group in inventory must have atleast one bmc ip."
   roles:
     - role: idrac_pxe_boot
       # vars:
