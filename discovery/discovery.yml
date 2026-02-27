@@ -99,7 +99,7 @@
         name: discovery_validations
         tasks_from: validate_openldap_container.yml
       when: hostvars['localhost']['openldap_support']
-    
+
     - name: Image validation
       ansible.builtin.include_role:
         name: discovery_validations
