@@ -38,11 +38,6 @@ class CreateBuildImageRequest(BaseModel):
         min_items=1,
         max_items=50,
     )
-    inventory_host: Optional[str] = Field(
-        None,
-        description="Inventory host IP for aarch64 builds (optional for x86_64)",
-        max_length=253,
-    )
 
 
 class CreateBuildImageResponse(BaseModel):
