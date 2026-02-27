@@ -1,0 +1,67 @@
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+ 
+# ============================================================================
+# GitLab Configuration for Omnia Build Stream
+# ============================================================================
+# This file contains all user inputs required for GitLab deployment and
+# integration with Omnia Infrastructure Manager (OIM).
+# ============================================================================
+ 
+# ----------------------------------------------------------------------------
+# USER INPUT VARIABLES (SET THESE FIRST)
+# ----------------------------------------------------------------------------
+# Set these values before running the GitLab build stream playbook.
+ 
+# Required: Set the target host in build_stream/gitlab/inventory/hosts.ini
+# Example entry: 172.168.0.5
+ 
+# Target host for GitLab deployment/cleanup
+gitlab_host: ""
+ 
+# Project settings
+# Name of the GitLab project Omnia will create/manage
+gitlab_project_name: "omnia-catalog"
+# Visibility options: private | internal | public
+gitlab_project_visibility: "private"
+# Default branch used for repository and API operations
+gitlab_default_branch: "main"
+ 
+# HTTPS is always enabled for GitLab deployment
+ 
+# ----------------------------------------------------------------------------
+# DEFAULT / ADVANCED VARIABLES (CHANGE ONLY IF NEEDED)
+# ----------------------------------------------------------------------------
+# These defaults are suitable for most setups and can be tuned as required.
+ 
+# Network
+# HTTPS port exposed via GitLab NGINX
+gitlab_https_port: 443
+# Minimum requirements
+# Free disk space validated before install
+gitlab_min_storage_gb: 20
+# Adjust upward for production workloads
+gitlab_min_memory_gb: 4
+# Minimum CPU core count validated before install
+gitlab_min_cpu_cores: 2
+ 
+# Performance tuning
+# Disable bundled monitoring to save resources
+gitlab_disable_prometheus: true
+# Disable Grafana if not needed
+gitlab_disable_grafana: true
+# Web worker count; scale with CPU
+gitlab_puma_workers: 2
+# Background job concurrency
+gitlab_sidekiq_concurrency: 10
