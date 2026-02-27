@@ -120,10 +120,10 @@ pulp_python_commands = {
 }
 
 CLI_FILE_PATH = "/root/.config/pulp/cli.toml"
-POST_TIMEOUT = 3600  # seconds
-TAR_POLL_VAL = 45    # minutes
-FILE_POLL_VAL = 1    # minutes
-ISO_POLL_VAL = 45    # minutes
+TAR_TIMEOUT_MIN = 45    # minutes
+FILE_TIMEOUT_MIN = 1    # minutes
+ISO_TIMEOUT_MIN = 45    # minutes
+TASK_POLL_INTERVAL = 10  # seconds
 FILE_URI = "/pulp/api/v3/content/file/files/"
 PULP_SSL_CA_CERT = "/etc/pki/ca-trust/source/anchors/pulp_webserver.crt"
 # ----------------------------
@@ -160,7 +160,7 @@ pulp_container_commands = {
     "get_repo_version": "pulp container repository show --href %s",
     "list_tags_by_version": "pulp show --href /pulp/api/v3/content/container/tags/?repository_version=%s",
     "rename_repository": "pulp container repository update --name %s --new-name %s",
-    "orphan_cleanup": "pulp orphan cleanup",
+    "orphan_cleanup": "pulp orphan cleanup --protection-time 0",
     "container_distribution_show": "pulp container distribution show --name %s | jq .repository",
     "show_repository_version": "pulp container repository show --href %s | jq .latest_version_href",
     "list_image_tags": "pulp show --href /pulp/api/v3/content/container/tags/?repository_version=%s"
