@@ -48,7 +48,7 @@
 
     - name: Populate busy_nodes list
       ansible.builtin.set_fact:
-        busy_nodes: "{{ (busy_nodes | default({})).combine({node_to_remove: current_jobs.stdout | int}) }}"
+        busy_nodes: "{{ (busy_nodes | default({})) | combine({node_to_remove: current_jobs.stdout | int}) }}"
       when:
         - current_jobs.stdout | int > 0
 
