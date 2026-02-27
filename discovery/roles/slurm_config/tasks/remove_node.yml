@@ -50,7 +50,9 @@
 - name: Update normal partition Nodes to match cmpt_list
   ansible.builtin.set_fact:
     updated_partitions: "{{ updated_partitions | default([])
-     + [item | combine({'Nodes': ((cmpt_list | difference(nodes_in_normal_not_in_cmpt)) | join(',')) if cmpt_list | length > 0 else slurm_partition_name}) if item.PartitionName == slurm_partition_name else item] }}"
+      + [item | combine({'Nodes': ((cmpt_list | difference(nodes_in_normal_not_in_cmpt)) | join(','))
+      if (cmpt_list | difference(nodes_in_normal_not_in_cmpt)) | length > 0 else slurm_partition_name})
+      if item.PartitionName == slurm_partition_name else item] }}"
   loop: "{{ slurm_conf_dict.PartitionName | default([]) }}"
   when:
     - "'slurm' in conf_merge_dict"
