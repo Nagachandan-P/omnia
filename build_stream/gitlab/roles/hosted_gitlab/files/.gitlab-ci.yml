@@ -792,12 +792,14 @@ job-summary:
       echo "  ├─────────────────────────────────────────────────────────┤"
       echo "  │  Stage Results:                                        │"
 
-      jq -r '.stages[]? | "  │    \(.stage_name): \(.stage_state)\(if .error_code then "  [\(.error_code)]" else "" end)"' final_status.json 2>/dev/null || echo "  │    (no stage data)"
+      jq -r '.stages[]? | "  │    \(.stage_name): \(.stage_state)\(if .error_code then "  [\(.error_code)]" else "" end)"' \
+        final_status.json 2>/dev/null || echo "  │    (no stage data)"
 
       echo "  ├─────────────────────────────────────────────────────────┤"
 
       # Print errors if any
-      ERRORS=$(jq -r '.stages[]? | select(.stage_state == "FAILED") | "  │    ✗ \(.stage_name): \(.error_summary // "no details")"' final_status.json 2>/dev/null)
+      ERRORS=$(jq -r '.stages[]? | select(.stage_state == "FAILED") | \
+        "  │    ✗ \(.stage_name): \(.error_summary // "no details")"' final_status.json 2>/dev/null)
       if [ -n "${ERRORS}" ]; then
         echo "  │  Errors:                                               │"
         echo "${ERRORS}"
