@@ -24,6 +24,121 @@
     - skip_merge | default(false)
     - configs_input is defined
 
+- name: Initialize node_params collection
+  ansible.builtin.set_fact:
+    node_params: []
+
+- name: Set discovery mode and get groups with specs
+  ansible.builtin.set_fact:
+    discovery_mode: "{{ (slurm_cluster[0].node_discovery_mode | default('heterogeneous')) | lower }}"
+    groups_with_specs: "{{ slurm_cluster[0].node_hardware_defaults | default({}) | list }}"
+
+- name: DEBUG - Show discovery configuration
+  ansible.builtin.debug:
+    msg:
+      - "Discovery Mode: {{ discovery_mode }}"
+      - "Groups with specs: {{ groups_with_specs }}"
+      - "Total compute nodes: {{ cmpt_list | length }}"
+      - "Node-to-hardware-group mapping: {{ name_hardware_group_map }}"
+
+- name: Categorize nodes for processing (homogeneous mode)
+  ansible.builtin.set_fact:
+    homogeneous_nodes: []
+    sample_idrac_groups: {}
+  when: discovery_mode == 'homogeneous'
+
+- name: DEBUG - Show node group checking details
+  ansible.builtin.debug:
+    msg:
+      - "Node: {{ item }}"
+      - "Hardware Group: {{ name_hardware_group_map.get(item, 'NOT_FOUND') }}"
+      - "Groups with specs: {{ groups_with_specs }}"
+      - "Is in specs: {{ name_hardware_group_map.get(item, '') in groups_with_specs }}"
+  loop: "{{ cmpt_list }}"
+  when:
+    - discovery_mode == 'homogeneous'
+    - name_hardware_group_map | length > 0
+
+- name: Build homogeneous nodes list (groups with specs)
+  ansible.builtin.set_fact:
+    homogeneous_nodes: >-
+      {{
+        homogeneous_nodes + [item]
+        if (name_hardware_group_map.get(item, '') in groups_with_specs)
+        else homogeneous_nodes
+      }}
+  loop: "{{ cmpt_list }}"
+  when:
+    - discovery_mode == 'homogeneous'
+    - name_hardware_group_map | length > 0
+
+- name: DEBUG - Show homogeneous nodes categorization
+  ansible.builtin.debug:
+    msg:
+      - "Homogeneous nodes (with user specs): {{ homogeneous_nodes | default([]) }}"
+      - "Nodes count: {{ homogeneous_nodes | default([]) | length }}"
+      - "Will process homogeneous task: {{ (discovery_mode == 'homogeneous' and homogeneous_nodes | length > 0) }}"
+  when: discovery_mode == 'homogeneous'
+
+- name: DEBUG - About to process homogeneous nodes
+  ansible.builtin.debug:
+    msg: "Processing {{ homogeneous_nodes | length }} nodes with user specs: {{ homogeneous_nodes }}"
+  when:
+    - discovery_mode == 'homogeneous'
+    - homogeneous_nodes | length > 0
+
+- name: Process homogeneous groups with user specs (no iDRAC)
+  ansible.builtin.include_tasks: read_node_homogeneous.yml
+  loop: "{{ homogeneous_nodes }}"
+  loop_control:
+    loop_var: item
+  when:
+    - discovery_mode == 'homogeneous'
+    - homogeneous_nodes | length > 0
+
+- name: Build sample iDRAC groups mapping (groups without specs)
+  ansible.builtin.set_fact:
+    sample_idrac_groups: >-
+      {{
+        sample_idrac_groups | default({}) |
+        combine({
+          name_hardware_group_map.get(item, ''): sample_idrac_groups.get(name_hardware_group_map.get(item, ''), []) + [item]
+        })
+      }}
+  loop: "{{ cmpt_list }}"
+  when:
+    - discovery_mode == 'homogeneous'
+    - name_hardware_group_map | length > 0
+    - name_hardware_group_map.get(item, '') not in groups_with_specs
+
+- name: Process homogeneous groups with user specs (no iDRAC)
+  ansible.builtin.include_tasks: read_node_homogeneous.yml
+  loop: "{{ homogeneous_nodes }}"
+  when:
+    - discovery_mode == 'homogeneous'
+    - homogeneous_nodes | length > 0
+
+- name: Process homogeneous groups without specs (group iDRAC)
+  ansible.builtin.include_tasks: read_node_idrac_group.yml
+  loop: "{{ sample_idrac_groups | dict2items }}"
+  loop_control:
+    loop_var: group_item
+  when:
+    - discovery_mode == 'homogeneous'
+    - sample_idrac_groups | default({}) | length > 0
+
+- name: Process heterogeneous nodes (individual iDRAC)
+  ansible.builtin.include_tasks: read_node_idrac.yml
+  loop: "{{ cmpt_list }}"
+  when:
+    - discovery_mode == 'heterogeneous'
+
+- name: DEBUG - Show final node_params before building slurm.conf
+  ansible.builtin.debug:
+    msg:
+      - "Total node_params entries: {{ node_params | length }}"
+      - "node_params: {{ node_params }}"
+
 - name: Build slurm.conf
   ansible.builtin.include_tasks: build_slurm_conf.yml
   when: "'slurm' in conf_files"
@@ -83,8 +198,8 @@
         conf_merge_dict | default({})
         | combine({
             existing_conf_set.item.1: (
-              [apply_config[existing_conf_set.item.1]]
-              + ([existing_conf_set.stat.path] if existing_conf_set.stat.exists else [])
+              ([existing_conf_set.stat.path] if existing_conf_set.stat.exists else [])
+              + [apply_config[existing_conf_set.item.1]]
               + ([parsed_configs_input.get(existing_conf_set.item.1)]
                if parsed_configs_input is defined and parsed_configs_input.get(existing_conf_set.item.1) else [])
             )
