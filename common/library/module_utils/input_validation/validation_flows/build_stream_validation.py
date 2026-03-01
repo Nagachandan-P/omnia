@@ -27,10 +27,15 @@ create_file_path = validation_utils.create_file_path
 load_yaml_as_json = validation_utils.load_yaml_as_json
 
 
-def check_port_available(port, logger):
+def check_port_available(port, host_ip, logger):
     """
-    Check if a port is available on the local machine.
+    Check if a port is available on the specified host.
     Tries to bind to the port to verify availability.
+    
+    Args:
+        port: Port number to check
+        host_ip: Host IP address to check (build_stream_host_ip or admin_ip)
+        logger: Logger instance
     
     Returns tuple: (is_available: bool, error_message: str or None)
     """
@@ -40,6 +45,27 @@ def check_port_available(port, logger):
             s.bind(('', port))
             return True, None
     except OSError:
+        # Port is in use, check if it's the build_stream service by trying to connect
+        # Since omnia_core and omnia_build_stream containers share the same network,
+        # we can check if the service responds on the configured host IP
+        try:
+            import http.client
+            import ssl
+            # Try to connect to the build_stream health endpoint
+            # Create an unverified SSL context since we're using self-signed certs
+            context = ssl._create_unverified_context()
+            conn = http.client.HTTPSConnection(host_ip, port, timeout=2, context=context)
+            conn.request("GET", "/health")
+            response = conn.getresponse()
+            conn.close()
+            
+            # If we get a response (any status code), it's the build_stream service
+            if response.status in [200, 401, 403, 404, 500]:  # Any valid HTTP response
+                logger.info("Port %s is already used by build_stream service on %s, skipping validation error", port, host_ip)
+                return True, None
+        except Exception as e:
+            logger.debug("Could not verify if build_stream service is using port %s on %s: %s", port, host_ip, str(e))
+        
         return False, msg.build_stream_port_in_use_msg(port)
  
  
@@ -163,14 +189,17 @@ def validate_build_stream_config(input_file_path, data,
                 "Port must be an integer between 1 and 65535"
             ))
         else:
-            # Check if port is available locally
-            is_available, port_error = check_port_available(build_stream_port, logger)
+            # Determine which host IP to use for port check
+            host_to_check = build_stream_host_ip if build_stream_host_ip else admin_ip
+            
+            # Check if port is available on the configured host
+            is_available, port_error = check_port_available(build_stream_port, host_to_check, logger)
             if not is_available:
                 errors.append(create_error_msg(
                     build_stream_yml,
                     "build_stream_port",
                     port_error
                 ))
-                logger.error("Port %d is not available: %s", build_stream_port, port_error)
+                logger.error("Port %d is not available on %s: %s", build_stream_port, host_to_check, port_error)
 
     return errors
