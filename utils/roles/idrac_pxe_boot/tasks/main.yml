@@ -19,11 +19,14 @@
     idrac_password: "{{ bmc_password | default(hostvars['localhost']['bmc_password']) }}"
     validate_certs: false
   register: lc_check_status
-  ignore_errors: true
-
-- name: Set reboot type
-  ansible.builtin.set_fact:
-    reboot_type: "{{ 'ForceRestart' if force_restart else 'GracefulRestart' }}"
+  until:
+    - lc_check_status.lc_status_info.LCReady is defined
+    - lc_check_status.lc_status_info.LCReady
+  retries: 3
+  delay: 5
+  # ignore_errors: true
+  # free startegy should be used to avoid blocking on failed hosts
+  # but issue will be summarizing/syncing summary report of all at the end
 
 - name: IDRAC ops when ready
   when:
@@ -50,7 +53,7 @@
         username: "{{ bmc_username | default(hostvars['localhost']['bmc_username']) }}"
         password: "{{ bmc_password | default(hostvars['localhost']['bmc_password']) }}"
         validate_certs: false
-        reset_type: ForceRestart
+        reset_type: "{{ 'ForceRestart' if force_restart else 'GracefulRestart' }}"
       when: restart_host
       register: restart_op
       failed_when: false
