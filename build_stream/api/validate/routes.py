@@ -81,7 +81,6 @@ def create_validate_image_on_test(
     job_id: str,
     token_data: dict = Depends(verify_token),
     use_case: ValidateImageOnTestUseCase = Depends(get_validate_image_on_test_use_case),
-    client_id: ClientId = Depends(get_validate_client_id),
     correlation_id: CorrelationId = Depends(get_validate_correlation_id),
     _: None = Depends(require_job_write),
 ) -> ValidateImageOnTestResponse:
@@ -90,6 +89,9 @@ def create_validate_image_on_test(
     Accepts the request synchronously and returns 202 Accepted.
     The playbook execution is handled by the NFS queue watcher service.
     """
+    # Extract client_id from token_data
+    client_id = get_validate_client_id(token_data)
+    
     logger.info(
         "Validate image on test request: job_id=%s, client_id=%s, correlation_id=%s",
         job_id,

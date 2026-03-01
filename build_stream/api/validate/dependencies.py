@@ -32,30 +32,19 @@ def get_validate_image_on_test_use_case():
     return _get_container().validate_image_on_test_use_case()
 
 
-def get_validate_client_id(
-    authorization: str = Header(..., description="Bearer token for authentication"),
-) -> ClientId:
-    """Extract ClientId from Bearer token header."""
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format",
-        )
-
-    token = authorization[7:].lstrip()
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing authentication token",
-        )
-
-    try:
-        return ClientId(token[:128] if len(token) > 128 else token)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid client credentials",
-        ) from exc
+def get_validate_client_id(token_data: dict) -> ClientId:
+    """Extract ClientId from verified token data.
+    
+    Note: token_data comes from verify_token dependency injected in the route.
+    This function is called after verify_token has already validated the JWT.
+    
+    Args:
+        token_data: Token data dict from verify_token dependency.
+        
+    Returns:
+        ClientId extracted from token.
+    """
+    return ClientId(token_data["client_id"])
 
 
 def get_validate_correlation_id(
