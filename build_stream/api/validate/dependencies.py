@@ -32,21 +32,6 @@ def get_validate_image_on_test_use_case():
     return _get_container().validate_image_on_test_use_case()
 
 
-def get_validate_client_id(token_data: dict) -> ClientId:
-    """Extract ClientId from verified token data.
-    
-    Note: token_data comes from verify_token dependency injected in the route.
-    This function is called after verify_token has already validated the JWT.
-    
-    Args:
-        token_data: Token data dict from verify_token dependency.
-        
-    Returns:
-        ClientId extracted from token.
-    """
-    return ClientId(token_data["client_id"])
-
-
 def get_validate_correlation_id(
     x_correlation_id: Optional[str] = Header(
         default=None,

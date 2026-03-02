@@ -21,7 +21,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.validate.dependencies import (
     get_validate_image_on_test_use_case,
-    get_validate_client_id,
     get_validate_correlation_id,
 )
 from api.dependencies import verify_token, require_job_write
@@ -90,7 +89,7 @@ def create_validate_image_on_test(
     The playbook execution is handled by the NFS queue watcher service.
     """
     # Extract client_id from token_data
-    client_id = get_validate_client_id(token_data)
+    client_id = token_data["client_id"]
     
     logger.info(
         "Validate image on test request: job_id=%s, client_id=%s, correlation_id=%s",
