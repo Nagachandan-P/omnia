@@ -465,8 +465,15 @@ def create_infra_package_entry(pkg_data):
     if pkg_data['tag']:
         entry["Tag"] = pkg_data['tag']
 
-    if pkg_data.get('url'):
-        entry["Url"] = pkg_data['url']
+    # For git type packages, create Sources array with Uri
+    if pkg_data['type'] == 'git' and pkg_data.get('url'):
+        sources = []
+        for arch in pkg_data['architectures']:
+            sources.append({
+                "Architecture": arch,
+                "Uri": pkg_data['url']
+            })
+        entry["Sources"] = sources
 
     return entry
 

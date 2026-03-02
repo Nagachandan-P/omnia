@@ -3988,7 +3988,12 @@
         "Architecture": [
           "x86_64"
         ],
-        "Url": "https://github.com/dell/csi-powerscale.git"
+        "Sources": [
+          {
+            "Architecture": "x86_64",
+            "Uri": "https://github.com/dell/csi-powerscale.git"
+          }
+        ]
       },
       "infrastructure_package_id_2": {
         "Name": "external-snapshotter",
@@ -4002,7 +4007,12 @@
         "Architecture": [
           "x86_64"
         ],
-        "Url": "https://github.com/kubernetes-csi/external-snapshotter.git"
+        "Sources": [
+          {
+            "Architecture": "x86_64",
+            "Uri": "https://github.com/kubernetes-csi/external-snapshotter.git"
+          }
+        ]
       },
       "infrastructure_package_id_3": {
         "Name": "helm-charts",
@@ -4016,7 +4026,12 @@
         "Architecture": [
           "x86_64"
         ],
-        "Url": "https://github.com/dell/helm-charts.git"
+        "Sources": [
+          {
+            "Architecture": "x86_64",
+            "Uri": "https://github.com/dell/helm-charts.git"
+          }
+        ]
       },
       "infrastructure_package_id_4": {
         "Name": "quay.io/dell/container-storage-modules/csi-isilon",
