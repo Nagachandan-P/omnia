@@ -18,7 +18,7 @@
   failed_when: false
   ignore_unreachable: true
   changed_when: false
-  delegate_to: "{{ ctld }}"
+  delegate_to: "{{ ctld_list[0] }}"
 
 - name: Skip if node does not exist
   ansible.builtin.debug:
@@ -40,79 +40,43 @@
           squeue -w {{ node_to_remove }} -h | wc -l
       register: current_jobs
       changed_when: false
-      delegate_to: "{{ ctld }}"
+      delegate_to: "{{ ctld_list[0] }}"
 
     - name: Display job information
       ansible.builtin.debug:
         msg: "Node {{ node_to_remove }} currently has {{ current_jobs.stdout }} running job(s)"
 
-    - name: Drain the node to prevent new job assignments
-      ansible.builtin.command: >
-        scontrol update NodeName={{ node_to_remove }}
-        State=DRAIN
-        Reason="Scheduled removal - waiting for jobs to complete"
+    - name: Force cancel jobs on the node to be removed from cluster
+      ansible.builtin.command: scancel -f -w {{ node_to_remove }} # Safe does not fail if no jobs are running
       changed_when: true
-      delegate_to: "{{ ctld }}"
+      register: scancel_result
+      failed_when: scancel_result.rc != 0
+      delegate_to: "{{ ctld_list[0] }}"
 
-    - name: Wait for all jobs to complete on the node
-      ansible.builtin.shell:
-        cmd: |
-          set -o pipefail
-          squeue -w {{ node_to_remove }} -h | wc -l
-      register: job_count_check
-      until: job_count_check.stdout | int == 0
-      retries: "{{ (node_drain_timeout / node_drain_delay) | int }}"
-      delay: "{{ node_drain_delay }}"
-      changed_when: false
-      delegate_to: "{{ ctld }}"
-      when: current_jobs.stdout | int > 0
-
-    - name: Confirm jobs completed
-      ansible.builtin.debug:
-        msg: "All jobs on {{ node_to_remove }} have completed"
-      when: current_jobs.stdout | int > 0
-
-    - name: Log node removal
-      ansible.builtin.debug:
-        msg: "Node {{ node_to_remove }} has been drained, jobs completed, and set to DOWN state"
-
-  rescue:
-    - name: Log node removal failure
-      ansible.builtin.debug:
-        msg: "Failed to drain node {{ node_to_remove }}"
-
-    - name: Remove slurm node with running job after timeout
-      ansible.builtin.pause:
-        prompt: |
-          Node {{ node_to_remove }} has been DRAINED to prevent new job assignments.
-          Jobs are still running on {{ node_to_remove }} after wait of {{ node_drain_timeout }} seconds.
-          Options:
-            1. Press Ctrl+C then 'A' to abort
-            2. Press Enter to force removal (jobs will be killed)
-      when:
-        - not force_scancel_node
-        - not (enable_build_stream | default(false) | bool)
-
-    - name: Auto-force removal when build stream is enabled
-      ansible.builtin.debug:
-        msg: "{{ build_stream_auto_force_node_msg }}"
-      when:
-        - not force_scancel_node
-        - enable_build_stream | default(false) | bool
-
-    - name: Force cancel jobs if timeout reached
-      ansible.builtin.command: scancel -f -w {{ node_to_remove }}
-      changed_when: true
-      failed_when: false
-      delegate_to: "{{ ctld }}"
-
-  always:
     - name: Set node to DOWN state
       ansible.builtin.command: >
         scontrol update NodeName={{ node_to_remove }}
         State=DOWN
-        Reason="Node removed from cluster"
+        Reason="Node removed from cluster via OMNIA discovery.yml"
       changed_when: true
       failed_when: false
-      delegate_to: "{{ ctld }}"
+      delegate_to: "{{ ctld_list[0] }}"
       when: node_exists_check.rc == 0
+
+    - name: Stop the slurmd service on node
+      ansible.builtin.service:
+        name: slurmd
+        state: stopped
+      delegate_to: "{{ node_to_remove }}"
+      ignore_unreachable: true
+      failed_when: false
+
+    - name: Delete the dir from NFS
+      ansible.builtin.file:
+        path: "{{ slurm_config_path }}/{{ node_to_remove }}"
+        state: absent
+  rescue:
+    - name: Failure to remove node
+      ansible.builtin.fail:
+        msg: "Node {{ node_to_remove }} failed to be removed from slurm cluster,
+          as task {{ ansible_failed_task.name }} failed."
