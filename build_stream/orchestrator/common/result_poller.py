@@ -175,6 +175,13 @@ class ResultPoller:
                 },
             )
             self._audit_repo.save(event)
+            
+            # Commit both repositories if using SQL
+            # Note: Each repository may have its own session, so commit both
+            if hasattr(self._stage_repo, 'session'):
+                self._stage_repo.session.commit()
+            if hasattr(self._audit_repo, 'session'):
+                    self._audit_repo.session.commit()
 
             log_secure_info(
                 "info",
