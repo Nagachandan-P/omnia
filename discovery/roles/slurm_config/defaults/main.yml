@@ -27,6 +27,9 @@ share_prefix: "/"
 conf_path_items: {}
 conf_dict_items: {}
 
+# Default memory percentage for real memory calculation
+memory_percentage: 90
+
 __default_config:
   cgroup:
     # CgroupAutomount: true

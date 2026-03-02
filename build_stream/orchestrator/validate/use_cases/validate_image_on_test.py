@@ -187,8 +187,12 @@ class ValidateImageOnTestUseCase:
         """Create ValidateImageOnTestRequest entity."""
         playbook_path = PlaybookPath(DISCOVERY_PLAYBOOK_NAME)
 
+        # Get image_key from the API request
+        image_key = command.image_key
+
         extra_vars_dict = {
             "job_id": str(command.job_id),
+            "image_key": image_key,
         }
         extra_vars = ExtraVars(extra_vars_dict)
 
