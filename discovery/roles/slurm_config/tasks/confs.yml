@@ -321,6 +321,14 @@
     - busy_nodes | length > 0
     - user_input.user_input | default('') | trim | upper == 'A'
 
+- name: Empty Busy nodes for Force removal
+  ansible.builtin.set_fact:
+    busy_nodes: {}
+  when:
+    - busy_nodes is defined
+    - busy_nodes | length > 0
+    - user_input.user_input | default('') | trim | upper == 'F'
+
 - name: Remove nodes
   ansible.builtin.include_tasks: remove_node.yml
   when:
