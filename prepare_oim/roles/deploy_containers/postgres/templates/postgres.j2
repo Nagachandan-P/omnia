@@ -33,8 +33,8 @@ Environment=POSTGRES_PASSWORD={{ postgres_password }}
 Environment=POSTGRES_DB={{ postgres_db_name }}
 
 # Volume mounts
-Volume={{ postgres_data_dir }}:/var/lib/postgresql/data:ro,z
-Volume={{ postgres_log_dir }}:/var/log/postgresql:ro,z
+Volume={{ postgres_data_dir }}:/var/lib/postgresql/data:z
+Volume={{ postgres_log_dir }}:/var/log/postgresql:z
 
 [Service]
 Restart=always

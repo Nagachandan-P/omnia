@@ -56,8 +56,8 @@ Environment=JWT_PUBLIC_KEY_PATH="/opt/omnia/build_stream/api/.auth/keys/jwt_publ
 Environment=BUILD_STREAM_CONFIG_PATH="/opt/omnia/build_stream/build_stream.ini"
 
 # Volume mounts
-Volume={{ omnia_path }}/omnia:/opt/omnia:ro,z
-Volume={{ build_stream_log_dir }}:/var/log/omnia_build_stream:ro,z
+Volume={{ omnia_path }}/omnia:/opt/omnia:z
+Volume={{ build_stream_log_dir }}:/var/log/omnia_build_stream:z
 Volume={{ build_stream_ssl_dir }}:/etc/ssl/omnia:ro,z
 Volume={{ build_stream_pulp_cert_host_dir }}:{{ build_stream_pulp_cert_container_path }}:ro,z
 
