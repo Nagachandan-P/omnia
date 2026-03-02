@@ -124,89 +124,67 @@ class ResultPoller:
         Args:
             result: Playbook execution result from NFS queue.
         """
-        # Import here to avoid circular imports
-        from infra.db.session import get_db_session
-        from infra.db.repositories import SqlStageRepository, SqlAuditEventRepository
-
         try:
-            # Use a fresh session for this operation to ensure proper transaction management
-            with get_db_session() as session:
-                # Create repositories with the same session
-                stage_repo = SqlStageRepository(session=session)
-                audit_repo = SqlAuditEventRepository(session=session)
+            # Find stage
+            stage_name = StageName(result.stage_name)
+            stage = self._stage_repo.find_by_job_and_name(result.job_id, stage_name)
 
-                # Find stage
-                stage_name = StageName(result.stage_name)
-                stage = stage_repo.find_by_job_and_name(result.job_id, stage_name)
-
-                if stage is None:
-                    logger.error(
-                        "Stage not found for result: job_id=%s, stage=%s",
-                        result.job_id,
-                        result.stage_name,
-                    )
-                    return
-
-                # Skip if stage is already in terminal state
-                if stage.stage_state.is_terminal():
-                    logger.info(
-                        "Stage already in terminal state, skipping update: job_id=%s, stage=%s, state=%s",
-                        result.job_id,
-                        result.stage_name,
-                        stage.stage_state.value,
-                    )
-                    return
-
-                # Update stage based on result
-                if result.status == "success":
-                    stage.complete()
-                    logger.info(
-                        "Stage completed successfully: job_id=%s, stage=%s",
-                        result.job_id,
-                        result.stage_name,
-                    )
-                else:
-                    error_code = result.error_code or "PLAYBOOK_FAILED"
-                    error_summary = result.error_summary or "Playbook execution failed"
-                    stage.fail(error_code=error_code, error_summary=error_summary)
-                    logger.warning(
-                        "Stage failed: job_id=%s, stage=%s, error=%s",
-                        result.job_id,
-                        result.stage_name,
-                        error_code,
-                    )
-
-                # Save updated stage
-                stage_repo.save(stage)
-
-                # Emit audit event
-                event = AuditEvent(
-                    event_id=str(self._uuid_generator.generate()),
-                    job_id=result.job_id,
-                    event_type="STAGE_COMPLETED" if result.status == "success" else "STAGE_FAILED",
-                    correlation_id=result.request_id,
-                    client_id=result.job_id,  # Using job_id as client_id placeholder
-                    timestamp=datetime.now(timezone.utc),
-                    details={
-                        "stage_name": result.stage_name,
-                        "status": result.status,
-                        "duration_seconds": result.duration_seconds,
-                        "exit_code": result.exit_code,
-                    },
-                )
-                audit_repo.save(event)
-
-                logger.info(
-                    "Result processed for job %s, stage %s: %s",
+            if stage is None:
+                logger.error(
+                    "Stage not found for result: job_id=%s, stage=%s",
                     result.job_id,
                     result.stage_name,
-                    result.request_id[:8] + "...",
                 )
+                return
+
+            # Update stage based on result
+            if result.status == "success":
+                stage.complete()
+                logger.info(
+                    "Stage completed successfully: job_id=%s, stage=%s",
+                    result.job_id,
+                    result.stage_name,
+                )
+            else:
+                error_code = result.error_code or "PLAYBOOK_FAILED"
+                error_summary = result.error_summary or "Playbook execution failed"
+                stage.fail(error_code=error_code, error_summary=error_summary)
+                logger.warning(
+                    "Stage failed: job_id=%s, stage=%s, error=%s",
+                    result.job_id,
+                    result.stage_name,
+                    error_code,
+                )
+
+            # Save updated stage
+            self._stage_repo.save(stage)
+
+            # Emit audit event
+            event = AuditEvent(
+                event_id=str(self._uuid_generator.generate()),
+                job_id=result.job_id,
+                event_type="STAGE_COMPLETED" if result.status == "success" else "STAGE_FAILED",
+                correlation_id=result.request_id,
+                client_id=result.job_id,  # Using job_id as client_id placeholder
+                timestamp=datetime.now(timezone.utc),
+                details={
+                    "stage_name": result.stage_name,
+                    "status": result.status,
+                    "duration_seconds": result.duration_seconds,
+                    "exit_code": result.exit_code,
+                },
+            )
+            self._audit_repo.save(event)
+
+            log_secure_info(
+                "info",
+                f"Result processed for job {result.job_id}, stage {result.stage_name}",
+                result.request_id,
+            )
 
         except Exception as exc:  # pylint: disable=broad-except
             logger.exception(
-                "Error processing result for job %s, stage %s: %s",
+                "Error handling result: job_id=%s, error=%s",
                 result.job_id,
-                result.stage_name,
                 exc,
             )
