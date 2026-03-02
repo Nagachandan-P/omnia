@@ -124,6 +124,7 @@
     localrepo_config_path: "{{ local_repo_config_path }}"
     output_file: "{{ metadata_file_path }}"
     update_metadata: "{{ update_metadata }}"
+    sub_urls: "{{ sub_final_repo_urls | default({}) }}"
   register: policy_result
   when:
     - final_status == 'SUCCESS'
