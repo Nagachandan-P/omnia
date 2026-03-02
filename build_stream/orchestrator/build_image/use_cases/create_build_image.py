@@ -307,18 +307,19 @@ class CreateBuildImageUseCase:
                 correlation_id=str(command.correlation_id),
             )
         except InventoryHostMissingError as exc:
-            # Refresh stage from database to avoid OptimisticLockError
-            fresh_stage = self._stage_repo.find_by_job_and_name(
-                command.job_id,
-                stage.stage_name
-            )
-            if fresh_stage:
-                fresh_stage.start()
-                fresh_stage.fail(
+            try:
+                stage.start()
+                stage.fail(
                     error_code="INVENTORY_HOST_MISSING",
                     error_summary=exc.message,
                 )
-                self._stage_repo.save(fresh_stage)
+                self._stage_repo.save(stage)
+            except Exception as save_exc:
+                # If save fails, stage was modified elsewhere
+                log_secure_info(
+                    "Stage fail save failed, stage already modified elsewhere: %s",
+                    str(save_exc)
+                )
             log_secure_info(
                 "error",
                 f"Inventory host missing for job {command.job_id}",
