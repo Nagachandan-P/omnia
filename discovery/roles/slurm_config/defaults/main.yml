@@ -35,7 +35,6 @@ __default_config:
     ConstrainDevices: true
     ConstrainRAMSpace: true
     ConstrainSwapSpace: true
-
   slurm:
     SlurmUser: "{{ slurm_user }}"
     SlurmctldPort: 6817
