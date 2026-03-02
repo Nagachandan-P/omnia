@@ -55,6 +55,21 @@
 
             - New variable: skip_merge (set to true to skip merging configs during upgrade when using external bundles)
 
+            - New variable: node_discovery_mode: 'Homogeneous' or 'Heterogeneous'
+
+            - New variable: node_hardware_defaults:
+
+              | Mode | What happens | iDRAC calls for 500 nodes |
+
+              |---|---|---|
+
+              Heterogeneous (default) | Each node queried individually 500
+
+              Homogeneous with specs provided | Specs applied directly, no querying 0
+
+              Homogeneous without specs | One node per group queried, specs shared 1 per group
+
+              also provide node_hardware_defaults for groups where you want to apply specs
 
       Optional: NFS cleanup (only if you are reprovisioning the cluster)
 
