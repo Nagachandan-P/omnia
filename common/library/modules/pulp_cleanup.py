@@ -29,6 +29,7 @@ import glob
 import json
 import shutil
 import subprocess
+import re
 import yaml
 from typing import Dict, List, Any, Tuple
 
@@ -1192,6 +1193,75 @@ def update_metadata_after_cleanup(cleaned_repos: List[str], metadata_file: str, 
         logger.error(f"Failed to update metadata after cleanup: {e}")
 
 
+def remove_repos_from_pulp_repo_file(cleaned_repos: List[str], pulp_repo_file: str, logger):
+    """Remove cleaned repository stanzas from a yum repo file (pulp.repo).
+
+    The pulp repo file is an INI-like file with sections such as:
+        [repo_name]
+        name=...
+        baseurl=...
+
+    For each repo in cleaned_repos, remove the entire stanza block.
+    If the file becomes empty (no sections remain), remove the file.
+    """
+    if not cleaned_repos or not pulp_repo_file:
+        return
+
+    if not os.path.exists(pulp_repo_file):
+        logger.info(f"pulp repo file not found: {pulp_repo_file}, skipping")
+        return
+
+    try:
+        repo_names = {r.replace('-', '_') for r in cleaned_repos if isinstance(r, str) and r}
+        if not repo_names:
+            return
+
+        with open(pulp_repo_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Split into sections keeping headers. Regex finds section headers like [name].
+        header_re = re.compile(r'^\[([^\]]+)\]\s*$', re.MULTILINE)
+        matches = list(header_re.finditer(content))
+        if not matches:
+            logger.info(f"No repo sections found in {pulp_repo_file}, skipping")
+            return
+
+        kept_blocks: List[str] = []
+        removed = 0
+        for idx, m in enumerate(matches):
+            section_name = m.group(1).strip()
+            start = m.start()
+            end = matches[idx + 1].start() if idx + 1 < len(matches) else len(content)
+            block = content[start:end]
+
+            # Section names in pulp.repo are expected to match Pulp distribution names.
+            # Compare normalized (hyphens -> underscores) for safety.
+            normalized_section = section_name.replace('-', '_')
+            if normalized_section in repo_names:
+                removed += 1
+                logger.info(f"Removed repo stanza [{section_name}] from {pulp_repo_file}")
+                continue
+
+            kept_blocks.append(block.rstrip() + "\n\n")
+
+        new_content = "".join(kept_blocks).strip() + "\n" if kept_blocks else ""
+        if not new_content.strip():
+            os.remove(pulp_repo_file)
+            logger.info(f"Removed empty pulp repo file: {pulp_repo_file}")
+            return
+
+        with open(pulp_repo_file, 'w', encoding='utf-8') as f:
+            f.write(new_content)
+        logger.info(f"Updated pulp repo file: {pulp_repo_file}")
+
+    except PermissionError:
+        logger.error(
+            f"Permission denied while updating {pulp_repo_file}. Run with elevated privileges."
+        )
+    except Exception as e:
+        logger.error(f"Failed to update {pulp_repo_file} after cleanup: {e}")
+
+
 # =============================================================================
 # MAIN MODULE
 # =============================================================================
@@ -1218,6 +1288,10 @@ def run_module():
             metadata_file=dict(
                 type='str', required=False,
                 default='/opt/omnia/offline_repo/.data/localrepo_metadata.yml'
+            ),
+            pulp_repo_file=dict(
+                type='str', required=False,
+                default='/etc/yum.repos.d/pulp.repo'
             )
         ),
         supports_check_mode=True
@@ -1231,6 +1305,7 @@ def run_module():
     cluster_os_type = module.params['cluster_os_type']
     cluster_os_version = module.params['cluster_os_version']
     metadata_file = module.params['metadata_file']
+    pulp_repo_file = module.params['pulp_repo_file']
 
     # Setup logger - setup_standard_logger expects a directory, creates standard.log inside
     log_dir = os.path.join(base_path, cluster_os_type, cluster_os_version, "cleanup")
@@ -1336,6 +1411,11 @@ def run_module():
     successfully_cleaned = [r['name'] for r in all_results if r['status'] == 'Success']
     if successfully_cleaned and metadata_file:
         update_metadata_after_cleanup(successfully_cleaned, metadata_file, logger)
+
+    # Update yum repo file (pulp.repo) to remove stanzas for successfully cleaned repositories
+    cleaned_repo_names = [r['name'] for r in all_results if r['status'] == 'Success' and r.get('type') == 'repository']
+    if cleaned_repo_names and pulp_repo_file:
+        remove_repos_from_pulp_repo_file(cleaned_repo_names, pulp_repo_file, logger)
 
     # Run orphan cleanup once after all deletions to reclaim disk space
     any_success = any(r['status'] == 'Success' for r in all_results)
