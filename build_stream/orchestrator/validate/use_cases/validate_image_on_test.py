@@ -23,6 +23,7 @@ from core.jobs.entities import AuditEvent, Stage
 from core.jobs.exceptions import (
     JobNotFoundError,
     UpstreamStageNotCompletedError,
+    InvalidStateTransitionError,
 )
 from core.jobs.repositories import (
     AuditEventRepository,
@@ -143,6 +144,15 @@ class ValidateImageOnTestUseCase:
         if stage is None:
             raise JobNotFoundError(
                 job_id=str(command.job_id),
+                correlation_id=str(command.correlation_id),
+            )
+
+        if stage.stage_state != StageState.PENDING:
+            raise InvalidStateTransitionError(
+                entity_type="Stage",
+                entity_id=f"{command.job_id}/validate-image-on-test",
+                from_state=stage.stage_state.value,
+                to_state="IN_PROGRESS",
                 correlation_id=str(command.correlation_id),
             )
 
