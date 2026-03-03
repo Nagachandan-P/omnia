@@ -19,7 +19,10 @@ import uuid
 import pytest
 
 from core.jobs.entities import Job, Stage
-from core.jobs.exceptions import JobNotFoundError
+from core.jobs.exceptions import (
+    JobNotFoundError,
+    UpstreamStageNotCompletedError,
+)
 from core.jobs.value_objects import (
     ClientId,
     CorrelationId,
@@ -292,7 +295,7 @@ class TestValidateImageOnTestUseCase:
     def test_execute_stage_guard_violation_no_build_stages(
         self, job_repo, stage_repo, audit_repo, queue_service, uuid_gen
     ):
-        """Should raise StageGuardViolationError when no build stage completed."""
+        """Should raise UpstreamStageNotCompletedError when no build stage completed."""
         job_id = JobId(_uuid())
         client_id = ClientId("test-client")
 
@@ -307,13 +310,13 @@ class TestValidateImageOnTestUseCase:
             job_repo, stage_repo, audit_repo, queue_service, uuid_gen
         )
 
-        with pytest.raises(StageGuardViolationError):
+        with pytest.raises(UpstreamStageNotCompletedError):
             use_case.execute(command)
 
     def test_execute_stage_guard_violation_build_pending(
         self, job_repo, stage_repo, audit_repo, queue_service, uuid_gen
     ):
-        """Should raise StageGuardViolationError when build stage is PENDING."""
+        """Should raise UpstreamStageNotCompletedError when build stage is PENDING."""
         job_id = JobId(_uuid())
         client_id = ClientId("test-client")
 
@@ -333,7 +336,7 @@ class TestValidateImageOnTestUseCase:
             job_repo, stage_repo, audit_repo, queue_service, uuid_gen
         )
 
-        with pytest.raises(StageGuardViolationError):
+        with pytest.raises(UpstreamStageNotCompletedError):
             use_case.execute(command)
 
     def test_execute_queue_failure(

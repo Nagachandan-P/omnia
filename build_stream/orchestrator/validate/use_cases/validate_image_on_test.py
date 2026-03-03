@@ -20,7 +20,10 @@ from datetime import datetime, timezone
 from api.logging_utils import log_secure_info
 
 from core.jobs.entities import AuditEvent, Stage
-from core.jobs.exceptions import JobNotFoundError
+from core.jobs.exceptions import (
+    JobNotFoundError,
+    UpstreamStageNotCompletedError,
+)
 from core.jobs.repositories import (
     AuditEventRepository,
     JobRepository,
@@ -171,12 +174,14 @@ class ValidateImageOnTestUseCase:
         )
 
         if not x86_completed and not aarch64_completed:
-            raise StageGuardViolationError(
-                message=(
-                    "At least one build-image stage (build-image-x86_64 or "
-                    "build-image-aarch64) must be COMPLETED before "
-                    "validate-image-on-test"
-                ),
+            # Determine which stages exist and their states for error message
+            x86_state = x86_stage.stage_state.value if x86_stage else "NOT_FOUND"
+            aarch64_state = aarch64_stage.stage_state.value if aarch64_stage else "NOT_FOUND"
+            
+            raise UpstreamStageNotCompletedError(
+                job_id=str(command.job_id),
+                required_stage="build-image-x86_64 or build-image-aarch64",
+                actual_state=f"x86_64: {x86_state}, aarch64: {aarch64_state}",
                 correlation_id=str(command.correlation_id),
             )
 

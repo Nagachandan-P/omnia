@@ -24,7 +24,11 @@ from api.validate.schemas import (
     ValidateImageOnTestErrorResponse,
     ValidateImageOnTestResponse,
 )
-from core.jobs.exceptions import InvalidStateTransitionError, JobNotFoundError
+from core.jobs.exceptions import (
+    InvalidStateTransitionError,
+    JobNotFoundError,
+    UpstreamStageNotCompletedError,
+)
 from core.jobs.value_objects import ClientId, CorrelationId
 from core.validate.exceptions import (
     StageGuardViolationError,
@@ -168,11 +172,14 @@ class TestCreateValidateImageOnTest:
         assert exc_info.value.status_code == 409
         assert exc_info.value.detail["error"] == "INVALID_STATE_TRANSITION"
 
-    def test_stage_guard_violation(self):
-        """StageGuardViolationError should raise 412."""
+    def test_upstream_stage_not_completed(self):
+        """UpstreamStageNotCompletedError should raise 422."""
         use_case = MockValidateUseCase(
-            error_to_raise=StageGuardViolationError(
-                "Build stage not completed", "corr-123"
+            error_to_raise=UpstreamStageNotCompletedError(
+                job_id="test-job-id",
+                required_stage="build-image-x86_64 or build-image-aarch64",
+                actual_state="x86_64: PENDING, aarch64: NOT_FOUND",
+                correlation_id="corr-123"
             )
         )
         corr_id = _uuid()
@@ -186,8 +193,8 @@ class TestCreateValidateImageOnTest:
                 correlation_id=CorrelationId(corr_id),
                 _=None,
             )
-        assert exc_info.value.status_code == 412
-        assert exc_info.value.detail["error"] == "STAGE_GUARD_VIOLATION"
+        assert exc_info.value.status_code == 422
+        assert exc_info.value.detail["error"] == "UPSTREAM_STAGE_NOT_COMPLETED"
 
     def test_validation_execution_error(self):
         """ValidationExecutionError should raise 500."""
