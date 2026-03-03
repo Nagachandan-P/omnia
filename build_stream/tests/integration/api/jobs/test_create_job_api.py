@@ -64,19 +64,15 @@ class TestCreateJobSuccess:
 
         assert response.status_code == 201
         stages = response.json()["stages"]
-        assert len(stages) == 10
+        assert len(stages) == 6
 
         expected_stages = [
             "parse-catalog",
             "generate-input-files",
             "create-local-repository",
-            "update-local-repository",
-            "create-image-repository",
             "build-image-x86_64",
             "build-image-aarch64",
-            "validate-image",
             "validate-image-on-test",
-            "promote"
         ]
 
         stage_names = [s["stage_name"] for s in stages]

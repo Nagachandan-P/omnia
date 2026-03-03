@@ -51,7 +51,6 @@ def _mock_verify_token(
 @pytest.fixture(scope="function")
 def client():
     """Create test client with mocked JWT auth for business logic tests."""
-    os.environ["ENV"] = "dev"
     app.dependency_overrides[verify_token] = _mock_verify_token
     test_client = TestClient(app)
     yield test_client
@@ -61,7 +60,6 @@ def client():
 @pytest.fixture(scope="function")
 def unauth_client():
     """Create test client without auth mock for testing real auth behaviour."""
-    os.environ["ENV"] = "dev"
     return TestClient(app)
 
 
