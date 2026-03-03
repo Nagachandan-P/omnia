@@ -869,7 +869,7 @@ poll-validate-status:
 summary:
   stage: summary
   needs: [auth, create-job, parse-catalog, generate-input-files, create-local-repo, poll-local-repo, get-roles, build-images,
-         poll-build-status, validate-image, poll-validate-status]
+          poll-build-status, validate-image, poll-validate-status]
   when: always
   script:
     - |
