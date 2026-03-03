@@ -178,12 +178,12 @@ def create_build_image(
     except UpstreamStageNotCompletedError as exc:
         log_secure_info(
             "warning",
-            f"Build image failed: job_id={job_id}, reason=upstream_stage_not_completed, status=422",
+            f"Build image failed: job_id={job_id}, reason=upstream_stage_not_completed, status=412",
             job_id=job_id,
             end_section=True,
         )
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
             detail=_build_error_response(
                 "UPSTREAM_STAGE_NOT_COMPLETED",
                 exc.message,

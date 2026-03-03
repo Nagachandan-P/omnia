@@ -186,7 +186,7 @@ class TestCreateValidateImageOnTest:
                 correlation_id=CorrelationId(corr_id),
                 _=None,
             )
-        assert exc_info.value.status_code == 422
+        assert exc_info.value.status_code == 412
         assert exc_info.value.detail["error"] == "UPSTREAM_STAGE_NOT_COMPLETED"
 
     def test_validation_execution_error(self):

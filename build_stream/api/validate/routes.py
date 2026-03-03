@@ -160,11 +160,11 @@ def create_validate_image_on_test(
     except UpstreamStageNotCompletedError as exc:
         log_secure_info(
             "warning",
-            f"Validate failed: job_id={job_id}, reason=upstream_stage_not_completed, status=422",
+            f"Validate failed: job_id={job_id}, reason=upstream_stage_not_completed, status=412",
             str(correlation_id.value),
         )
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
             detail=_build_error_response(
                 "UPSTREAM_STAGE_NOT_COMPLETED",
                 exc.message,

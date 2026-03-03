@@ -230,13 +230,13 @@ class TestGetCatalogRolesAPI:  # pylint: disable=too-many-public-methods
         data = response.json()
         assert data["detail"]["error_code"] == "JOB_NOT_FOUND"
 
-    def test_get_roles_before_parse_catalog_returns_422(
+    def test_get_roles_before_parse_catalog_returns_412(
         self,
         client: TestClient,
         auth_headers: Dict[str, str],
         created_job: Dict[str, Any],
     ) -> None:
-        """Test that calling get-roles before parse-catalog returns 422."""
+        """Test that calling get-roles before parse-catalog returns 412."""
         job_id = created_job["job_id"]
 
         response = client.get(
@@ -244,7 +244,7 @@ class TestGetCatalogRolesAPI:  # pylint: disable=too-many-public-methods
             headers=auth_headers,
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 412
         data = response.json()
         assert data["detail"]["error"] == "UPSTREAM_STAGE_NOT_COMPLETED"
 
