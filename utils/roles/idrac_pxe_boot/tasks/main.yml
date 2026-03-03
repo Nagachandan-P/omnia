@@ -19,40 +19,99 @@
     idrac_password: "{{ bmc_password | default(hostvars['localhost']['bmc_password']) }}"
     validate_certs: false
   register: lc_check_status
+  until:
+    - lc_check_status.lc_status_info.LCReady is defined
+    - lc_check_status.lc_status_info.LCReady
+  retries: 3
+  delay: 5
+  # ignore_errors: true
+  # free startegy should be used to avoid blocking on failed hosts
+  # but issue will be summarizing/syncing summary report of all at the end
+
+- name: IDRAC ops when ready
+  when:
+    - lc_check_status is success
+    - lc_check_status.lc_status_info.LCReady
+  block:
+    - name: Set boot option from pxe
+      dellemc.openmanage.idrac_boot:
+        idrac_ip: "{{ inventory_hostname }}"
+        idrac_user: "{{ bmc_username | default(hostvars['localhost']['bmc_username']) }}"
+        idrac_password: "{{ bmc_password | default(hostvars['localhost']['bmc_password']) }}"
+        validate_certs: false
+        boot_source_override_mode: uefi
+        boot_source_override_target: "{{ boot_source_override_target }}"
+        boot_source_override_enabled: "{{ boot_source_override_enabled }}"
+        reset_type: "none" # Dont Restart here as to Handle poweroff case
+      register: pxe_provisioning
+      ignore_errors: true
+      ignore_unreachable: true
+
+    - name: Try ForceRestart
+      dellemc.openmanage.redfish_powerstate:
+        baseuri: "{{ inventory_hostname }}"
+        username: "{{ bmc_username | default(hostvars['localhost']['bmc_username']) }}"
+        password: "{{ bmc_password | default(hostvars['localhost']['bmc_password']) }}"
+        validate_certs: false
+        reset_type: "{{ 'ForceRestart' if force_restart else 'GracefulRestart' }}"
+      when: restart_host
+      register: restart_op
+      failed_when: false
+
+    - name: Try On if ForceRestart did not change
+      dellemc.openmanage.redfish_powerstate:
+        baseuri: "{{ inventory_hostname }}"
+        username: "{{ bmc_username | default(hostvars['localhost']['bmc_username']) }}"
+        password: "{{ bmc_password | default(hostvars['localhost']['bmc_password']) }}"
+        validate_certs: false
+        reset_type: "On"
+      register: power_on_op
+      failed_when: false
+      when:
+        - restart_host
+        - not (restart_op is changed)
 
 - name: Check LC availibility
-  ansible.builtin.fail:
-    msg: "{{ lc_check_fail_msg }}"
-  when: not lc_check_status.lc_status_info.LCReady
-
-- name: Set reboot type
   ansible.builtin.set_fact:
-    reboot_type: "{{ 'none' if not restart_host else ('force_restart' if force_restart else 'graceful_restart') }}"
+    reboot_failed: true
+    reboot_status: "{{ lc_check_fail_msg }}"
+  when: lc_check_status is unreachable or lc_check_status is failed or not (lc_check_status.lc_status_info.LCReady | default(false))
 
-- name: Set boot from pxe
-  dellemc.openmanage.idrac_boot:
-    idrac_ip: "{{ inventory_hostname }}"
-    idrac_user: "{{ bmc_username | default(hostvars['localhost']['bmc_username']) }}"
-    idrac_password: "{{ bmc_password | default(hostvars['localhost']['bmc_password']) }}"
-    validate_certs: false
-    boot_source_override_mode: uefi
-    boot_source_override_target: "{{ boot_source_override_target }}"
-    boot_source_override_enabled: "{{ boot_source_override_enabled }}"
-    reset_type: "{{ reboot_type }}"
-  register: pxe_provisioning
-  ignore_errors: true
-  ignore_unreachable: true
+- name: Fail if PXE provisioning failed
+  ansible.builtin.set_fact:
+    reboot_failed: true
+    reboot_status: "{{ pxe_provisioning_fail_msg }}"
+  when:
+    - not reboot_failed
+    - pxe_provisioning is defined
+    - pxe_provisioning is failed
 
-- name: OS provisioning failed using PXE
-  ansible.builtin.fail:
-    msg: "{{ pxe_provisioning_fail_msg }}"
-  when: pxe_provisioning is failed
+- name: Fail if PXE provisioning target is unreachable
+  ansible.builtin.set_fact:
+    reboot_failed: true
+    reboot_status: "{{ unreachable_idrac_msg }}"
+  when:
+    - not reboot_failed
+    - pxe_provisioning is defined
+    - pxe_provisioning is unreachable
 
-- name: IDRAC might be unreachable during OS provisioning
-  ansible.builtin.debug:
-    msg: "{{ unreachable_idrac_msg }}"
-  when: pxe_provisioning is unreachable
+- name: Fail if power operation failed
+  ansible.builtin.set_fact:
+    reboot_failed: true
+    reboot_status: "Power operation failed on {{ inventory_hostname }}. Failed to restart server."
+  when:
+    - not reboot_failed
+    - restart_host
+    - not (restart_op is defined and restart_op is changed)
+    - not (power_on_op is defined and power_on_op is changed)
 
-- name: Provision OS status
-  ansible.builtin.debug:
-    msg: "{{ provision_os_msg }}"
+- name: Summarize PXE boot and power operation results
+  ansible.builtin.set_fact:
+    reboot_failed: false
+    reboot_status: >-
+      PXE Boot: {{ 'OK' if pxe_provisioning is success else ('UNREACHABLE' if pxe_provisioning is unreachable else 'FAILED') }} |
+      Power: {{ 'Restart OK' if (restart_op is defined and restart_op is changed)
+      else ('On OK' if (power_on_op is defined and power_on_op is changed)
+      else ('Skipped (no restart)' if not restart_host
+      else 'FAILED')) }}
+  when: not reboot_failed
