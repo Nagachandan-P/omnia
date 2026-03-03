@@ -16,7 +16,7 @@
 
 from typing import Optional
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header
 from sqlalchemy.orm import Session
 
 from api.dependencies import (
@@ -27,7 +27,7 @@ from api.dependencies import (
     _get_container,
     _ENV,
 )
-from core.jobs.value_objects import ClientId, CorrelationId
+from core.jobs.value_objects import CorrelationId
 from orchestrator.validate.use_cases import ValidateImageOnTestUseCase
 
 
