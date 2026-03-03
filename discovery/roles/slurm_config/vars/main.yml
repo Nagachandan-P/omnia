@@ -126,6 +126,7 @@ partition_params:
   MaxTime: "INFINITE"
   State: "UP"
   Default: "YES"
+busy_nodes: {}
 openldap_dir_name: "openldap/"
 software_config_file: "{{ input_project_dir }}/software_config.json"
 omnia_run_tags: "{{ hostvars['localhost']['omnia_run_tags'] }}"
