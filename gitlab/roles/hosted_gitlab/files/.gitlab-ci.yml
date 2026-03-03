@@ -868,7 +868,8 @@ poll-validate-status:
 # ==========================================================================
 summary:
   stage: summary
-  needs: [auth, create-job, parse-catalog, generate-input-files, create-local-repo, poll-local-repo, get-roles, build-images, poll-build-status, validate-image, poll-validate-status]
+  needs: [auth, create-job, parse-catalog, generate-input-files, create-local-repo, poll-local-repo, get-roles, build-images,
+         poll-build-status, validate-image, poll-validate-status]
   when: always
   script:
     - |
@@ -934,7 +935,9 @@ summary:
       echo "  +-----------------------------------------------------------+"
 
       # Print errors if any
-      ERRORS=$(jq -r '.stages[]? | select(.stage_state == "FAILED") | "  |    X \(.stage_name): \(.error_summary // "no details")"' final_status.json 2>/dev/null)
+      ERRORS=$(jq -r '.stages[]? | select(.stage_state == "FAILED") | \
+                     "  |    X \(.stage_name): \(.error_summary // "no details")"' \
+                     final_status.json 2>/dev/null)
       if [ -n "${ERRORS}" ]; then
         echo "  |  Errors:                                                |"
         echo "${ERRORS}"
