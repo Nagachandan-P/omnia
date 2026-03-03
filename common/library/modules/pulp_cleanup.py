@@ -1140,18 +1140,46 @@ def update_metadata_after_cleanup(cleaned_repos: List[str], metadata_file: str, 
 
         updated = False
         for repo_name in cleaned_repos:
-            # Normalize repo name to match metadata key format: name_policy
-            policy_key = f"{repo_name.replace('-', '_')}_policy"
-            # Search through all sections in metadata for this policy key
+            # Normalize repo name to match metadata key format: <name>_policy.
+            # Metadata may store keys either with arch prefix (e.g., x86_64_doca_policy)
+            # or without it (e.g., doca_policy), so try both.
+            normalized_name = repo_name.replace('-', '_')
+            candidate_policy_keys = {f"{normalized_name}_policy"}
+            repo_arch = None
+            for arch in ARCH_SUFFIXES:
+                arch_prefix = f"{arch}_"
+                if normalized_name.startswith(arch_prefix):
+                    repo_arch = arch
+                    candidate_policy_keys.add(f"{normalized_name[len(arch_prefix):]}_policy")
+
+            def _section_matches_repo_arch(section: str, arch: str) -> bool:
+                """Return True if a metadata section belongs to the given arch.
+
+                Expected section naming patterns in localrepo_metadata.yml:
+                    - omnia_repo_url_rhel_x86_64 / omnia_repo_url_rhel_aarch64
+                    - rhel_subscription_url_x86_64 / rhel_subscription_url_aarch64
+                    - user_repo_url_x86_64 / user_repo_url_aarch64
+                """
+                suffix = f"_{arch}"
+                return isinstance(section, str) and section.endswith(suffix)
+
+            # Search through all sections in metadata for these policy keys
             for section_key in list(metadata.keys()):
-                if isinstance(metadata[section_key], dict) and policy_key in metadata[section_key]:
-                    del metadata[section_key][policy_key]
-                    updated = True
-                    logger.info(f"Removed '{policy_key}' from metadata section '{section_key}'")
-                    # Remove the section if it's now empty
-                    if not metadata[section_key]:
-                        del metadata[section_key]
-                        logger.info(f"Removed empty metadata section '{section_key}'")
+                if repo_arch and not _section_matches_repo_arch(section_key, repo_arch):
+                    continue
+                if not isinstance(metadata.get(section_key), dict):
+                    continue
+                for policy_key in list(candidate_policy_keys):
+                    if policy_key in metadata[section_key]:
+                        del metadata[section_key][policy_key]
+                        updated = True
+                        logger.info(
+                            f"Removed '{policy_key}' from metadata section '{section_key}'"
+                        )
+                # Remove the section if it's now empty
+                if section_key in metadata and isinstance(metadata[section_key], dict) and not metadata[section_key]:
+                    del metadata[section_key]
+                    logger.info(f"Removed empty metadata section '{section_key}'")
 
         if updated:
             with open(metadata_file, 'w', encoding='utf-8') as f:
