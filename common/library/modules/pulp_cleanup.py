@@ -327,6 +327,7 @@ def cleanup_container(user_input: str, base_path: str, logger) -> Dict[str, Any]
     # Check if input is already a Pulp repository name (from get_all_containers)
     if user_input.startswith('container_repo_'):
         pulp_name = user_input
+        repo_suffix = user_input[len('container_repo_'):]
     else:
         # Validate format
         is_valid, error_msg = validate_container_format(user_input)
@@ -336,6 +337,7 @@ def cleanup_container(user_input: str, base_path: str, logger) -> Dict[str, Any]
 
         # Convert to Pulp naming convention
         pulp_name = convert_to_pulp_container_name(user_input)
+        repo_suffix = pulp_name[len('container_repo_'):]
 
     # Check existence
     if not container_exists(pulp_name, logger):
@@ -353,12 +355,41 @@ def cleanup_container(user_input: str, base_path: str, logger) -> Dict[str, Any]
                 if d.get('name', '') == pulp_name:
                     run_cmd(pulp_container_commands["delete_distribution"] % d.get('name', ''), logger)
 
-        # Delete remote
-        remote_result = run_cmd(pulp_container_commands["delete_remote"] % pulp_name, logger)
-        if remote_result["rc"] == 0:
-            logger.info(f"Deleted container remote: {pulp_name}")
-        else:
-            logger.warning(f"Could not delete container remote '{pulp_name}': {remote_result['stderr']}")
+        # Delete remote(s)
+        # Omnia creates container remotes as:
+        #   - remote_<image_sans_separators> (for standard images)
+        #   - user_remote_<image_sans_separators> (for user registries)
+        # where the suffix matches the container repo name after 'container_repo_'.
+        remote_candidates = [
+            f"remote_{repo_suffix}",
+            f"user_remote_{repo_suffix}",
+        ]
+
+        # Also try to discover any remotes that match this suffix (defensive)
+        remote_list = run_cmd(pulp_container_commands["list_remotes"], logger)
+        if remote_list["rc"] == 0:
+            remotes = safe_json_parse(remote_list["stdout"], default=[])
+            for r in remotes:
+                rname = r.get('name', '') if isinstance(r, dict) else ''
+                if not rname:
+                    continue
+                if rname.endswith(f"_{repo_suffix}") or rname in remote_candidates:
+                    remote_candidates.append(rname)
+
+        seen = set()
+        for remote_name in remote_candidates:
+            if not remote_name or remote_name in seen:
+                continue
+            seen.add(remote_name)
+            remote_result = run_cmd(
+                pulp_container_commands["delete_remote"] % remote_name, logger
+            )
+            if remote_result["rc"] == 0:
+                logger.info(f"Deleted container remote: {remote_name}")
+            else:
+                logger.warning(
+                    f"Could not delete container remote '{remote_name}': {remote_result['stderr']}"
+                )
 
         # Delete repository
         del_result = run_cmd(pulp_container_commands["delete_repository"] % pulp_name, logger)
