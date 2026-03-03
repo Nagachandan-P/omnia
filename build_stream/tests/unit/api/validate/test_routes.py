@@ -21,8 +21,7 @@ from fastapi import HTTPException
 
 from api.validate.routes import create_validate_image_on_test, _build_error_response
 from api.validate.schemas import (
-    ValidateImageOnTestErrorResponse,
-    ValidateImageOnTestResponse,
+    ValidateImageOnTestRequest,
 )
 from core.jobs.exceptions import (
     InvalidStateTransitionError,
@@ -31,10 +30,8 @@ from core.jobs.exceptions import (
 )
 from core.jobs.value_objects import ClientId, CorrelationId
 from core.validate.exceptions import (
-    StageGuardViolationError,
     ValidationExecutionError,
 )
-from orchestrator.validate.commands import ValidateImageOnTestCommand
 from orchestrator.validate.dtos import ValidateImageOnTestResponse as UseCaseResponse
 
 
@@ -44,12 +41,14 @@ def _uuid():
 
 class MockValidateUseCase:
     """Mock use case for testing."""
+    # pylint: disable=too-few-public-methods
 
     def __init__(self, error_to_raise=None):
         self.error_to_raise = error_to_raise
         self.executed_commands = []
 
     def execute(self, command):
+        """Mock execute method."""
         self.executed_commands.append(command)
         if self.error_to_raise:
             raise self.error_to_raise
@@ -65,8 +64,10 @@ class MockValidateUseCase:
 
 class TestBuildErrorResponse:
     """Tests for _build_error_response helper."""
+    # pylint: disable=too-few-public-methods
 
     def test_builds_correct_response(self):
+        """Test building correct error response."""
         response = _build_error_response("TEST_ERROR", "Test message", "corr-123")
         assert response.error == "TEST_ERROR"
         assert response.message == "Test message"
@@ -82,19 +83,14 @@ class TestCreateValidateImageOnTest:
         job_id = _uuid()
         corr_id = _uuid()
         use_case = MockValidateUseCase()
-        use_case.response = UseCaseResponse(
-            job_id=job_id,
-            stage_name="validate-image-on-test",
-            status="accepted",
-            submitted_at="2026-02-17T10:30:00Z",
-            correlation_id=corr_id,
-        )
-
+        
+        request_body = ValidateImageOnTestRequest(image_key="test-image")
+        
         response = create_validate_image_on_test(
             job_id=job_id,
-            token_data={"client_id": "test", "scopes": ["job:write"]},
+            request_body=request_body,
+            token_data={"client_id": "test-client", "scopes": ["job:write"]},
             use_case=use_case,
-            client_id=ClientId("test-client"),
             correlation_id=CorrelationId(corr_id),
             _=None,
         )
@@ -120,9 +116,9 @@ class TestCreateValidateImageOnTest:
         with pytest.raises(HTTPException) as exc_info:
             create_validate_image_on_test(
                 job_id="not-a-uuid",
-                token_data={"client_id": "test", "scopes": ["job:write"]},
+                request_body=ValidateImageOnTestRequest(image_key="test-image"),
+                token_data={"client_id": "test-client", "scopes": ["job:write"]},
                 use_case=use_case,
-                client_id=ClientId("test-client"),
                 correlation_id=CorrelationId(corr_id),
                 _=None,
             )
@@ -139,9 +135,8 @@ class TestCreateValidateImageOnTest:
         with pytest.raises(HTTPException) as exc_info:
             create_validate_image_on_test(
                 job_id=_uuid(),
-                token_data={"client_id": "test", "scopes": ["job:write"]},
-                use_case=use_case,
-                client_id=ClientId("test-client"),
+                request_body=ValidateImageOnTestRequest(image_key="test-image"),
+                token_data={"client_id": "test-client", "scopes": ["job:write"]},
                 correlation_id=CorrelationId(corr_id),
                 _=None,
             )
@@ -163,9 +158,8 @@ class TestCreateValidateImageOnTest:
         with pytest.raises(HTTPException) as exc_info:
             create_validate_image_on_test(
                 job_id=_uuid(),
-                token_data={"client_id": "test", "scopes": ["job:write"]},
-                use_case=use_case,
-                client_id=ClientId("test-client"),
+                request_body=ValidateImageOnTestRequest(image_key="test-image"),
+                token_data={"client_id": "test-client", "scopes": ["job:write"]},
                 correlation_id=CorrelationId(corr_id),
                 _=None,
             )
@@ -187,9 +181,8 @@ class TestCreateValidateImageOnTest:
         with pytest.raises(HTTPException) as exc_info:
             create_validate_image_on_test(
                 job_id=_uuid(),
-                token_data={"client_id": "test", "scopes": ["job:write"]},
-                use_case=use_case,
-                client_id=ClientId("test-client"),
+                request_body=ValidateImageOnTestRequest(image_key="test-image"),
+                token_data={"client_id": "test-client", "scopes": ["job:write"]},
                 correlation_id=CorrelationId(corr_id),
                 _=None,
             )
@@ -208,9 +201,8 @@ class TestCreateValidateImageOnTest:
         with pytest.raises(HTTPException) as exc_info:
             create_validate_image_on_test(
                 job_id=_uuid(),
-                token_data={"client_id": "test", "scopes": ["job:write"]},
-                use_case=use_case,
-                client_id=ClientId("test-client"),
+                request_body=ValidateImageOnTestRequest(image_key="test-image"),
+                token_data={"client_id": "test-client", "scopes": ["job:write"]},
                 correlation_id=CorrelationId(corr_id),
                 _=None,
             )
@@ -227,9 +219,8 @@ class TestCreateValidateImageOnTest:
         with pytest.raises(HTTPException) as exc_info:
             create_validate_image_on_test(
                 job_id=_uuid(),
-                token_data={"client_id": "test", "scopes": ["job:write"]},
-                use_case=use_case,
-                client_id=ClientId("test-client"),
+                request_body=ValidateImageOnTestRequest(image_key="test-image"),
+                token_data={"client_id": "test-client", "scopes": ["job:write"]},
                 correlation_id=CorrelationId(corr_id),
                 _=None,
             )
