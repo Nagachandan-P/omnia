@@ -96,6 +96,9 @@
       ]
     },
     "service_k8s.json": {
+      "conditions": {
+        "architectures": ["x86_64"]
+      },
       "transform": {
         "exclude_fields": ["architecture"],
         "rename_fields": {"uri": "url"}
@@ -177,6 +180,9 @@
       ]
     },
     "csi_driver_powerscale.json": {
+      "conditions": {
+        "architectures": ["x86_64"]
+      },
       "transform": {
         "exclude_fields": ["architecture"],
         "rename_fields": {"uri": "url"}
