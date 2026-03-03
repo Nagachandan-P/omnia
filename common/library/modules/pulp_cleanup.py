@@ -352,6 +352,13 @@ def cleanup_container(user_input: str, base_path: str, logger) -> Dict[str, Any]
                 if d.get('name', '') == pulp_name:
                     run_cmd(pulp_container_commands["delete_distribution"] % d.get('name', ''), logger)
 
+        # Delete remote
+        remote_result = run_cmd(pulp_container_commands["delete_remote"] % pulp_name, logger)
+        if remote_result["rc"] == 0:
+            logger.info(f"Deleted container remote: {pulp_name}")
+        else:
+            logger.warning(f"Could not delete container remote '{pulp_name}': {remote_result['stderr']}")
+
         # Delete repository
         del_result = run_cmd(pulp_container_commands["delete_repository"] % pulp_name, logger)
 
