@@ -19,9 +19,10 @@ slurmctld_service_default_path: '/usr/lib/systemd/system/slurmctld.service'
 slurmd_service_default_path: '/usr/lib/systemd/system/slurmd.service'
 slurmdbd_service_default_path: '/usr/lib/systemd/system/slurmdbd.service'
 sys_env_path: '/etc/environment'
-default_real_memory: 4 # This is the minimum default memory in GiB
+default_real_memory: 864
 default_threadspercore: 1
-default_corespersocket: 1
+default_corespersocket: 72
+default_sockets: 2
 share_prefix: "/"
 conf_path_items: {}
 conf_dict_items: {}
@@ -50,7 +51,10 @@ __default_config:
     PrologFlags: contain
     JobAcctGatherType: jobacct_gather/linux
     JobAcctGatherFrequency: 30
-    SelectType: select/linear
+    SelectType: select/cons_tres
+    GresTypes: gpu
+    SelectTypeParameters: CR_Core_Memory
+    SlurmdParameters: l3cache_as_socket # Requires hwloc v2.
     SlurmctldLogFile: "/var/log/slurm/slurmctld.log"
     SlurmdLogFile: "/var/log/slurm/slurmd.log"
     SlurmctldPidFile: /var/run/slurmctld.pid
@@ -61,6 +65,10 @@ __default_config:
     SlurmdTimeout: 300
     Epilog: "/etc/slurm/epilog.d/logout_user.sh"
     PluginDir: "{{ plugin_slurm_dir }}"
+    MaxNodeCount: 65000
+    NodeSet:
+      - NodeSet: "{{ slurm_partition_name }}"
+        Feature: "{{ slurm_partition_name }}"
     NodeName:
       - NodeName: DEFAULT
         State: UNKNOWN
@@ -69,9 +77,6 @@ __default_config:
         Nodes: ALL
         MaxTime: INFINITE
         State: UP
-    # S_P_ARRAY type paramater to be provided this way
-    # Epilog:
-    #   - Epilog: "/etc/slurm/epilog.d/logout_user.sh"
   slurmdbd:
     AuthType: auth/munge
     LogFile: "/var/log/slurm/slurmdbd.log"
