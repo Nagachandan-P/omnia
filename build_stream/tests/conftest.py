@@ -21,13 +21,9 @@ import the app directly (it runs the server as a subprocess).
 
 # pylint: disable=redefined-outer-name,global-statement,import-outside-toplevel,protected-access
 
+import base64
 import sys
 from pathlib import Path
-
-# Ensure build_stream is at the front of sys.path to avoid /opt/omnia/api/ conflict
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-import base64
 from typing import Dict, Generator
 
 import pytest
