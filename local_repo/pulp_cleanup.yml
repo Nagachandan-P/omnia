@@ -78,7 +78,7 @@
       ansible.builtin.pause:
         prompt: |
 
-          ⚠️  WARNING: This will permanently delete the specified artifacts.
+          WARNING: This will permanently delete the specified artifacts.
           This action cannot be undone.
 
           Type 'yes' to continue or press Ctrl+C to abort
@@ -94,7 +94,7 @@
 
   tasks:
     # Step 3: Call Python Module
-    - name: Execute cleanup
+    - name: Execute cleanup ( This task might take sometime )
       pulp_cleanup:
         cleanup_repos: "{{ repo_list | default([]) }}"
         cleanup_containers: "{{ container_list | default([]) }}"
