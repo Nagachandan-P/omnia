@@ -1547,12 +1547,14 @@ phase1_validate() {
     core_config=$(podman exec omnia_core /bin/bash -c 'cat /opt/omnia/.data/oim_metadata.yml' 2>/dev/null)
     if [ -z "$core_config" ]; then
         echo "[ERROR] [ORCHESTRATOR] Unable to read oim_metadata.yml from omnia_core container"
+        display_cleanup_instructions
         return 1
     fi
 
     previous_omnia_version=$(echo "$core_config" | grep "^omnia_version:" | cut -d':' -f2 | tr -d ' \t\n\r')
     if [ -z "$previous_omnia_version" ]; then
         echo "[ERROR] [ORCHESTRATOR] omnia_version not found in oim_metadata.yml"
+        display_cleanup_instructions
         return 1
     fi
 
@@ -1773,8 +1775,7 @@ phase4_container_swap() {
     if [ ! -f "$quadlet_file" ]; then
         echo "[ERROR] [ORCHESTRATOR] Phase 4.3 failed: Quadlet file not found: $quadlet_file"
         echo "[ERROR] [ORCHESTRATOR] Upgrade failed: Quadlet configuration file missing"
-        echo "[ERROR] [ORCHESTRATOR] Initiating rollback to restore container..."
-        rollback_omnia_core
+        display_cleanup_instructions
         return 1
     fi
 
@@ -1882,6 +1883,7 @@ upgrade_omnia_core() {
     if [ -z "$OMNIA_VERSION" ]; then
         echo -e "${RED}ERROR: Could not determine current Omnia version${NC}"
         echo -e "${YELLOW}Please ensure omnia_core container is running and metadata is accessible${NC}"
+        display_cleanup_instructions
         exit 1
     fi
     
@@ -1889,6 +1891,7 @@ upgrade_omnia_core() {
     if [[ "$OMNIA_VERSION" == *-rc* ]]; then
         echo -e "${RED}Upgrade is not supported for release-candidate builds ($OMNIA_VERSION).${NC}"
         echo -e "${YELLOW}Please install a GA version before attempting an upgrade.${NC}"
+        display_cleanup_instructions
         exit 1
     fi
     
