@@ -52,6 +52,7 @@
         name: "{{ pulp_container_name }}"
         enabled: true
       no_log: true
+      changed_when: false
 
     - name: Restart pulp container
       ansible.builtin.systemd_service:
@@ -59,11 +60,13 @@
         name: "{{ pulp_container_name }}"
       when: quad_out.changed # noqa: no-handler
       no_log: true
+      changed_when: false
 
     - name: Check if Pulp container is running after deployment
       containers.podman.podman_container_info:
         name: "{{ pulp_container_name }}"
       register: pulp_container_status
+      no_log: true
 
     - name: Notify user of Pulp container deployment status
       ansible.builtin.debug:

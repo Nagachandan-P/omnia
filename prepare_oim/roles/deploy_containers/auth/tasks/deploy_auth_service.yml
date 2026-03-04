@@ -158,11 +158,14 @@
         name: "{{ auth_service_container_name }}.service"
         enabled: true
         state: started
+      no_log: true
+      changed_when: false
 
     - name: Check if auth service container is running after deployment
       containers.podman.podman_container_info:
         name: "{{ auth_service_container_name }}"
       register: auth_service_container_status
+      no_log: true
 
     - name: Notify user of auth service container deployment status
       ansible.builtin.debug:
