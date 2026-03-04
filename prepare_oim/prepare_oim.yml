@@ -39,6 +39,11 @@
 
     - name: Read software_config.json to check for additional services
       block:
+        - name: Validate software_config.json syntax
+          ansible.builtin.include_role:
+            name: prepare_oim_validation
+            tasks_from: validate_software_config_syntax.yml
+
         - name: Load software_config.json
           ansible.builtin.include_vars:
             file: "{{ input_project_dir }}/software_config.json"
