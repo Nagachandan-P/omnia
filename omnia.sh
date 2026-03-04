@@ -2204,6 +2204,14 @@ display_cleanup_instructions() {
 }
 
 rollback_omnia_core() {
+    # FIRST THING: Check if user has root privileges
+    if [ "$(id -u)" -ne 0 ]; then
+        echo -e "${RED}ERROR: Upgrade requires root or sudo privileges${NC}"
+        echo -e "${YELLOW}Please run this script with sudo or login as root user.${NC}"
+        echo -e "${YELLOW}Example: sudo $0 --rollback${NC}"
+        exit 1
+    fi
+    
     echo -e "${GREEN}================================================================================${NC}"
     echo -e "${GREEN}                         OMNIA CORE ROLLBACK${NC}"
     echo -e "${GREEN}================================================================================${NC}"
