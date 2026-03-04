@@ -2340,7 +2340,8 @@ rollback_omnia_core() {
     done < <(podman exec -u root omnia_core find /opt/omnia/backups/upgrade -maxdepth 1 -type d -name "version_${selected_version}*" 2>/dev/null | sort -r)
     
     if [ ${#backup_dirs[@]} -eq 0 ]; then
-        echo -e "${RED}ERROR: No backup directories found for version $selected_version.${NC}"
+        echo -e "${RED}ERROR: Rollback failed from version $current_version to version $selected_version because backup of version $selected_version is missing.${NC}"
+        echo -e "${YELLOW}No backup directories found for version $selected_version.${NC}"
         exit 1
     fi
     
