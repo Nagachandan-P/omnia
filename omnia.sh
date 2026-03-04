@@ -1533,7 +1533,9 @@ phase1_validate() {
 
     if [ "$(id -u)" -ne 0 ]; then
         if ! sudo -n true >/dev/null 2>&1; then
-            echo "[ERROR] [ORCHESTRATOR] Prerequisite failed: run as root or configure passwordless sudo"
+            echo -e "${RED}ERROR: Upgrade requires root or sudo privileges${NC}"
+            echo -e "${YELLOW}Please run this script with sudo or login as root user.${NC}"
+            echo -e "${YELLOW}Example: sudo $0 --upgrade${NC}"
             return 1
         fi
     fi
