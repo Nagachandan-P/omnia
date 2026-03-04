@@ -1531,15 +1531,6 @@ phase1_validate() {
 
     echo "[INFO] [ORCHESTRATOR] Phase 1: Pre-Upgrade Validation"
 
-    if [ "$(id -u)" -ne 0 ]; then
-        if ! sudo -n true >/dev/null 2>&1; then
-            echo -e "${RED}ERROR: Upgrade requires root or sudo privileges${NC}"
-            echo -e "${YELLOW}Please run this script with sudo or login as root user.${NC}"
-            echo -e "${YELLOW}Example: sudo $0 --upgrade${NC}"
-            return 1
-        fi
-    fi
-
     if ! podman ps --format '{{.Names}}' | grep -qw "omnia_core"; then
         echo "[ERROR] [ORCHESTRATOR] Prerequisite failed: omnia_core container is not running"
         display_cleanup_instructions
@@ -1874,6 +1865,14 @@ phase4_container_swap() {
 }
 
 upgrade_omnia_core() {
+    # FIRST THING: Check if user has root privileges
+    if [ "$(id -u)" -ne 0 ]; then
+        echo -e "${RED}ERROR: Upgrade requires root or sudo privileges${NC}"
+        echo -e "${YELLOW}Please run this script with sudo or login as root user.${NC}"
+        echo -e "${YELLOW}Example: sudo $0 --upgrade${NC}"
+        exit 1
+    fi
+    
     echo -e "${BLUE}=================== Omnia Core Upgrade ====================${NC}"
     echo -e "${BLUE}This script will upgrade Omnia core container.${NC}"
     echo -e "${BLUE}Current version will be backed up and upgraded to target version.${NC}"
