@@ -131,7 +131,7 @@ def input_data(input_file_path, omnia_base_dir, project_name, logger, module):
         input_file_path (str): The path to the input file.
 
     Returns:
-        Tuple[Any, str]: A tuple containing the loaded data and the file extension.
+        tuple: A tuple containing the loaded data and the file extension.
 
     Raises:
         ValueError: If the file extension is unsupported.
