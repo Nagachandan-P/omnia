@@ -100,6 +100,11 @@ gitlab_runner_online_failure_msg: "No online runner is assigned to project {{ gi
 podman_socket_path: "/run/podman/podman.sock"
 docker_socket_path: "/var/run/docker.sock"
 
+# Quadlet configuration
+quadlet_dir: "/etc/containers/systemd"
+quadlet_dir_mode: "0755"
+quadlet_file_mode: "0644"
+
 # Network
 gitlab_ssh_port: 22
 
@@ -178,6 +183,22 @@ gitlab_selinux_fail_msg: >
   Disable SELinux and reboot the host before running this playbook.
 gitlab_bs_host_connectivity_fail_msg: "Cannot reach build stream host at {{ build_stream_host_ip }}. GitLab server must be able to ping the build stream host."
 
+gitlab_watcher_not_running_msg: >
+  playbook_watcher.service is not running on OIM host {{ build_stream_host_ip }}.
+  Ensure prepare_oim.yml has been successfully executed before deploying GitLab.
+
+gitlab_build_stream_not_running_msg: >
+  omnia_build_stream.service is not running on OIM host {{ build_stream_host_ip }}.
+  Ensure prepare_oim.yml has been successfully executed before deploying GitLab.
+
+gitlab_postgres_not_running_msg: >
+  omnia_postgres.service is not running on OIM host {{ build_stream_host_ip }}.
+  Ensure prepare_oim.yml has been successfully executed before deploying GitLab.
+
+gitlab_bs_cert_missing_msg: >
+  Build stream SSL certificate not found at {{ gitlab_bs_cert_path }} on OIM host {{ build_stream_host_ip }}.
+  Ensure prepare_oim.yml has been successfully executed and certificates are generated.
+
 # Debug messages
 gitlab_ca_export_path: "{{ gitlab_cert_dir }}/ca.crt"
 
@@ -232,6 +253,6 @@ gitlab_deployment_complete_msg:
   - "- Certificates are reused on re-run (generated only if missing)"
   - ""
   - "Service:    {{ gitlab_ctl_command }} (start|stop|status|reconfigure)"
-  - "Runner:     {{ gitlab_runner_container_name }} (Podman container, registered)"
+  - "Runner:     {{ gitlab_runner_container_name }}.service (Quadlet systemd service, persists across reboots)"
   - ""
   - "============================================"
