@@ -115,7 +115,6 @@
 - name: Reload systemd daemon to recognize quadlet
   ansible.builtin.systemd_service:
     daemon_reload: true
-  when: runner_quadlet_deployed.changed
 
 - name: Enable and start GitLab runner service via quadlet
   ansible.builtin.systemd_service:
