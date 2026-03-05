@@ -20,8 +20,6 @@
     name: "{{ postgres_container_name }}.service"
   register: postgres_service_status
   failed_when: false
-  no_log: true
-  changed_when: false
 
 - name: Stop omnia_postgres service if running
   ansible.builtin.systemd:
@@ -30,8 +28,6 @@
     enabled: false
   when: postgres_service_status.status is defined
   failed_when: false
-  no_log: true
-  changed_when: false
 
 - name: Check if omnia_postgres container exists
   containers.podman.podman_container_info:
@@ -85,7 +81,6 @@
         dest: "{{ postgres_quadlet_path }}"
         mode: "{{ postgres_quadlet_file_mode }}"
       register: quadlet_out
-      no_log: true
 
     - name: Reload systemd if Quadlet changed
       ansible.builtin.systemd_service:
@@ -98,7 +93,6 @@
         enabled: true
         state: started
       no_log: true
-      changed_when: false
 
     - name: Restart postgres container if Quadlet changed
       ansible.builtin.systemd_service:
@@ -106,7 +100,6 @@
         name: "{{ postgres_container_name }}.service"
       when: quadlet_out.changed # noqa: no-handler
       no_log: true
-      changed_when: false
 
     - name: Wait for PostgreSQL to be ready
       ansible.builtin.pause:
@@ -116,7 +109,6 @@
       containers.podman.podman_container_info:
         name: "{{ postgres_container_name }}"
       register: postgres_container_status
-      no_log: true
 
     - name: Wait for PostgreSQL to accept connections
       containers.podman.podman_container_exec:
@@ -127,21 +119,18 @@
       delay: "{{ postgres_ready_delay }}"
       until: pg_ready.rc == 0
       changed_when: false
-      no_log: true
 
     - name: Create temporary directory for initialization script
       ansible.builtin.tempfile:
         state: directory
         suffix: _postgres_init
       register: temp_init_dir
-      no_log: true
 
     - name: Generate database initialization script
       ansible.builtin.template:
         src: init_build_stream_db.sql.j2
         dest: "{{ temp_init_dir.path }}/init_build_stream_db.sql"
         mode: "0644"
-      no_log: true
 
     - name: Check if build_stream_db exists
       containers.podman.podman_container_exec:
@@ -150,7 +139,6 @@
       register: db_exists_check
       changed_when: false
       failed_when: false
-      no_log: true
 
     - name: Create build_stream_db database if it doesn't exist
       containers.podman.podman_container_exec:
@@ -160,13 +148,11 @@
       register: db_create_result
       changed_when: db_create_result.rc == 0
       failed_when: db_create_result.rc != 0 and 'already exists' not in db_create_result.stderr
-      no_log: true
 
     - name: Copy initialization script to postgres container
       ansible.builtin.command:
         cmd: podman cp "{{ temp_init_dir.path }}/init_build_stream_db.sql" "{{ postgres_container_name }}:/tmp/init_build_stream_db.sql"
       changed_when: true
-      no_log: true
 
     - name: Set up database schema permissions
       containers.podman.podman_container_exec:
@@ -174,7 +160,6 @@
         command: psql -U {{ postgres_user }} -d {{ postgres_db_name }} -f /tmp/init_build_stream_db.sql
       register: db_init_result
       changed_when: false
-      no_log: true
 
     - name: Display database initialization result
       ansible.builtin.debug:
@@ -192,7 +177,6 @@
       ansible.builtin.file:
         path: "{{ temp_init_dir.path }}"
         state: absent
-      no_log: true
 
     - name: Notify user of postgres container deployment status
       ansible.builtin.debug:

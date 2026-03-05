@@ -22,7 +22,6 @@
   register: build_stream_service_status
   failed_when: false
   changed_when: false
-  no_log: true
 
 - name: Stop and disable omnia_build_stream service if present
   ansible.builtin.systemd_service:
@@ -31,8 +30,6 @@
     enabled: false
   when: build_stream_service_status.status is defined
   failed_when: false
-  no_log: true
-  changed_when: false
 
 - name: Check if omnia_build_stream container exists
   containers.podman.podman_container_info:
@@ -152,7 +149,6 @@
     -subj "/C=US/ST=State/L=City/O=Omnia/CN={{ ansible_hostname }}"
     -addext "subjectAltName=DNS:{{ ansible_hostname }},DNS:localhost,IP:{{ ansible_default_ipv4.address }},IP:127.0.0.1,IP:{{ admin_ip }}"
   changed_when: true
-  no_log: true
 
 - name: Set permissions on SSL certificates
   ansible.builtin.file:
@@ -189,10 +185,8 @@
 
 - name: Generate JWT keys
   ansible.builtin.command: "{{ build_stream_jwt_keys_script }}"
-  register: jwt_keys
-  changed_when: true
   delegate_to: localhost
-  no_log: true
+  changed_when: false
 
 # - name: Update project name in default.yml
 #  ansible.builtin.replace:
@@ -219,7 +213,6 @@
         mode: "{{ build_stream_quadlet_file_mode }}"
       notify:
         - Reload systemd
-      no_log: true
 
     # Ensure systemd reload happens even if Quadlet content was already up-to-date
     - name: Force systemd to re-read Quadlet units
@@ -235,8 +228,6 @@
         name: "{{ build_stream_service }}"
         enabled: true
         state: started
-      no_log: true
-      changed_when: false
 
     - name: Wait until omnia_build_stream container exists and is running
       containers.podman.podman_container_info:
@@ -249,7 +240,6 @@
         - bs_info.containers | length > 0
         - bs_info.containers[0].State is defined
         - bs_info.containers[0].State.Running | bool
-      no_log: true
 
     - name: Run Alembic database migrations inside build_stream container
       containers.podman.podman_container_exec:
@@ -263,7 +253,6 @@
           DB_NAME: "{{ postgres_db_name }}"
       register: alembic_result
       changed_when: "'Running upgrade' in alembic_result.stdout"
-      no_log: true
 
     - name: Display migration result
       ansible.builtin.debug:
