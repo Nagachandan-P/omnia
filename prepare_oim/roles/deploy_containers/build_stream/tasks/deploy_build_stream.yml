@@ -182,7 +182,7 @@
 - name: Display certificate validation result
   ansible.builtin.debug:
     msg: "SSL certificate regeneration needed: {{ cert_regeneration_needed }}"
-  verbosity: 1
+    verbosity: 2
 
 - name: Ensure SSL certificate directory exists
   ansible.builtin.file:
