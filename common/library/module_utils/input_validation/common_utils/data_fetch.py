@@ -138,7 +138,18 @@ def input_data(input_file_path, omnia_base_dir, project_name, logger, module):
     """
     _, extension = os.path.splitext(input_file_path)
     if "json" in extension:
-        return json.load(open(input_file_path, "r")), extension
+        try:
+            with open(input_file_path, "r", encoding="utf-8") as file_obj:
+                return json.load(file_obj), extension
+        except json.JSONDecodeError as exc:
+            message = f"Syntax errors present in {input_file_path}: {exc}"
+            module.fail_json(msg=message)
+        except FileNotFoundError:
+            message = f"File not found: {input_file_path}"
+            module.fail_json(msg=message)
+        except Exception as exc:  # pragma: no cover - defensive
+            message = f"Error reading {input_file_path}: {exc}"
+            module.fail_json(msg=message)
     if "yml" in extension or "yaml" in extension:
         return (
             validation_utils.load_yaml_as_json(
