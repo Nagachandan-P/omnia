@@ -191,6 +191,10 @@ gitlab_build_stream_not_running_msg: >
   omnia_build_stream.service is not running on OIM host {{ build_stream_host_ip }}.
   Ensure prepare_oim.yml has been successfully executed before deploying GitLab.
 
+gitlab_postgres_not_running_msg: >
+  omnia_postgres.service is not running on OIM host {{ build_stream_host_ip }}.
+  Ensure prepare_oim.yml has been successfully executed before deploying GitLab.
+
 gitlab_bs_cert_missing_msg: >
   Build stream SSL certificate not found at {{ gitlab_bs_cert_path }} on OIM host {{ build_stream_host_ip }}.
   Ensure prepare_oim.yml has been successfully executed and certificates are generated.
