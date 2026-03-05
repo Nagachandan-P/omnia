@@ -200,13 +200,14 @@
   changed_when: true
   when: cert_regeneration_needed | default(true)
 
-- name: Set permissions on SSL certificates
+- name: Set permissions on SSL certificates (only when newly generated)
   ansible.builtin.file:
     path: "{{ item }}"
     mode: "{{ build_stream_ssl_file_mode }}"
   loop:
     - "{{ build_stream_ssl_cert }}"
     - "{{ build_stream_ssl_key }}"
+  when: cert_regeneration_needed | default(true)
 
 - name: Set execute permission on JWT key generation script
   ansible.builtin.file:
@@ -216,26 +217,35 @@
 
 - name: Check if JWT keys already exist
   ansible.builtin.stat:
-    path: "{{ build_stream_jwt_keys_dir }}/jwt_private.pem"
-  register: jwt_private_key
+    path: "{{ item }}"
+  register: jwt_keys_check
+  loop:
+    - "{{ build_stream_jwt_keys_dir }}/jwt_private.pem"
+    - "{{ build_stream_jwt_keys_dir }}/jwt_public.pem"
   delegate_to: localhost
 
-- name: Check if JWT public key exists
-  ansible.builtin.stat:
-    path: "{{ build_stream_jwt_keys_dir }}/jwt_public.pem"
-  register: jwt_public_key
+- name: Validate existing JWT keys
+  ansible.builtin.shell: |
+    # Check if private key is valid
+    openssl rsa -in "{{ build_stream_jwt_keys_dir }}/jwt_private.pem" -check -noout
+    # Check if public key is valid
+    openssl rsa -pubin -in "{{ build_stream_jwt_keys_dir }}/jwt_public.pem" -check -noout
+    # Check if keys match (modulus comparison)
+    priv_mod=$(openssl rsa -in "{{ build_stream_jwt_keys_dir }}/jwt_private.pem" -noout -modulus | openssl md5)
+    pub_mod=$(openssl rsa -pubin -in "{{ build_stream_jwt_keys_dir }}/jwt_public.pem" -noout -modulus | openssl md5)
+    [ "$priv_mod" = "$pub_mod" ]
+  register: jwt_keys_validation
+  changed_when: false
+  failed_when: false
   delegate_to: localhost
+  when: jwt_keys_check.results | selectattr('stat.exists') | list | length == 2
 
-- name: Remove existing JWT keys directory if it exists
-  ansible.builtin.file:
-    path: "{{ build_stream_jwt_keys_dir }}"
-    state: absent
-  delegate_to: localhost
-  when: jwt_private_key.stat.exists or jwt_public_key.stat.exists
-
-- name: Generate JWT keys
+- name: Generate JWT keys (only if needed)
   ansible.builtin.command: "{{ build_stream_jwt_keys_script }}"
   delegate_to: localhost
+  when: >
+    (jwt_keys_check.results | selectattr('stat.exists') | list | length != 2) or
+    (jwt_keys_validation.rc != 0)
   changed_when: false
 
 # - name: Update project name in default.yml
