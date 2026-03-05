@@ -54,7 +54,7 @@
     pulp_password: "{{ hostvars['localhost']['pulp_password'] }}"
     postgres_user: "{{ hostvars['localhost']['postgres_user'] }}"
     postgres_password: "{{ hostvars['localhost']['postgres_password'] }}"
-    postgres_db_name: "{{ hostvars['localhost']['postgres_db_name'] }}"
+    postgres_db_name: "{{ postgres_db_name }}"
   no_log: true
 
 # -------------------------------------------------------------------
