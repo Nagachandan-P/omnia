@@ -39,13 +39,6 @@
 
     - name: Read software_config.json to check for additional services
       block:
-        - name: Validate software_config.json using input validation
-          ansible.builtin.include_role:
-            name: ../input_validation/roles/validate_input
-          vars:
-            input_dir: "{{ input_project_dir }}"
-            input_validate_tags: ["software_config"]
-
         - name: Load software_config.json
           block:
             - name: Load software_config.json

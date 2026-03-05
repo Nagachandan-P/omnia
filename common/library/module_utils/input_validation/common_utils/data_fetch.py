@@ -144,21 +144,26 @@ def input_data(input_file_path, omnia_base_dir, project_name, logger, module):
             with open(input_file_path, "r", encoding="utf-8") as file_obj:
                 return json.load(file_obj), extension
         except json.JSONDecodeError as e:
-            error_msg = f"JSON syntax error in {input_file_path}: {e}"
+            error_msg = (
+                f"Failed to parse JSON file '{input_file_path}':\n"
+                f"Error: {e.msg}\n"
+                f"Line {e.lineno}, Column {e.colno}: {e.docline[e.colno-1:e.colno+10] if hasattr(e, 'docline') and e.docline else 'N/A'}\n"
+                f"Please check the JSON syntax in the file."
+            )
             logger.error(error_msg)
-            module.fail_json(msg="Failed.")
+            module.fail_json(msg="input data reading failed.")
         except FileNotFoundError:
             error_msg = f"File not found: {input_file_path}"
             logger.error(error_msg)
-            module.fail_json(msg="Failed.")
+            module.fail_json(msg="input data reading failed.")
         except (IOError, OSError, PermissionError) as exc:  # pragma: no cover - defensive
             error_msg = f"Error reading {input_file_path}: {exc}"
             logger.error(error_msg)
-            module.fail_json(msg="Failed.")
+            module.fail_json(msg="input data reading failed.")
         except Exception as exc:  # pragma: no cover - defensive
             error_msg = f"Unexpected error reading {input_file_path}: {exc}"
             logger.error(error_msg)
-            module.fail_json(msg="Failed.")
+            module.fail_json(msg="input data reading failed.")
     if "yml" in extension or "yaml" in extension:
         return (
             validation_utils.load_yaml_as_json(
