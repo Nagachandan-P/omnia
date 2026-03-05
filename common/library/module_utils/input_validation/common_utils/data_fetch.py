@@ -19,6 +19,8 @@ This module is used to fetch data from files
 import glob
 import os
 import json
+
+# pylint: disable=import-error,no-name-in-module
 from ansible.module_utils.input_validation.common_utils import validation_utils
 from ansible.module_utils.input_validation.common_utils import config
 
