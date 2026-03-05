@@ -13,30 +13,32 @@
 # limitations under the License.
 ---
 
-- name: Verify OIM prerequisites on build stream host
-  block:
-    - name: Check if playbook_watcher service is running
-      ansible.builtin.systemd_service:
-        name: playbook_watcher.service
-      register: watcher_service_status
-      failed_when: false
+- name: Set build_stream_host_ip fact from localhost
+  ansible.builtin.set_fact:
+    build_stream_host_ip: "{{ hostvars['localhost']['build_stream_host_ip'] }}"
 
-    - name: Fail if playbook_watcher service is not running
-      ansible.builtin.fail:
-        msg: "{{ gitlab_watcher_not_running_msg }}"
-      when: >
-        watcher_service_status.status is not defined or
-        watcher_service_status.status.ActiveState != 'active'
+- name: Check if playbook_watcher service is running
+  ansible.builtin.systemd_service:
+    name: playbook_watcher.service
+  register: watcher_service_status
+  failed_when: false
 
-    - name: Check if omnia_build_stream service is running
-      ansible.builtin.systemd_service:
-        name: omnia_build_stream.service
-      register: build_stream_service_status
-      failed_when: false
+- name: Fail if playbook_watcher service is not running
+  ansible.builtin.fail:
+    msg: "{{ gitlab_watcher_not_running_msg }}"
+  when: >
+    watcher_service_status.status is not defined or
+    watcher_service_status.status.ActiveState != 'active'
 
-    - name: Fail if omnia_build_stream service is not running
-      ansible.builtin.fail:
-        msg: "{{ gitlab_build_stream_not_running_msg }}"
-      when: >
-        build_stream_service_status.status is not defined or
-        build_stream_service_status.status.ActiveState != 'active'
+- name: Check if omnia_build_stream service is running
+  ansible.builtin.systemd_service:
+    name: omnia_build_stream.service
+  register: build_stream_service_status
+  failed_when: false
+
+- name: Fail if omnia_build_stream service is not running
+  ansible.builtin.fail:
+    msg: "{{ gitlab_build_stream_not_running_msg }}"
+  when: >
+    build_stream_service_status.status is not defined or
+    build_stream_service_status.status.ActiveState != 'active'
