@@ -99,15 +99,28 @@
       - "{{ gitlab_runner_config_path }}:/etc/gitlab-runner{{ gitlab_runner_volume_suffix | default('') }}"
   when: not gitlab_runner_config_stat.stat.exists
 
-- name: Ensure runner container is started
-  containers.podman.podman_container:
-    name: "{{ gitlab_runner_container_name }}"
-    image: "{{ gitlab_runner_image }}"
+- name: Ensure quadlet directory exists
+  ansible.builtin.file:
+    path: "{{ quadlet_dir }}"
+    state: directory
+    mode: "{{ quadlet_dir_mode }}"
+
+- name: Deploy GitLab runner quadlet file
+  ansible.builtin.template:
+    src: gitlab_runner.container.j2
+    dest: "{{ quadlet_dir }}/{{ gitlab_runner_container_name }}.container"
+    mode: "{{ quadlet_file_mode }}"
+  register: runner_quadlet_deployed
+
+- name: Reload systemd daemon to recognize quadlet
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: Enable and start GitLab runner service via quadlet
+  ansible.builtin.systemd_service:
+    name: "{{ gitlab_runner_container_name }}.service"
+    enabled: true
     state: started
-    restart_policy: "{{ gitlab_restart_policy }}"
-    volumes:
-      - "{{ gitlab_runner_config_path }}:/etc/gitlab-runner{{ gitlab_runner_volume_suffix | default('') }}"
-      - "{{ podman_socket_path }}:{{ docker_socket_path }}{{ gitlab_runner_volume_suffix | default('') }}"
 
 - name: Wait for an online project runner after deployment
   ansible.builtin.uri:
