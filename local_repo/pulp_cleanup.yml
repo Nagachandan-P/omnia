@@ -66,6 +66,19 @@
         container_list: "{{ cleanup_containers.split(',') | map('trim') | list if cleanup_containers is string else (cleanup_containers | default([])) }}"
         file_list: "{{ cleanup_files.split(',') | map('trim') | list if cleanup_files is string else (cleanup_files | default([])) }}"
 
+    - name: Load local_repo_config.yml
+      ansible.builtin.include_vars:
+        file: "/opt/omnia/input/project_default/local_repo_config.yml"
+        name: local_repo_config
+
+    - name: Extract omnia repo names from local_repo_config
+      ansible.builtin.set_fact:
+        omnia_repo_names: >-
+          {{
+            (((local_repo_config.omnia_repo_url_rhel_x86_64 | default([])) | map(attribute='name') | list) +
+            ((local_repo_config.omnia_repo_url_rhel_aarch64 | default([])) | map(attribute='name') | list)) | unique
+          }}
+
     - name: Display cleanup summary
       ansible.builtin.debug:
         msg:
@@ -74,12 +87,17 @@
           - "Containers   : {{ (container_list | default([]) | join(', ')) if cleanup_containers | default([]) | length > 0 else 'None' }}"
           - "Files        : {{ (file_list | default([]) | join(', ')) if cleanup_files | default([]) | length > 0 else 'None' }}"
           - "====================================="
+
     - name: Get user confirmation
       ansible.builtin.pause:
         prompt: |
 
           WARNING: This will permanently delete the specified artifacts.
           This action cannot be undone.
+
+          NOTE: If you are deleting any of the following Omnia repos: {{ omnia_repo_names | join(', ') }}
+          You MUST rerun local_repo.yml after cleanup to reconfigure the repo(s).
+          Failure to do so will result in failures in execution of further playbooks.
 
           Type 'yes' to continue or press Ctrl+C to abort
       register: user_input

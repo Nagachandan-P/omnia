@@ -1147,17 +1147,22 @@ def write_cleanup_status(results: List[Dict], base_path: str):
     return status_file
 
 
-def update_metadata_after_cleanup(cleaned_repos: List[str], metadata_file: str, logger):
+def update_metadata_after_cleanup(cleaned_repos: List[str], metadata_file: str, logger,
+                                  cleanup_all: bool = False):
     """Remove cleaned-up repository entries from localrepo_metadata.yml.
 
     For each successfully cleaned repo, find and remove its policy entry
     from the metadata file. Repo names in metadata are normalized
     (hyphens replaced with underscores, suffixed with _policy).
 
+    When cleanup_all is True (i.e. cleanup_repos=all), the entire metadata
+    file is deleted.
+
     Args:
         cleaned_repos: List of repo names that were successfully deleted
         metadata_file: Path to localrepo_metadata.yml
         logger: Logger instance
+        cleanup_all: If True, delete the entire metadata file
     """
     if not cleaned_repos or not metadata_file:
         return
@@ -1167,6 +1172,12 @@ def update_metadata_after_cleanup(cleaned_repos: List[str], metadata_file: str, 
         return
 
     try:
+        # When cleanup_repos=all, delete the metadata file entirely.
+        if cleanup_all:
+            os.remove(metadata_file)
+            logger.info(f"Deleted metadata file: {metadata_file}")
+            return
+
         with open(metadata_file, 'r', encoding='utf-8') as f:
             metadata = yaml.safe_load(f) or {}
 
@@ -1441,7 +1452,8 @@ def run_module():
     # Update metadata file to remove entries for successfully cleaned repos
     successfully_cleaned = [r['name'] for r in all_results if r['status'] == 'Success']
     if successfully_cleaned and metadata_file:
-        update_metadata_after_cleanup(successfully_cleaned, metadata_file, logger)
+        update_metadata_after_cleanup(successfully_cleaned, metadata_file, logger,
+                                          cleanup_all=cleanup_all_repos)
 
     # Update yum repo file (pulp.repo) to remove stanzas for successfully cleaned repositories
     cleaned_repo_names = [r['name'] for r in all_results if r['status'] == 'Success' and r.get('type') == 'repository']
