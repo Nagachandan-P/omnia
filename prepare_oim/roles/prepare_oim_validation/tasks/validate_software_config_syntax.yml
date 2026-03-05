@@ -14,13 +14,15 @@
 ---
 
 - name: Validate software_config.json syntax
-  ansible.builtin.command:
-    cmd: python3 -m json.tool "{{ input_project_dir }}/software_config.json"
-  register: software_config_validate
-  changed_when: false
-  failed_when: software_config_validate.rc != 0
+  block:
+    - name: Check JSON syntax
+      ansible.builtin.command:
+        cmd: python3 -m json.tool "{{ input_project_dir }}/software_config.json"
+      register: software_config_validate
+      changed_when: false
+      failed_when: software_config_validate.rc != 0
 
-- name: Fail with clear error message if JSON is invalid
-  ansible.builtin.fail:
-    msg: "{{ software_config_syntax_fail_msg }}"
-  when: software_config_validate.rc != 0
+  rescue:
+    - name: Fail with clear error message if JSON is invalid
+      ansible.builtin.fail:
+        msg: "{{ software_config_syntax_fail_msg }}"
