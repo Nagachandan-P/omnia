@@ -13,14 +13,19 @@
 # limitations under the License.
 ---
 
-- name: Check prerequisites
-  ansible.builtin.include_tasks: prereq_checks.yml
+- name: Install sshpass on localhost
+  block:
+    - name: Install sshpass package
+      ansible.builtin.package:
+        name: sshpass
+        state: present
+  rescue:
+    - name: Fail with repo configuration guidance
+      ansible.builtin.fail:
+        msg: "{{ gitlab_sshpass_install_fail_msg }}"
 
-- name: Generate SSH keypair on control node
-  ansible.builtin.include_tasks: generate_keypair.yml
-
-- name: Authorize key on remote host
-  ansible.builtin.include_tasks: authorize_key.yml
-
-- name: Validate SSH connectivity
-  ansible.builtin.include_tasks: validate_ssh.yml
+- name: Load GitLab configuration inputs
+  ansible.builtin.include_vars:
+    file: "{{ hostvars['localhost']['input_project_dir'] }}/gitlab_config.yml"
+  delegate_to: localhost
+  run_once: true
