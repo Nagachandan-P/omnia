@@ -150,6 +150,7 @@
 
 - name: Verify key-certificate pairing
   ansible.builtin.shell: |
+    set -o pipefail
     cert_modulus=$(openssl x509 -noout -modulus -in {{ build_stream_ssl_cert }} | openssl md5)
     key_modulus=$(openssl rsa -noout -modulus -in {{ build_stream_ssl_key }} | openssl md5)
     [ "$cert_modulus" = "$key_modulus" ]
@@ -226,6 +227,7 @@
 
 - name: Validate existing JWT keys
   ansible.builtin.shell: |
+    set -o pipefail
     # Check if private key is valid
     openssl rsa -in "{{ build_stream_jwt_keys_dir }}/jwt_private.pem" -check -noout
     # Check if public key is valid
