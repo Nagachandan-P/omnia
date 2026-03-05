@@ -250,6 +250,7 @@ def validate_build_stream_config(input_file_path, data,
     # Validate aarch64_inventory_host_ip (conditional - required if PXE mapping has aarch64 groups)
     aarch64_inventory_host_ip = data.get("aarch64_inventory_host_ip")
     
+    ### aarch64_inventory_host_ip check
     # Check if PXE mapping file contains aarch64 functional groups
     has_aarch64_groups = False
     try:
@@ -273,8 +274,7 @@ def validate_build_stream_config(input_file_path, data,
             errors.append(create_error_msg(
                 build_stream_yml, 
                 "aarch64_inventory_host_ip",
-                "Field 'aarch64_inventory_host_ip' is required when PXE mapping file contains aarch64 functional groups. "
-                "Provide the admin IP of the aarch64 inventory host or remove aarch64 groups from PXE mapping."
+                msg.AARCH64_INVENTORY_HOST_IP_REQUIRED_MSG
             ))
             return errors
 
@@ -300,6 +300,37 @@ def validate_build_stream_config(input_file_path, data,
                 ))
         except ValueError as e:
             logger.error("Failed to validate subnet for aarch64_inventory_host_ip: %s", str(e))
+
+        # Check aarch64 host IP reachability using socket (safer than subprocess)
+        try:
+            import socket
+            # Try to connect to SSH port which is usually open on inventory hosts
+            ssh_port = 22  # SSH
+            reachable = False
+            
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                    sock.settimeout(2)  # 2-second timeout
+                    result = sock.connect_ex((str(aarch64_ip), ssh_port))
+                    if result == 0:
+                        reachable = True
+                        logger.debug(f"aarch64 host {aarch64_ip} reachable on SSH port {ssh_port}")
+            except (socket.timeout, socket.error):
+                pass
+            
+            if not reachable:
+                errors.append(create_error_msg(
+                    build_stream_yml,
+                    "aarch64_inventory_host_ip",
+                    msg.AARCH64_INVENTORY_HOST_IP_NOT_REACHABLE_MSG.format(str(aarch64_ip))
+                ))
+        except Exception as e:
+            logger.warning("Failed to check aarch64 host IP reachability: %s", str(e))
+            errors.append(create_error_msg(
+                build_stream_yml,
+                "aarch64_inventory_host_ip",
+                msg.AARCH64_INVENTORY_HOST_IP_REACHABILITY_CHECK_FAILED_MSG.format(str(aarch64_ip))
+            ))
 
     # Validate build_stream_port
     build_stream_port = data.get("build_stream_port")
