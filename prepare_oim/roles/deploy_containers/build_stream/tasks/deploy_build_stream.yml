@@ -216,6 +216,13 @@
     mode: "{{ build_stream_jwt_script_mode }}"
   delegate_to: localhost
 
+- name: Ensure JWT keys directory exists
+  ansible.builtin.file:
+    path: "{{ build_stream_jwt_keys_dir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+
 - name: Check if JWT keys already exist
   ansible.builtin.stat:
     path: "{{ item }}"
@@ -242,13 +249,39 @@
   delegate_to: localhost
   when: jwt_keys_check.results | selectattr('stat.exists') | list | length == 2
 
+- name: Determine if JWT key regeneration is needed
+  ansible.builtin.set_fact:
+    jwt_regeneration_needed: >-
+      {{
+        (jwt_keys_check.results | selectattr('stat.exists') | list | length != 2) or
+        (jwt_keys_validation.rc | default(1) != 0)
+      }}
+
+- name: Display JWT key validation result
+  ansible.builtin.debug:
+    msg: "JWT key regeneration needed: {{ jwt_regeneration_needed }}"
+    verbosity: 2
+
+- name: Remove incomplete JWT keys if regeneration needed
+  ansible.builtin.file:
+    path: "{{ build_stream_jwt_keys_dir }}"
+    state: absent
+  delegate_to: localhost
+  when: jwt_regeneration_needed | bool
+
+- name: Recreate JWT keys directory
+  ansible.builtin.file:
+    path: "{{ build_stream_jwt_keys_dir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  when: jwt_regeneration_needed | bool
+
 - name: Generate JWT keys (only if needed)
   ansible.builtin.command: "{{ build_stream_jwt_keys_script }}"
   delegate_to: localhost
-  when: >
-    (jwt_keys_check.results | selectattr('stat.exists') | list | length != 2) or
-    (jwt_keys_validation.rc != 0)
-  changed_when: false
+  when: jwt_regeneration_needed | bool
+  changed_when: true
 
 # - name: Update project name in default.yml
 #  ansible.builtin.replace:
