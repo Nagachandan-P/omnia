@@ -70,7 +70,7 @@ def json_line_number(file_path, json_path, module):
     if '.' in json_path:
         json_path = json_path.split('.')[0] + "\":"
         is_line_num = False
-    with open(file_path, "r") as file:
+    with open(file_path, "r", encoding="utf-8") as file:
         lines = file.readlines()
         if not lines:
             message = f"Unable to access and read file: {file_path}"
@@ -147,7 +147,7 @@ def input_data(input_file_path, omnia_base_dir, project_name, logger, module):
         except FileNotFoundError:
             message = f"File not found: {input_file_path}"
             module.fail_json(msg=message)
-        except Exception as exc:  # pragma: no cover - defensive
+        except (IOError, OSError, PermissionError) as exc:  # pragma: no cover - defensive
             message = f"Error reading {input_file_path}: {exc}"
             module.fail_json(msg=message)
     if "yml" in extension or "yaml" in extension:
