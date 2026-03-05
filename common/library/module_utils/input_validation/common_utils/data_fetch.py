@@ -143,15 +143,22 @@ def input_data(input_file_path, omnia_base_dir, project_name, logger, module):
         try:
             with open(input_file_path, "r", encoding="utf-8") as file_obj:
                 return json.load(file_obj), extension
-        except json.JSONDecodeError as exc:
-            message = f"Syntax errors present in {input_file_path}: {exc}"
-            module.fail_json(msg=message)
+        except json.JSONDecodeError as e:
+            error_msg = f"JSON syntax error in {input_file_path}: {e}"
+            logger.error(error_msg)
+            module.fail_json(msg="Failed.")
         except FileNotFoundError:
-            message = f"File not found: {input_file_path}"
-            module.fail_json(msg=message)
+            error_msg = f"File not found: {input_file_path}"
+            logger.error(error_msg)
+            module.fail_json(msg="Failed.")
         except (IOError, OSError, PermissionError) as exc:  # pragma: no cover - defensive
-            message = f"Error reading {input_file_path}: {exc}"
-            module.fail_json(msg=message)
+            error_msg = f"Error reading {input_file_path}: {exc}"
+            logger.error(error_msg)
+            module.fail_json(msg="Failed.")
+        except Exception as exc:  # pragma: no cover - defensive
+            error_msg = f"Unexpected error reading {input_file_path}: {exc}"
+            logger.error(error_msg)
+            module.fail_json(msg="Failed.")
     if "yml" in extension or "yaml" in extension:
         return (
             validation_utils.load_yaml_as_json(
