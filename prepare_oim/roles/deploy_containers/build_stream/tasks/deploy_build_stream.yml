@@ -129,19 +129,68 @@
     verbosity: 2
   when: image_pull_result is succeeded
 
-# Generate SSL certificates
-- name: Remove existing SSL certificate directory if it exists
-  ansible.builtin.file:
-    path: "{{ build_stream_ssl_dir }}"
-    state: absent
+# -------------------------------------------------------------------
+# 6) Generate SSL certificates (idempotent)
+# -------------------------------------------------------------------
+- name: Check if Build Stream SSL certificates exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: cert_files_check
+  loop:
+    - "{{ build_stream_ssl_cert }}"
+    - "{{ build_stream_ssl_key }}"
 
-- name: Create SSL certificate directory
+- name: Check certificate expiration
+  ansible.builtin.command: |
+    openssl x509 -enddate -noout -in {{ build_stream_ssl_cert }}
+  register: cert_enddate
+  changed_when: false
+  failed_when: false
+  when: cert_files_check.results | selectattr('stat.exists') | list | length == 2
+
+- name: Verify key-certificate pairing
+  ansible.builtin.shell: |
+    cert_modulus=$(openssl x509 -noout -modulus -in {{ build_stream_ssl_cert }} | openssl md5)
+    key_modulus=$(openssl rsa -noout -modulus -in {{ build_stream_ssl_key }} | openssl md5)
+    [ "$cert_modulus" = "$key_modulus" ]
+  register: cert_key_match
+  changed_when: false
+  failed_when: false
+  when: cert_files_check.results | selectattr('stat.exists') | list | length == 2
+
+- name: Check certificate SAN entries
+  ansible.builtin.command: |
+    openssl x509 -noout -ext subjectAltName -in {{ build_stream_ssl_cert }}
+  register: cert_san
+  changed_when: false
+  failed_when: false
+  when: cert_files_check.results | selectattr('stat.exists') | list | length == 2
+
+- name: Determine if certificate regeneration is needed
+  ansible.builtin.set_fact:
+    cert_regeneration_needed: >-
+      {{
+        (cert_files_check.results | selectattr('stat.exists') | list | length != 2) or
+        (cert_enddate.rc != 0) or
+        (cert_key_match.rc != 0) or
+        (cert_san.rc != 0) or
+        (cert_san.stdout is not search('DNS:' + ansible_hostname)) or
+        (cert_san.stdout is not search('IP:' + admin_ip)) or
+        (cert_enddate.stdout is not search('GMT'))
+      }}
+
+- name: Display certificate validation result
+  ansible.builtin.debug:
+    msg: "SSL certificate regeneration needed: {{ cert_regeneration_needed }}"
+  verbosity: 1
+
+- name: Ensure SSL certificate directory exists
   ansible.builtin.file:
     path: "{{ build_stream_ssl_dir }}"
     state: directory
     mode: "{{ build_stream_dir_mode }}"
 
-- name: Generate self-signed SSL certificate
+- name: Generate self-signed SSL certificate (only if needed)
   ansible.builtin.command: |
     openssl req -x509 -newkey rsa:4096 -nodes -days {{ build_stream_ssl_days }}
     -keyout {{ build_stream_ssl_key }}
@@ -149,6 +198,7 @@
     -subj "/C=US/ST=State/L=City/O=Omnia/CN={{ ansible_hostname }}"
     -addext "subjectAltName=DNS:{{ ansible_hostname }},DNS:localhost,IP:{{ ansible_default_ipv4.address }},IP:127.0.0.1,IP:{{ admin_ip }}"
   changed_when: true
+  when: cert_regeneration_needed | default(true)
 
 - name: Set permissions on SSL certificates
   ansible.builtin.file:
