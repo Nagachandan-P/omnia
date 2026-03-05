@@ -247,9 +247,38 @@ def validate_build_stream_config(input_file_path, data,
             msg.build_stream_host_ip_not_oim_ip_msg(build_stream_host_ip, ethernet_ips)
         ))
 
-    # Validate aarch64_inventory_host_ip
+    # Validate aarch64_inventory_host_ip (conditional - required if PXE mapping has aarch64 groups)
     aarch64_inventory_host_ip = data.get("aarch64_inventory_host_ip")
+    
+    # Check if PXE mapping file contains aarch64 functional groups
+    has_aarch64_groups = False
+    try:
+        pxe_mapping_path = os.path.join(omnia_base_dir, project_name, "pxe_mapping_file.csv")
+        if os.path.exists(pxe_mapping_path):
+            with open(pxe_mapping_path, 'r', encoding='utf-8') as f:
+                # Skip header and check for aarch64 in functional group names
+                for line in f:
+                    if line.startswith('FUNCTIONAL_GROUP_NAME'):
+                        continue
+                    if 'aarch64' in line.lower():
+                        has_aarch64_groups = True
+                        break
+        logger.debug("PXE mapping contains aarch64 groups: %s", has_aarch64_groups)
+    except Exception as e:
+        logger.warning("Failed to check PXE mapping file for aarch64 groups: %s", str(e))
 
+    # If PXE mapping has aarch64 groups, require aarch64_inventory_host_ip
+    if has_aarch64_groups:
+        if not aarch64_inventory_host_ip or aarch64_inventory_host_ip in ["", None]:
+            errors.append(create_error_msg(
+                build_stream_yml, 
+                "aarch64_inventory_host_ip",
+                "Field 'aarch64_inventory_host_ip' is required when PXE mapping file contains aarch64 functional groups. "
+                "Provide the admin IP of the aarch64 inventory host or remove aarch64 groups from PXE mapping."
+            ))
+            return errors
+
+    # If aarch64_inventory_host_ip is provided, validate it
     if aarch64_inventory_host_ip and aarch64_inventory_host_ip not in ["", None]:
         # Check if it's a valid IP format
         try:
