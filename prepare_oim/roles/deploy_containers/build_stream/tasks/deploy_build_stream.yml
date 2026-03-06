@@ -233,7 +233,8 @@
         state: started
       no_log: true
       changed_when: false
-    - block:
+    - name: "Ensure build_stream readiness and migrations"
+      block:
         - name: Wait until omnia_build_stream container exists and is running
           containers.podman.podman_container_info:
             name: "{{ build_stream_container_name }}"
