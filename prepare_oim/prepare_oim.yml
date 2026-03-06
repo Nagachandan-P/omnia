@@ -39,17 +39,26 @@
 
     - name: Read software_config.json to check for additional services
       block:
+        - name: Validate software_config.json using input validation
+          ansible.builtin.include_role:
+            name: ../input_validation/roles/validate_input
+          vars:
+            input_dir: "{{ input_project_dir }}"
+            input_validate_tags: ["software_config"]
+          register: software_config_validation
+
         - name: Load software_config.json
           block:
             - name: Load software_config.json
               ansible.builtin.include_vars:
                 file: "{{ input_project_dir }}/software_config.json"
                 name: software_config
-
-          rescue:
-            - name: Fail with clear error message for JSON syntax error
-              ansible.builtin.fail:
-                msg: "Failed. Syntax errors present in software_config.json. Fix errors and re-run playbook again."
+              no_log: true
+              failed_when: false
+              register: software_config_load
+          when:
+            - software_config_validation is defined
+            - not software_config_validation.failed | default(false)
 
         - name: Set software names list
           ansible.builtin.set_fact:
