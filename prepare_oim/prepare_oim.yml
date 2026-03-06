@@ -48,6 +48,9 @@
           register: software_config_validation
 
         - name: Load software_config.json
+          when:
+            - software_config_validation is defined
+            - not software_config_validation.failed | default(false)
           block:
             - name: Load software_config.json
               ansible.builtin.include_vars:
@@ -56,9 +59,6 @@
               no_log: true
               failed_when: false
               register: software_config_load
-          when:
-            - software_config_validation is defined
-            - not software_config_validation.failed | default(false)
 
         - name: Set software names list
           ansible.builtin.set_fact:
