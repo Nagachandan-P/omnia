@@ -151,27 +151,18 @@ def input_data(input_file_path, omnia_base_dir, project_name, logger, module):
                 f"Please check the JSON syntax in the file."
             )
             logger.error(error_msg)
-            #module.fail_json(msg="input data reading failed.")
-            #errors.append(
-            #    create_error_msg(
-            #        "additional_software.json",
-            #        "",
-            #        en_us_validation_msg.MISSING_ADDITIONAL_SOFTWARE_JSON_FILE))
             return None, extension
         except FileNotFoundError:
             error_msg = f"File not found: {input_file_path}"
             logger.error(error_msg)
-            #module.fail_json(msg="input data reading failed.")
             return None, extension
         except (IOError, OSError, PermissionError) as exc:  # pragma: no cover - defensive
             error_msg = f"Error reading {input_file_path}: {exc}"
             logger.error(error_msg)
-            #module.fail_json(msg="input data reading failed.")
             return None, extension
         except Exception as exc:  # pragma: no cover - defensive
             error_msg = f"Unexpected error reading {input_file_path}: {exc}"
             logger.error(error_msg)
-            #module.fail_json(msg="input data reading failed.")
             return None, extension
     if "yml" in extension or "yaml" in extension:
         return (
