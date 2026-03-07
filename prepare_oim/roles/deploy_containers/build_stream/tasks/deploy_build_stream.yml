@@ -58,21 +58,11 @@
   no_log: true
 
 # -------------------------------------------------------------------
-# 2) Set build_stream_host_ip from config or fallback to admin_ip
+# 2) Display build_stream_host_ip being used
 # -------------------------------------------------------------------
-- name: Set build_stream_host_ip from config or fallback to admin_ip
-  ansible.builtin.set_fact:
-    build_stream_host_ip: "{{
-      build_stream_host_ip
-      if (build_stream_host_ip is defined and
-          build_stream_host_ip != None and
-          build_stream_host_ip != '')
-      else admin_ip }}"
-  changed_when: false
-
 - name: Display host IP being used
   ansible.builtin.debug:
-    msg: "Using host IP: {{ build_stream_host_ip }} for Build stream API server"
+    msg: "Using host IP: {{ build_stream_host_ip }} and port: {{ build_stream_port }} for Build stream API server"
     verbosity: 1
 
 # -------------------------------------------------------------------
@@ -147,7 +137,7 @@
     -keyout {{ build_stream_ssl_key }}
     -out {{ build_stream_ssl_cert }}
     -subj "/C=US/ST=State/L=City/O=Omnia/CN={{ ansible_hostname }}"
-    -addext "subjectAltName=DNS:{{ ansible_hostname }},DNS:localhost,IP:{{ ansible_default_ipv4.address }},IP:127.0.0.1,IP:{{ admin_ip }}"
+    -addext "subjectAltName=DNS:{{ ansible_hostname }},DNS:localhost,IP:{{ ansible_default_ipv4.address }},IP:127.0.0.1,IP:{{ build_stream_host_ip }}"
   changed_when: true
 
 - name: Set permissions on SSL certificates
