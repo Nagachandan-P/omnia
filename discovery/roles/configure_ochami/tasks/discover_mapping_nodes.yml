@@ -68,7 +68,7 @@
       register: openchami_target_status
       retries: 2
       delay: 5
-      until: openchami_target_status is succeeded
+      until: openchami_target_status is success
 
     - name: Fail if openchami.target is not up
       ansible.builtin.fail:
