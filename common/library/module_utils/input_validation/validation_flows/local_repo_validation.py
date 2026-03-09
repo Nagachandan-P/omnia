@@ -20,6 +20,7 @@ import glob
 import re
 from ansible.module_utils.input_validation.common_utils import validation_utils
 from ansible.module_utils.input_validation.common_utils import config
+from ansible.module_utils.input_validation.common_utils import en_us_validation_msg
 from ansible.module_utils.local_repo.software_utils import load_yaml, load_json
 
 file_names = config.files
@@ -128,6 +129,27 @@ def validate_local_repo_config(input_file_path, data,
             if key_path and not os.path.exists(key_path):
                 errors.append(create_error_msg(local_repo_yml, "user_registry", 
                                              f"Key file not found: {key_path}"))
+
+    # Validate user_repo_url name prefixes
+    user_repo_prefix_map = {
+        "user_repo_url_x86_64": "x86_64_",
+        "user_repo_url_aarch64": "aarch64_",
+    }
+    for repo_key, expected_prefix in user_repo_prefix_map.items():
+        user_repos = data.get(repo_key)
+        if user_repos:
+            for repo in user_repos:
+                repo_name = repo.get("name", "")
+                if repo_name and not repo_name.startswith(expected_prefix):
+                    errors.append(create_error_msg(
+                        local_repo_yml, repo_key,
+                        en_us_validation_msg.USER_REPO_NAME_PREFIX_FAIL_MSG.format(
+                            repo_name=repo_name,
+                            repo_key=repo_key,
+                            expected_prefix=expected_prefix
+                        )
+                    ))
+
     repo_names = {}
     sub_result = check_subscription_status(logger)
     logger.info(f"validate_local_repo_config: Subscription status: {sub_result}")
