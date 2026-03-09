@@ -484,6 +484,15 @@
 
       runcmd:
         - rm -rf /var/lib/cloud/instance
+        - |
+          # Force hostname from cloud-init metadata
+          CLOUD_HOSTNAME=$(cloud-init query ds.meta_data.local-hostname 2>/dev/null || echo "localhost")
+          if [ -n "$CLOUD_HOSTNAME" ] && [ "$CLOUD_HOSTNAME" != "localhost" ]; then
+            echo "Setting hostname to: $CLOUD_HOSTNAME"
+            hostnamectl set-hostname "$CLOUD_HOSTNAME"
+            echo "$CLOUD_HOSTNAME" > /etc/hostname
+            systemctl restart systemd-hostnamed 2>/dev/null || true
+          fi
         - /usr/local/bin/set-ssh.sh
         - /usr/local/bin/install_nvidia_driver.sh
         # slurm user and group created in the users module
