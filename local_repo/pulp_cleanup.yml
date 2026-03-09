@@ -74,13 +74,13 @@
           - "Containers   : {{ (container_list | default([]) | join(', ')) if cleanup_containers | default([]) | length > 0 else 'None' }}"
           - "Files        : {{ (file_list | default([]) | join(', ')) if cleanup_files | default([]) | length > 0 else 'None' }}"
           - "====================================="
+
     - name: Get user confirmation
       ansible.builtin.pause:
         prompt: |
 
           WARNING: This will permanently delete the specified artifacts.
           This action cannot be undone.
-
           Type 'yes' to continue or press Ctrl+C to abort
       register: user_input
       when: not (force | default(false)) | bool
@@ -114,7 +114,9 @@
     - name: Display summary
       ansible.builtin.debug:
         msg:
-          - "========== CLEANUP COMPLETED =========="
+          - "================================================CLEANUP COMPLETED==========================================================="
           - "Total: {{ cleanup_result.total }}, Success: {{ cleanup_result.success_count }}, Failed: {{ cleanup_result.failed_count }}"
           - "Status file: {{ cleanup_result.status_file }}"
-          - "========================================"
+          - "NOTE: If the deleted artifact is required by any software, you must rerun local_repo.yml to sync the artifact(s) again."
+          - "If the artifact(s) is not synced in local repo, subsequent playbooks having dependency may fail"
+          - "============================================================================================================================"
