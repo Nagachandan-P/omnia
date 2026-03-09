@@ -73,6 +73,7 @@ class StageResponse(BaseModel):
     ended_at: Optional[str] = Field(default=None, description="End timestamp (ISO 8601)")
     error_code: Optional[str] = Field(default=None, description="Error code if failed")
     error_summary: Optional[str] = Field(default=None, description="Error summary if failed")
+    log_file_path: Optional[str] = Field(default=None, description="Ansible log file path on OIM host (NFS share)")
 
 
 class CreateJobResponse(BaseModel):

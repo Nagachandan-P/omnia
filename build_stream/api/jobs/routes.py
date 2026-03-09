@@ -183,6 +183,7 @@ async def create_job(
                 ended_at=s.ended_at.isoformat() + "Z" if s.ended_at else None,
                 error_code=s.error_code,
                 error_summary=s.error_summary,
+                log_file_path=s.log_file_path,
             )
             for s in stages_entities
         ]
@@ -376,6 +377,7 @@ async def get_job(
                 ended_at=s.ended_at.isoformat() + "Z" if s.ended_at else None,
                 error_code=s.error_code,
                 error_summary=s.error_summary,
+                log_file_path=s.log_file_path,
             )
             for s in filtered_stages
         ]
