@@ -76,7 +76,6 @@ gitlab_directories:
 # GitLab files
 gitlab_initial_root_password_path: "/etc/gitlab/initial_root_password"
 gitlab_root_token_file_path: "/root/.gitlab_root_token"
-gitlab_root_access_file_path: "/root/.gitlab_root_access"
 
 # Runner container
 gitlab_runner_image: "docker.io/gitlab/gitlab-runner:v18.8.0"
@@ -98,6 +97,13 @@ gitlab_runner_require_online_after_deploy: true
 gitlab_runner_online_check_retries: 12
 gitlab_runner_online_check_delay: 10
 gitlab_runner_online_failure_msg: "No online runner is assigned to project {{ gitlab_project_name }} after deployment."
+
+gitlab_runner_online_check_detailed_fail_msg: |
+  Failed to detect online GitLab runner after deployment.
+  This can be caused by GitLab configuration changes like:
+  - GitLab port changed (current: {{ gitlab_https_port }})
+  - GitLab project name/ID changed (current: {{ gitlab_project_name }})
+  For any GitLab reconfiguration, you must run gitlab_cleanup.yml before re-running the gitlab playbook.
 
 # Podman socket (Docker-compatible, used by runner)
 podman_socket_path: "/run/podman/podman.sock"
@@ -217,6 +223,9 @@ gitlab_storage_insufficient_msg: >
   Insufficient storage space. Required: {{ gitlab_min_storage_gb }}GB, Available: {{ available_disk_space.stdout }}GB.
   Please ensure the GitLab host has at least {{ gitlab_min_storage_gb }}GB of free disk space.
 
+gitlab_disable_prometheus: true
+gitlab_disable_grafana: true
+
 # Podman login configuration
 retry_count: "5"
 delay_time: "10"
@@ -297,7 +306,7 @@ gitlab_deployment_complete_msg:
   - "Access URL: {{ gitlab_external_url_computed }}"
   - "SSH Port:   {{ gitlab_ssh_port }}"
   - "Username:   root"
-  - "Password:   [CONFIGURED - See /root/.gitlab_root_access]"
+  - "Password:   [Encrypted - Stored in {{ hostvars['localhost']['input_project_dir'] }}/omnia_config_credentials.yml]"
   - ""
   - "Project:    {{ gitlab_project_name }}"
   - "Project ID: {{ gitlab_project_id }}"
