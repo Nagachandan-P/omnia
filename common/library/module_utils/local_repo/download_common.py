@@ -1,4 +1,4 @@
-# Copyright 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,11 +35,12 @@ from ansible.module_utils.local_repo.rest_client import RestClient
 from ansible.module_utils.local_repo.common_functions import load_pulp_config
 from ansible.module_utils.local_repo.config import (
     pulp_file_commands,
+    pulp_rpm_commands,
     CLI_FILE_PATH,
-    POST_TIMEOUT,
-    ISO_POLL_VAL,
-    TAR_POLL_VAL,
-    FILE_POLL_VAL,
+    ISO_TIMEOUT_MIN,
+    TAR_TIMEOUT_MIN,
+    FILE_TIMEOUT_MIN,
+    TASK_POLL_INTERVAL,
     FILE_URI,
     PULP_SSL_CA_CERT
 )
@@ -200,7 +201,7 @@ def wait_for_task(task_href, base_url, username, password, logger, timeout=3600,
     logger.error("Timeout waiting for task to complete")
     return False
 
-def handle_file_upload(repository_name, relative_path, file_url, poll_interval, logger):
+def handle_file_upload(repository_name, relative_path, file_url, timeout_minutes, logger):
     """
     Ensure repository exists, then POST a file to Pulp and wait for the task to complete.
 
@@ -208,7 +209,7 @@ def handle_file_upload(repository_name, relative_path, file_url, poll_interval, 
         repository_name (str): Name of the repository.
         relative_path (str): Relative path for the file in the repository.
         file_url (str): URL of the file to upload.
-        poll_interval: Polling time
+        timeout_minutes (int): Maximum time in minutes to wait for task completion.
         logger (logging.Logger): Logger instance.
 
     Returns:
@@ -261,9 +262,10 @@ def handle_file_upload(repository_name, relative_path, file_url, poll_interval, 
         return "Failed"
 
     # Wait for task completion
-    logger.info(f"Waiting for task {task_href} to complete...")
+    timeout_seconds = timeout_minutes * 60
+    logger.info(f"Waiting for task {task_href} to complete (timeout: {timeout_minutes} min)...")
     task_result = wait_for_task(task_href, base_url, config["username"], passcode,
-                               logger, timeout=POST_TIMEOUT, interval=poll_interval)
+                               logger, timeout=timeout_seconds, interval=TASK_POLL_INTERVAL)
     if task_result:
         logger.info(f"File successfully uploaded to repository '{repository_name}'.")
         return "Success"
@@ -271,7 +273,7 @@ def handle_file_upload(repository_name, relative_path, file_url, poll_interval, 
         logger.error(f"Task {task_href} failed or timed out. File upload to repository '{repository_name}' failed.")
         return "Failed"
 
-def handle_post_request(repository_name, relative_path, base_path, file_url, poll_interval,logger):
+def handle_post_request(repository_name, relative_path, base_path, file_url, timeout_minutes,logger):
     """
     Handles the full Pulp upload and distribution process for a given repository and file.
     Args:
@@ -279,13 +281,13 @@ def handle_post_request(repository_name, relative_path, base_path, file_url, pol
         relative_path (str): Path where the file should be stored inside the repository.
         base_path (str): The base path for the distribution.
         file_url (str): URL of the file to be uploaded.
-        poll_interval: Interval for polling
+        timeout_minutes (int): Maximum time in minutes to wait for upload task completion.
         logger (logging.Logger): Logger for logging messages and errors.
 
     Returns:
         str: "Success" if the operation completes successfully, "Failed" otherwise.
     """
-    result = handle_file_upload(repository_name, relative_path, file_url, poll_interval,logger)
+    result = handle_file_upload(repository_name, relative_path, file_url, timeout_minutes,logger)
     if result =="Success":
         distribution_name = repository_name
         logger.info("Creating publication...")
@@ -477,12 +479,12 @@ def process_manifest(file,repo_store_path, status_file_path, cluster_os_type, cl
         manifest_directory = os.path.join(repo_store_path, "offline_repo", "cluster",arc.lower(), cluster_os_type, cluster_os_version, "manifest", package_name)
         # # Determine the manifest file path
         file_path = os.path.join(manifest_directory, f"{package_name}.yaml")
-        repository_name = "manifest" + package_name
+        repository_name = arc.lower() + "_manifest" + package_name
         output_file =  package_name + ".yml"
         relative_path = output_file
         base_path = manifest_directory.strip("/")
         status = handle_post_request(repository_name, relative_path,
-                 base_path, url, FILE_POLL_VAL, logger)
+                 base_path, url, FILE_TIMEOUT_MIN, logger)
     except Exception as e:
         logger.error(f"Error processing manifest: {e}")
         status= "Failed"
@@ -531,7 +533,7 @@ def process_git(file,repo_store_path, status_file_path, cluster_os_type, cluster
         clone_directory = os.path.join(git_modules_directory, package_name)
         clone_directory = shlex.quote(clone_directory).strip("'\"")
         tarball_path = os.path.join(git_modules_directory, f'{package_name}.tar.gz')
-        repository_name = "git" + package_name
+        repository_name = arc.lower() + "_git" + package_name
         output_file = package_name + ".tar.gz"
         relative_path = output_file
         base_path = git_modules_directory.strip("/")
@@ -600,7 +602,7 @@ def process_shell(file,repo_store_path, status_file_path,  cluster_os_type, clus
         os.makedirs(sh_directory, exist_ok=True)  # Ensure the directory exists
 
         sh_path = os.path.join(sh_directory, f"{package_name}.sh")
-        repository_name = "shell" + package_name
+        repository_name = arc.lower() + "_shell" + package_name
         output_file = package_name + ".sh"
         relative_path = output_file
         base_path = sh_directory.strip("/")
@@ -651,7 +653,7 @@ def process_ansible_galaxy_collection(file, repo_store_path, status_file_path, c
         galaxy_collections_directory = shlex.quote(galaxy_collections_directory).strip("'\"")
         os.makedirs(galaxy_collections_directory, exist_ok=True)  # Ensure the directory exists
         collections_tarball_path = os.path.join(galaxy_collections_directory, f'{package_name.replace(".", "-")}-{version}.tar.gz')
-        repository_name = "ansible_galaxy_collection" + package_name
+        repository_name = arc.lower() + "_ansible_galaxy_collection" + package_name
         output_file = f"{file['package'].replace('.', '-')}-{file['version']}.tar.gz"
         relative_path = output_file
         base_path = galaxy_collections_directory.strip("/")
@@ -758,7 +760,7 @@ def process_tarball(package, repo_store_path, status_file_path, version_variable
     tarball_path = os.path.join(tarball_directory, f"{package_name}.tar.gz")
     tarball_path = shlex.quote(tarball_path).strip("'\"")
 
-    repository_name = "tarball" + package_name
+    repository_name = arc.lower() + "_tarball" + package_name
     output_file = package_name + ".tar.gz"
     relative_path = output_file
     base_path = tarball_directory.strip("/")
@@ -774,7 +776,7 @@ def process_tarball(package, repo_store_path, status_file_path, version_variable
             if url:
                 try:
                     status = handle_post_request(repository_name, relative_path,
-                             base_path, url, TAR_POLL_VAL,logger)
+                             base_path, url, TAR_TIMEOUT_MIN,logger)
                 except Exception as e:
                     logger.error(f"Error processing tarball: {e}")
                     status = "Failed"
@@ -844,7 +846,7 @@ def process_iso(package, repo_store_path, status_file_path,
     url_support = True
     package_name = package['package']
     package_type = package['type']
-    repository_name = "iso" + package_name + arc
+    repository_name = arc.lower() + "_iso" + package_name
 
     distribution_name = repository_name
     if 'url' in package:
@@ -881,7 +883,7 @@ def process_iso(package, repo_store_path, status_file_path,
                 # non-zero for failure)
                 subprocess.run(['wget', '-q', '--spider', '--tries=1', url], check=True)
                 status = handle_post_request(repository_name, relative_path,
-                         base_path, url, ISO_POLL_VAL,logger)
+                         base_path, url, ISO_TIMEOUT_MIN,logger)
         except subprocess.CalledProcessError as e:
             logger.error(f"Error executing iso commands: {e}")
             status = "Failed"
@@ -941,7 +943,7 @@ def process_pip(package, repo_store_path, status_file_path,  cluster_os_type, cl
         package_name = shlex.quote(package['package']).strip("'\"")
         package_type = package['type']
         version = package.get('version', None)
-        pip_repo = "pip_module" + package_name
+        pip_repo =  arc.lower() + "_pip_module" + package_name
         distribution_name = pip_repo
 
         logger.info(f"Processing Pip Package: {package_name}, Version: {version}")
@@ -1022,4 +1024,157 @@ def process_pip(package, repo_store_path, status_file_path,  cluster_os_type, cl
         write_status_to_file(status_file_path, package_name, package_type, status, logger, file_lock)
 
         logger.info("#" * 30 + f" {process_pip.__name__} end " + "#" * 30)
+        return status
+
+def process_rpm_file(package, repo_store_path, status_file_path, cluster_os_type, cluster_os_version, arc, logger):
+    """
+    Process an RPM file package by downloading it and setting up a Pulp RPM repository.
+
+    Args:
+        package (dict): A dictionary containing the package information.
+        repo_store_path (str): The path to the repository store.
+        status_file_path (str): The path to the status file.
+        cluster_os_type (str): The type of the cluster operating system.
+        cluster_os_version (str): The version of the cluster operating system.
+        arc (str): The architecture (x86_64 or aarch64).
+        logger (logging.Logger): The logger instance.
+
+    Returns:
+        str: The status of the RPM file package processing.
+    """
+    logger.info("#" * 30 + f" {process_rpm_file.__name__} start " + "#" * 30)
+
+    try:
+        package_name = package['package']
+        url = package.get('url', None)
+        package_type = package['type']
+        repo_name = arc.lower() + "_" + package_name
+
+        if not url:
+            logger.error(f"No URL provided for RPM file package: {package_name}")
+            status = "Failed"
+            write_status_to_file(status_file_path, package_name, package_type, status, logger, file_lock, repo_name)
+            return status
+
+        url = shlex.quote(url).strip("'\"")
+        logger.info(f"Processing RPM File Package: {package_name}, URL: {url}")
+
+        # Create rpm_file directory structure
+        rpm_file_directory = os.path.join(
+            repo_store_path, "offline_repo", "cluster", arc.lower(),
+                        cluster_os_type, cluster_os_version, "rpm_file", package_name
+        )
+        os.makedirs(rpm_file_directory, exist_ok=True)
+
+        # Extract filename from URL
+        download_file_name = url.split('/')[-1]
+        rpm_file_path = os.path.join(rpm_file_directory, download_file_name)
+
+        # Step 1: Download the RPM file
+        logger.info("Step 1: Downloading RPM file...")
+        if os.path.exists(rpm_file_path):
+            logger.info(f"RPM file already exists: {rpm_file_path}")
+        else:
+            # Verify URL exists
+            subprocess.run(['wget', '-q', '--spider', '--tries=1', url], check=True)
+
+            # Download the file
+            download_command = f"wget -O {shlex.quote(rpm_file_path)} {url}"
+            if not execute_command(download_command, logger):
+                logger.error(f"Failed to download RPM file from: {url}")
+                status = "Failed"
+                write_status_to_file(status_file_path, package_name, package_type, status, logger, file_lock, repo_name)
+                return status
+
+        # Step 2: CREATE A NEW RPM REPOSITORY IN PULP (if it doesn't exist)
+        logger.info("Step 2: Creating RPM repository in Pulp...")
+        # Check if repository already exists
+        if execute_command(pulp_rpm_commands["show_repository"] % repo_name, logger):
+            logger.info(f"RPM repository {repo_name} already exists. Skipping creation.")
+        else:
+            logger.info(f"Creating RPM repository: {repo_name}")
+            if not execute_command(pulp_rpm_commands["create_repository"] % repo_name, logger):
+                logger.error(f"Failed to create RPM repository: {repo_name}")
+                status = "Failed"
+                write_status_to_file(status_file_path, package_name, package_type, status, logger, file_lock, repo_name)
+                return status
+
+        # Step 3: UPLOAD THE RPM INTO THE REPO
+        logger.info("Step 3: Uploading RPM to repository...")
+        upload_command = pulp_rpm_commands["upload_content"] % (repo_name, shlex.quote(rpm_file_path))
+        if not execute_command(upload_command, logger):
+            logger.error(f"Failed to upload RPM to repository: {repo_name}")
+            status = "Failed"
+            write_status_to_file(status_file_path, package_name, package_type, status, logger, file_lock, repo_name)
+            return status
+
+        # Step 4: PUBLISH THE REPOSITORY
+        logger.info("Step 4: Publishing repository...")
+        if not execute_command(pulp_rpm_commands["publish_repository"] % repo_name, logger):
+            logger.error(f"Failed to publish repository: {repo_name}")
+            status = "Failed"
+            write_status_to_file(status_file_path, package_name, package_type, status, logger, file_lock, repo_name)
+            return status
+
+        # Step 5: CREATE A DISTRIBUTION FOR THE REPO (if it doesn't exist)
+        logger.info("Step 5: Creating distribution...")
+   
+        # Check if distribution already exists
+        if execute_command(pulp_rpm_commands["check_distribution"] % repo_name, logger):
+            logger.info(f"Distribution {repo_name} already exists. Skipping creation.")
+        else:
+            logger.info(f"Creating distribution: {repo_name}")
+            # Get the publication href
+            pub_result = execute_command(pulp_rpm_commands["list_all_publications"], logger, type_json=True)
+            if not pub_result or not pub_result.get("stdout"):
+                logger.error("Failed to get publication list")
+                status = "Failed"
+                write_status_to_file(status_file_path, package_name, package_type, status, logger, file_lock, repo_name)
+                return status
+
+            publications = pub_result["stdout"]
+            if not publications:
+                logger.error("No publications found")
+                status = "Failed"
+                write_status_to_file(status_file_path, package_name, package_type, status, logger, file_lock, repo_name)
+                return status
+
+            latest_publication = publications[0]
+            publication_href = latest_publication.get("pulp_href")
+            
+            if not publication_href:
+                logger.error("No publication href found")
+                status = "Failed"
+                write_status_to_file(status_file_path, package_name, package_type, status, logger, file_lock, repo_name)
+                return status
+
+            base_path = f" opt/omnia/offline_repo/cluster/{arc}/rhel/{cluster_os_version}/rpms/{repo_name}"
+            dist_create_command = pulp_rpm_commands["distribute_repository"] % (repo_name, base_path, repo_name)
+            if not execute_command(dist_create_command, logger):
+                logger.error(f"Failed to create distribution: {repo_name}")
+                status = "Failed"
+                write_status_to_file(status_file_path, package_name, package_type, status, logger, file_lock, repo_name)
+                return status
+
+        # Step 6: ENABLE AUTO-GENERATION OF .repo FILES
+        logger.info("Step 6: Enabling auto-generation of .repo files...")
+        update_command = pulp_rpm_commands["update_distribution_repo_config"] % repo_name
+        if not execute_command(update_command, logger):
+            logger.warning(f"Failed to enable repo config generation for: {repo_name}")
+            # Not a critical failure, continue
+
+        logger.info(f"RPM file package {package_name} processed successfully!")
+        status = "Success"
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error executing RPM file commands: {e}")
+        status = "Failed"
+    except Exception as e:
+        logger.error(f"Error processing RPM file package: {e}")
+        status = "Failed"
+
+    finally:
+        # Write the status to the file
+        write_status_to_file(status_file_path, package_name, package_type, status, logger, file_lock, repo_name)
+        logger.info("#" * 30 + f" {process_rpm_file.__name__} end " + "#" * 30)
         return status

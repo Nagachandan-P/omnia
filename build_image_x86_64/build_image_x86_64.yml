@@ -1,4 +1,4 @@
-# Copyright 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ---
+
+- name: Check if upgrade is in progress
+  ansible.builtin.import_playbook: ../utils/upgrade_checkup.yml
 
 - name: Set_fact for fetch omnia config credentials
   hosts: localhost
@@ -80,7 +83,7 @@
     - name: Tag OpenCHAMI image
       ansible.builtin.include_role:
         name: image_creation
-        tasks_from: build_image_tag.yml
+        tasks_from: prepare_pulp_image.yml
 
 - name: OpenCHAMI build image for x86_64
   hosts: localhost
