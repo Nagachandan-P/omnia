@@ -217,6 +217,10 @@ gitlab_storage_insufficient_msg: >
   Insufficient storage space. Required: {{ gitlab_min_storage_gb }}GB, Available: {{ available_disk_space.stdout }}GB.
   Please ensure the GitLab host has at least {{ gitlab_min_storage_gb }}GB of free disk space.
 
+# Performance tuning
+gitlab_disable_prometheus: true
+gitlab_disable_grafana: true
+
 # Podman login configuration
 retry_count: "5"
 delay_time: "10"

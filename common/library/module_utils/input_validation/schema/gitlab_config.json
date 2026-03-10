@@ -52,14 +52,6 @@
       "minimum": 1,
       "description": "Minimum CPU core count required before install. Accepted values: integer >= 1. Default: 2"
     },
-    "gitlab_disable_prometheus": {
-      "type": "boolean",
-      "description": "Disable bundled Prometheus monitoring to save resources. Accepted values: true or false. Default: true"
-    },
-    "gitlab_disable_grafana": {
-      "type": "boolean",
-      "description": "Disable bundled Grafana if not needed. Accepted values: true or false. Default: true"
-    },
     "gitlab_puma_workers": {
       "type": "integer",
       "minimum": 1,
