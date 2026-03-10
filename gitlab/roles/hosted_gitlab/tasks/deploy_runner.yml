@@ -153,25 +153,31 @@
     state: started
 
 - name: Wait for an online project runner after deployment
-  ansible.builtin.uri:
-    url: "{{ gitlab_external_url_computed }}/api/v4/projects/{{ gitlab_project_id }}/runners"
-    method: GET
-    headers:
-      PRIVATE-TOKEN: "{{ gitlab_root_token }}"
-    validate_certs: false
-    status_code: "{{ gitlab_default_status_codes.project_runners_list }}"
-  register: gitlab_project_runners_online
-  retries: "{{ gitlab_runner_online_check_retries }}"
-  delay: "{{ gitlab_runner_online_check_delay }}"
-  until: >-
-    (
-      gitlab_project_runners_online.json
-      | selectattr('status', 'equalto', 'online')
-      | list
-      | length
-    ) > 0
-  when: gitlab_runner_require_online_after_deploy | bool
-  no_log: true
+  block:
+    - name: Wait for an online project runner after deployment
+      ansible.builtin.uri:
+        url: "{{ gitlab_external_url_computed }}/api/v4/projects/{{ gitlab_project_id }}/runners"
+        method: GET
+        headers:
+          PRIVATE-TOKEN: "{{ gitlab_root_token }}"
+        validate_certs: false
+        status_code: "{{ gitlab_default_status_codes.project_runners_list }}"
+      register: gitlab_project_runners_online
+      retries: "{{ gitlab_runner_online_check_retries }}"
+      delay: "{{ gitlab_runner_online_check_delay }}"
+      until: >-
+        (
+          gitlab_project_runners_online.json
+          | selectattr('status', 'equalto', 'online')
+          | list
+          | length
+        ) > 0
+      when: gitlab_runner_require_online_after_deploy | bool
+      no_log: true
+  rescue:
+    - name: Fail with detailed error message for runner online check
+      ansible.builtin.fail:
+        msg: "{{ gitlab_runner_online_check_detailed_fail_msg }}"
 
 - name: Fail when no online runner is assigned to project
   ansible.builtin.fail:

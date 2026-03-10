@@ -99,6 +99,15 @@ gitlab_runner_online_check_retries: 12
 gitlab_runner_online_check_delay: 10
 gitlab_runner_online_failure_msg: "No online runner is assigned to project {{ gitlab_project_name }} after deployment."
 
+gitlab_runner_online_check_detailed_fail_msg: |
+  Failed to detect online GitLab runner after deployment.
+  
+  This can be caused by GitLab configuration changes like:
+  - GitLab port changed (current: {{ gitlab_https_port }})
+  - GitLab project name/ID changed (current: {{ gitlab_project_name }})
+  
+  For any GitLab reconfiguration, you must run gitlab_cleanup.yml before re-running the gitlab playbook.
+
 # Podman socket (Docker-compatible, used by runner)
 podman_socket_path: "/run/podman/podman.sock"
 docker_socket_path: "/var/run/docker.sock"
