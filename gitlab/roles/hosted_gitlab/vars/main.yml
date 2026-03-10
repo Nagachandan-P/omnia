@@ -76,7 +76,6 @@ gitlab_directories:
 # GitLab files
 gitlab_initial_root_password_path: "/etc/gitlab/initial_root_password"
 gitlab_root_token_file_path: "/root/.gitlab_root_token"
-gitlab_root_access_file_path: "/root/.gitlab_root_access"
 
 # Runner container
 gitlab_runner_image: "docker.io/gitlab/gitlab-runner:v18.8.0"
@@ -310,7 +309,7 @@ gitlab_deployment_complete_msg:
   - "Access URL: {{ gitlab_external_url_computed }}"
   - "SSH Port:   {{ gitlab_ssh_port }}"
   - "Username:   root"
-  - "Password:   [CONFIGURED - See /root/.gitlab_root_access]"
+  - "Password:   [CONFIGURED - See {{ hostvars['localhost']['input_project_dir'] }}/omnia_config_credentials.yml]"
   - ""
   - "Project:    {{ gitlab_project_name }}"
   - "Project ID: {{ gitlab_project_id }}"

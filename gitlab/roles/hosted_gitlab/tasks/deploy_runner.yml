@@ -177,11 +177,11 @@
   rescue:
     - name: Fail with detailed error message for runner online check
       ansible.builtin.fail:
-        msg: "{{ gitlab_runner_online_check_detailed_fail_msg }}"
+        msg: "{{ gitlab_runner_online_check_detailed_fail_msg.splitlines() | join(' ') }}"
 
 - name: Fail when no online runner is assigned to project
   ansible.builtin.fail:
-    msg: "{{ gitlab_runner_online_failure_msg }}"
+    msg: "{{ gitlab_runner_online_failure_msg.splitlines() | join(' ') }}"
   when:
     - gitlab_runner_require_online_after_deploy | bool
     - gitlab_project_runners_online is defined
