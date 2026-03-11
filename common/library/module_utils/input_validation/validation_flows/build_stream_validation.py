@@ -184,7 +184,48 @@ def validate_build_stream_config(input_file_path, data,
             msg.build_stream_host_ip_not_oim_ip_msg(build_stream_host_ip, ethernet_ips)
         ))
 
-    # Validate aarch64_inventory_host_ip (conditional - required if PXE mapping has aarch64 groups)
+    # Validate aarch64_inventory_host_ip
+    # Validate build_stream_port availability
+    build_stream_port = data.get("build_stream_port")
+    if build_stream_port:
+        try:
+            port_int = int(build_stream_port)
+            if not (1 <= port_int <= 65535):
+                raise ValueError
+        except (TypeError, ValueError):
+            errors.append(create_error_msg(
+                build_stream_yml,
+                "build_stream_port",
+                msg.BUILD_STREAM_PORT_RANGE_MSG,
+            ))
+            return errors
+
+        port_in_use = False
+        try:
+            with socket.create_connection((build_stream_host_ip, port_int), timeout=2):
+                port_in_use = True
+        except (OSError, ValueError):
+            port_in_use = False
+
+        if port_in_use:
+            # Port is in use, check if it's build_stream by probing /health
+            try:
+                context = ssl._create_unverified_context()
+                conn = client.HTTPSConnection(build_stream_host_ip, port_int, timeout=2, context=context)
+                conn.request("GET", "/health")
+                resp = conn.getresponse()
+                conn.close()
+                if resp.status not in [200, 401, 403, 404, 500]:
+                    raise ValueError(f"Unexpected HTTP status {resp.status}")
+            except Exception as exc:  # pylint: disable=broad-except
+                errors.append(create_error_msg(
+                    build_stream_yml,
+                    "build_stream_port",
+                    msg.BUILD_STREAM_PORT_INUSE_MSG.format(port=port_int, host_ip=build_stream_host_ip, detail=str(exc)),
+                ))
+                return errors
+
+    # Validate aarch64_inventory_host_ip
     aarch64_inventory_host_ip = data.get("aarch64_inventory_host_ip")
     
     ### aarch64_inventory_host_ip check
