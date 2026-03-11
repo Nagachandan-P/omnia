@@ -130,7 +130,6 @@ def validate_build_stream_config(input_file_path, data,
         errors.append(create_error_msg(build_stream_yml, "enable_build_stream",
                                        msg.ENABLE_BUILD_STREAM_BOOLEAN_MSG))
 
-    
     if errors or not enable_build_stream:
         return errors
 
