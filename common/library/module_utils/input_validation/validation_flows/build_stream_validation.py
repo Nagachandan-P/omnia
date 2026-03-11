@@ -18,7 +18,9 @@ Validates build stream configuration files for Omnia.
 import ipaddress
 import os
 import socket
+import ssl
 import subprocess
+from http import client
 from ansible.module_utils.input_validation.common_utils import validation_utils
 from ansible.module_utils.input_validation.common_utils import config
 from ansible.module_utils.input_validation.common_utils import en_us_validation_msg as msg
@@ -96,71 +98,6 @@ def get_ethernet_interface_ips(logger):
         logger.warning("Failed to get ethernet interface IPs: %s", str(e))
     return ethernet_ips
 
-
-def is_port_used_by_build_stream(port, admin_ip, logger):
-    """
-    Check if the configured port is already in use by build_stream service.
-
-    Build_stream listens on admin_ip:port. If we find the port listening on
-    admin IP, it means build_stream is already deployed with this port.
-
-    Args:
-        port (int): The configured port from build_stream_config.yml
-        admin_ip (str): The admin IP where build_stream listens
-        logger: Logger instance
-
-    Returns:
-        bool: True if port is listening on admin IP (build_stream deployed)
-    """
-    try:
-        result = subprocess.run(
-            ['ss', '-tln', f'sport = :{port}'],
-            capture_output=True, text=True, timeout=10, check=False
-        )
-        if result.returncode == 0 and admin_ip in result.stdout and 'LISTEN' in result.stdout:
-            logger.info(
-                "Port %d is listening on %s (build_stream re-deployment allowed)",
-                port, admin_ip
-            )
-            return True
-    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-        logger.warning("Failed to check port status: %s", str(e))
-    return False
-
-
-def check_port_available(port, admin_ip, logger):
-    """
-    Validate if port is available for build_stream deployment.
-
-    Validation Logic:
-    1. If port is listening on admin_ip → build_stream already deployed
-       → PASS (re-deployment with same port allowed)
-    2. If port is NOT listening on admin_ip → check if port is free
-       → If free: PASS (new deployment)
-       → If in use: FAIL (port conflict with another service)
-
-    Args:
-        port (int): The configured port from build_stream_config.yml
-        admin_ip (str): The admin IP where build_stream listens
-        logger: Logger instance
-
-    Returns:
-        tuple: (is_available: bool, error_message: str or None)
-    """
-    # Case 1: Port already used by build_stream → allow re-deployment
-    if is_port_used_by_build_stream(port, admin_ip, logger):
-        return True, None
-
-    # Case 2: Check if port is free for new deployment
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            s.bind(('', port))
-            return True, None
-    except OSError:
-        return False, msg.build_stream_port_in_use_msg(port)
- 
- 
 def validate_build_stream_config(input_file_path, data,
                                   logger, module, omnia_base_dir,
                                   module_utils_base, project_name):
@@ -355,5 +292,6 @@ def validate_build_stream_config(input_file_path, data,
             #     ))
             #     logger.error("Port %d is not available: %s", build_stream_port, port_error)
             pass
+
 
     return errors

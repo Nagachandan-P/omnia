@@ -94,22 +94,6 @@ gitlab_min_memory_gb: 4
 #   - More cores may be needed for production workloads
 gitlab_min_cpu_cores: 2
  
-# Performance tuning
-# Disable bundled monitoring to save resources
-# Fields:
-#   gitlab_disable_prometheus: boolean - true | false
-# Notes:
-#   - Default: true
-#   - Set to false to enable Prometheus monitoring
-gitlab_disable_prometheus: true
-
-# Disable Grafana if not needed
-# Fields:
-#   gitlab_disable_grafana: boolean - true | false
-# Notes:
-#   - Default: true
-#   - Set to false to enable Grafana dashboards
-gitlab_disable_grafana: true
 
 # Web worker count; scale with CPU
 # Fields:
