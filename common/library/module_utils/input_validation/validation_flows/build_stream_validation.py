@@ -281,7 +281,6 @@ def validate_build_stream_config(input_file_path, data,
 
         # Check aarch64 host IP reachability using socket (safer than subprocess)
         try:
-            import socket
             # Try to connect to SSH port which is usually open on inventory hosts
             ssh_port = 22  # SSH
             reachable = False
