@@ -3720,11 +3720,11 @@
         "Sources": [
           {
             "Architecture": "aarch64",
-            "RepoName": "aarch64_appstream"
+            "RepoName": "aarch64_codeready-builder"
           },
           {
             "Architecture": "x86_64",
-            "RepoName": "x86_64_appstream"
+            "RepoName": "x86_64_codeready-builder"
           }
         ]
       },
@@ -3864,7 +3864,7 @@
         "Sources": [
           {
             "Architecture": "aarch64",
-            "RepoName": "aarch64_baseos"
+            "RepoName": "aarch64_appstream"
           },
           {
             "Architecture": "x86_64",
