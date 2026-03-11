@@ -1,4 +1,4 @@
-# Copyright 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -91,6 +91,65 @@ def validate_functional_groups_separation(pxe_mapping_file_path):
     if errors:
         raise ValueError("PXE mapping file group separation validation errors: " + "; ".join([str(e) for e in errors]))
 
+def validate_slurm_login_compiler_prefix(pxe_mapping_file_path):
+    """Validate that slurm_node and login_compiler entries align on architecture suffix when both are present.
+
+    - Functional group suffix must be either _x86_64 or _aarch64 (case-sensitive).
+    - When both slurm_node* and login_compiler_node* are present, their suffixes must match.
+
+    Raises ValueError with details if suffixes differ. Prefix differences are allowed.
+    """
+
+    if not pxe_mapping_file_path or not os.path.isfile(pxe_mapping_file_path):
+        raise ValueError(f"PXE mapping file not found: {pxe_mapping_file_path}")
+
+    with open(pxe_mapping_file_path, "r", encoding="utf-8") as fh:
+        raw_lines = fh.readlines()
+
+    non_comment_lines = [ln for ln in raw_lines if ln.strip()]
+    reader = csv.DictReader(non_comment_lines)
+
+    fieldname_map = {fn.strip().upper(): fn for fn in reader.fieldnames}
+    fg_col = fieldname_map.get("FUNCTIONAL_GROUP_NAME")
+    hostname_col = fieldname_map.get("HOSTNAME")
+
+    if not fg_col or not hostname_col:
+        raise ValueError("FUNCTIONAL_GROUP_NAME or HOSTNAME column not found in PXE mapping file")
+
+    arch_map = {"slurm_node": [], "login_compiler_node": []}
+
+    for row_idx, row in enumerate(reader, start=2):
+        fg_name = row.get(fg_col, "").strip() if row.get(fg_col) else ""
+        hostname = row.get(hostname_col, "").strip() if row.get(hostname_col) else ""
+        if not fg_name or not hostname:
+            continue
+
+        fg_arch = None
+        fg_base = fg_name
+        for suffix in ("_x86_64", "_aarch64"):
+            if fg_name.endswith(suffix):
+                fg_arch = suffix.lstrip("_")
+                fg_base = fg_name[: -len(suffix)]
+                break
+
+        if fg_base in arch_map and fg_arch:
+            arch_map[fg_base].append((fg_arch, row_idx))
+
+    if not arch_map["slurm_node"] or not arch_map["login_compiler_node"]:
+        return
+
+    slurm_arch, _ = arch_map["slurm_node"][0]
+    login_arch, _ = arch_map["login_compiler_node"][0]
+    if slurm_arch != login_arch:
+        slurm_rows = [str(r[1]) for r in arch_map["slurm_node"]]
+        login_rows = [str(r[1]) for r in arch_map["login_compiler_node"]]
+        raise ValueError(
+            "Architecture suffix mismatch between slurm_node and login_compiler_node. "
+            f"slurm_node suffix '{slurm_arch}' vs "
+            f"login_compiler_node suffix '{login_arch}' "
+            "Ensure both use the same suffix (_x86_64 or _aarch64)."
+        )
+
 def validate_duplicate_hostnames_in_mapping_file(pxe_mapping_file_path):
     """
     Validates that HOSTNAME values in the mapping file are unique.
@@ -164,6 +223,52 @@ def validate_duplicate_service_tags_in_mapping_file(pxe_mapping_file_path):
 
     if duplicates:
         raise ValueError(f"Duplicate SERVICE_TAG found in PXE mapping file: {'; '.join(duplicates)}")
+
+
+def validate_duplicate_admin_ips_in_mapping_file(pxe_mapping_file_path):
+    """Validates that ADMIN_IP values in the mapping file are unique."""
+    if not pxe_mapping_file_path or not os.path.isfile(pxe_mapping_file_path):
+        raise ValueError(f"PXE mapping file not found: {pxe_mapping_file_path}")
+
+    with open(pxe_mapping_file_path, "r", encoding="utf-8") as fh:
+        raw_lines = fh.readlines()
+
+    non_comment_lines = [ln for ln in raw_lines if ln.strip()]
+    reader = csv.DictReader(non_comment_lines)
+
+    fieldname_map = {fn.strip().upper(): fn for fn in reader.fieldnames}
+    admin_ip_col = fieldname_map.get("ADMIN_IP")
+    hostname_col = fieldname_map.get("HOSTNAME")
+
+    if not admin_ip_col:
+        raise ValueError("ADMIN_IP column not found in PXE mapping file")
+
+    seen_admin_ips = {}
+    duplicates = []
+
+    for row_idx, row in enumerate(reader, start=2):
+        admin_ip = row.get(admin_ip_col, "").strip() if row.get(admin_ip_col) else ""
+        hostname = ""
+        if hostname_col:
+            hostname = row.get(hostname_col, "").strip() if row.get(hostname_col) else ""
+
+        if not admin_ip:
+            continue
+
+        if admin_ip in seen_admin_ips:
+            first_row = seen_admin_ips[admin_ip]["row"]
+            first_host = seen_admin_ips[admin_ip]["hostname"]
+            dup_host = hostname or "<empty>"
+            first_host_disp = first_host or "<empty>"
+            duplicates.append(
+                f"'{admin_ip}' at CSV rows {first_row} ({first_host_disp}) and {row_idx} ({dup_host})"
+            )
+            continue
+
+        seen_admin_ips[admin_ip] = {"row": row_idx, "hostname": hostname}
+
+    if duplicates:
+        raise ValueError(f"Duplicate ADMIN_IP found in PXE mapping file: {'; '.join(duplicates)}")
 
 
 def validate_group_parent_service_tag_consistency_in_mapping_file(pxe_mapping_file_path):
@@ -648,8 +753,12 @@ def validate_provision_config(
     """
     errors = []
     software_config_file_path = create_file_path(input_file_path, file_names["software_config"])
-    with open(software_config_file_path, "r", encoding="utf-8") as f:
-        software_config_json = json.load(f)
+    try:
+        with open(software_config_file_path, "r", encoding="utf-8") as f:
+            software_config_json = json.load(f)
+    except json.JSONDecodeError as e:
+        # Return error with correct filename using proper format
+        return [create_error_msg("JSON syntax error", software_config_file_path, str(e))]
 
     # Call validate_software_config from common_validation
     software_errors = common_validation.validate_software_config(
@@ -681,9 +790,11 @@ def validate_provision_config(
             validate_functional_groups_in_mapping_file(pxe_mapping_file_path)
             validate_duplicate_service_tags_in_mapping_file(pxe_mapping_file_path)
             validate_duplicate_hostnames_in_mapping_file(pxe_mapping_file_path)
+            validate_duplicate_admin_ips_in_mapping_file(pxe_mapping_file_path)
             validate_group_parent_service_tag_consistency_in_mapping_file(pxe_mapping_file_path)
             validate_functional_groups_separation(pxe_mapping_file_path)
             validate_parent_service_tag_hierarchy(pxe_mapping_file_path)
+            validate_slurm_login_compiler_prefix(pxe_mapping_file_path)
 
             # Validate ADMIN_IPs against network_spec.yml ranges
             network_spec_path = create_file_path(input_file_path, file_names["network_spec"])
@@ -845,6 +956,16 @@ def _validate_admin_network(network):
             )
         )
 
+        # Ensure dynamic_range is inside the admin subnet (primary_oim_admin_ip/netmask_bits)
+        if not validation_utils.is_range_within_subnet(admin_net["dynamic_range"], primary_oim_admin_ip, netmask):
+            errors.append(
+                create_error_msg(
+                    "admin_network.dynamic_range",
+                    admin_net["dynamic_range"],
+                    en_us_validation_msg.RANGE_NETMASK_BOUNDARY_FAIL_MSG,
+                )
+            )
+
     #  Admin and BMC IP should not be the same
     errors.extend(validate_admin_bmc_ip_not_same(primary_oim_admin_ip, primary_oim_bmc_ip))
 
@@ -973,21 +1094,6 @@ def _validate_ip_ranges(dynamic_range, network_type, netmask_bits):
                 en_us_validation_msg.RANGE_IP_CHECK_FAIL_MSG,
             )
         )
-
-    # Validate that IP ranges are within the netmask boundaries
-    if netmask_bits:
-        # Check dynamic range
-        if (validation_utils.validate_ipv4_range(dynamic_range) and
-                not validation_utils.is_range_within_netmask(
-                    dynamic_range, netmask_bits
-                )):
-            errors.append(
-                create_error_msg(
-                    f"{network_type}.dynamic_range",
-                    dynamic_range,
-                    en_us_validation_msg.RANGE_NETMASK_BOUNDARY_FAIL_MSG,
-                )
-            )
 
     return errors
 

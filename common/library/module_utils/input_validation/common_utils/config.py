@@ -26,8 +26,23 @@ module_log_dir = {
 # log path for input validator
 INPUT_VALIDATOR_LOG_PATH = '/opt/omnia/log/core/playbooks/'
 
-ENTITLEMENT_PEM = '/opt/omnia/rhel_repo_certs/*.pem'
-REDHAT_REPO_FILE = '/opt/omnia/rhel_repo_certs/redhat.repo'
+# Subscription checking paths - checked in order of priority
+SYSTEM_ENTITLEMENT_PATH = '/etc/pki/entitlement/*.pem'
+SYSTEM_REDHAT_REPO = '/etc/yum.repos.d/redhat.repo'
+
+OMNIA_ENTITLEMENT_PATH = '/opt/omnia/rhel_repo_certs/*.pem'
+OMNIA_REDHAT_REPO = '/opt/omnia/rhel_repo_certs/redhat.repo'
+
+# Supported functional groups for additional_packages per architecture
+ADDITIONAL_PACKAGES_SUPPORTED_SUBGROUPS = {
+    "x86_64": [
+        "slurm_control_node", "slurm_node", "login_node", "login_compiler_node",
+        "service_kube_control_plane", "service_kube_control_plane_first", "service_kube_node"
+    ],
+    "aarch64": [
+         "slurm_node", "login_node", "login_compiler_node"
+    ]
+}
 
 # dict to hold the file names. If any file's name changes just change it here.
 files = {
@@ -76,6 +91,7 @@ input_file_inventory = {
     "storage": [files["storage_config"]],
     "prepare_oim": [
         files["network_spec"],
+        files["software_config"]
     ],
     # "high_availability": [files["high_availability_config"]],
     # "additional_software": [files["additional_software"]],
@@ -131,7 +147,7 @@ extensions = {
 }
 
 os_version_ranges = {
-    "rhel": ["10.0"],
+    "rhel": ["10.0", "10.1"],
     #"rocky": ["9.4"],
     #"ubuntu": ["20.04", "22.04", "24.04"]
 }
@@ -141,6 +157,8 @@ os_version_ranges = {
 TYPE_REQUIREMENTS = {
     "rpm": ["package", "repo_name"],
     "rpm_list": ["package_list", "repo_name"],
+    "rpm_file": ["package", "url"],
+    "rpm_repo": ["package", "repo_name"],
     "ansible_galaxy_collection": ["package", "version"],
     "git": ["package", "version", "url"],
     "image": ["package", ["tag", "digest"]],  # Special: one of tag or digest

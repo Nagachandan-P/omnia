@@ -1,4 +1,4 @@
-# Copyright 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,12 +13,20 @@
 # limitations under the License.
 ---
 
+- name: Refresh SMD access token before ochami operations
+  ansible.builtin.include_tasks: "{{ role_path }}/../../../common/tasks/common/openchami_auth.yml"
+  vars:
+    oim_node_name: "{{ hostvars['localhost']['oim_node_name'] }}"
+
 - name: Configure the ochami
   environment: "{{ hostvars['oim']['ochami_env'] }}"
   block:
     - name: Create groups
       ansible.builtin.include_tasks: create_groups.yml
       with_items: "{{ hostvars['localhost']['functional_groups'] | map(attribute='name') | list }}"
+
+    - name: Fecth image of additional_packages.json file
+      ansible.builtin.include_tasks: fetch_additional_images.yml
 
     - name: Create groups common
       ansible.builtin.include_tasks: create_groups_common.yml

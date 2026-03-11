@@ -36,10 +36,13 @@ from ansible.module_utils.input_validation.common_utils import (
 
 from ansible.module_utils.local_repo.software_utils import (
     load_json,
-    load_yaml,
     get_subgroup_dict,
     get_software_names,
     get_json_file_path
+)
+from ansible.module_utils.input_validation.common_utils.slurm_conf_utils import (
+    parse_slurm_conf,
+    validate_config_types
 )
 
 file_names = config.files
@@ -91,13 +94,13 @@ def validate_software_config(
     if cluster_os_type.lower() in os_version_ranges:
         version_range = os_version_ranges[cluster_os_type.lower()]
         if cluster_os_type.lower() in ["rhel", "rocky"]:
-            if float(cluster_os_version) != float(version_range[0]):
+            if cluster_os_version not in version_range:
                 errors.append(
                     create_error_msg(
                         "cluster_os_version",
                         cluster_os_version,
                         en_us_validation_msg.os_version_fail_msg(
-                            cluster_os_type, version_range[0], None
+                            cluster_os_type, ", ".join(version_range), None
                         ),
                     )
                 )
@@ -230,14 +233,28 @@ def validate_software_config(
             )
         )
 
+    # Check for required subgroups when specific software names are present
+    software_requiring_subgroups = ["additional_packages", "slurm_custom", "service_k8s"]
+    for software_name in software_requiring_subgroups:
+        if software_name in software_names:
+            if software_name not in data or not data[software_name]:
+                errors.append(
+                    create_error_msg(
+                        "Validation Error: ",
+                        software_name,
+                        f"is present in softwares but corresponding subgroup '{software_name}' is missing or empty in software_config.json. Please refer examples directory for the correct format."
+                    )
+                )
+
+    supported_subgroups = config.ADDITIONAL_PACKAGES_SUPPORTED_SUBGROUPS
+    additional_packages_warnings = False
+
     for software_pkg in data['softwares']:
         software = software_pkg['name']
         arch_list = software_pkg.get('arch')
-        json_paths = []
         for arch in arch_list:
-            json_paths.append(get_json_file_path(
-                software, cluster_os_type, cluster_os_version, input_file_path, arch))
-        for json_path in json_paths:
+            json_path = get_json_file_path(
+                software, cluster_os_type, cluster_os_version, input_file_path, arch)
             # Check if json_path is None or if the JSON syntax is invalid
             if not json_path:
                 errors.append(
@@ -250,7 +267,43 @@ def validate_software_config(
                 try:
                     subgroup_softwares = subgroup_dict.get(software, None)
                     json_data = load_json(json_path)
+                    # For additional_packages, validate subgroup keys in the JSON
+                    if software == "additional_packages":
+                        if "additional_packages" not in json_data:
+                            logger.warning(
+                                f"{software}/{arch}: {json_path} - "
+                                f"Required key 'additional_packages' is missing from the JSON file."
+                            )
+                            additional_packages_warnings = True
+                        arch_supported = supported_subgroups.get(arch, [])
+                        user_subgroups = [p.get('name') for p in data.get(software, [])]
+                        for json_key in json_data:
+                            if json_key == "additional_packages":
+                                continue
+                            if json_key not in arch_supported:
+                                logger.warning(
+                                    f"{software}/{arch}: {json_path} - "
+                                    f"Subgroup '{json_key}' is not supported for architecture {arch}."
+                                )
+                                additional_packages_warnings = True
+                            elif json_key not in user_subgroups:
+                                logger.warning(
+                                    f"{software}/{arch}: {json_path} - "
+                                    f"Subgroup '{json_key}' is present in JSON but not listed under additional_packages in software_config.json."
+                                )
+                                additional_packages_warnings = True
                     for subgroup_software in subgroup_softwares:
+                        # For additional_packages, skip subgroups that are
+                        # not supported for this arch, or warn if supported but missing
+                        if software == "additional_packages":
+                            if subgroup_software not in supported_subgroups.get(arch, []):
+                                continue
+                            elif subgroup_software not in json_data:
+                                logger.warning(
+                                    f"{software}/{arch}: {json_path} - "
+                                    f"Software {subgroup_software} not found in {software}.")
+                                additional_packages_warnings = True
+                                continue
                         _, fail_data = validation_utils.validate_softwaresubgroup_entries(
                             subgroup_software, json_path, json_data, validation_results, failures
                         )
@@ -268,6 +321,11 @@ def validate_software_config(
                 "Please resolve the issues first before proceeding.",
             )
         )
+    
+    if additional_packages_warnings:
+        logger.info(
+            "[INFO] Additional packages validation completed with warnings. "
+            "Please review the log file for additional_packages configuration details.")
 
     return errors
 
@@ -1058,17 +1116,60 @@ def validate_omnia_config(
                     "slurm NFS not provided",
                     f"NFS name {', '.join(diff_set)} required for slurm is not defined in {storage_config}"
                     ))
-        config_paths_list = [clst.get('config_sources', {}) for clst in data.get('slurm_cluster')]
-        for cfg_path_dict in config_paths_list:
-            for k,v in cfg_path_dict.items():
-                if isinstance(v, str) and not os.path.exists(v):
+        
+        # Validate node_hardware_defaults requires node_discovery_mode=homogeneous
+        for clst in data.get('slurm_cluster', []):
+            node_hardware_defaults = clst.get('node_hardware_defaults')
+            node_discovery_mode = clst.get('node_discovery_mode')
+            
+            # Normalize mode to lowercase for case-insensitive comparison
+            if node_discovery_mode and isinstance(node_discovery_mode, str):
+                node_discovery_mode = node_discovery_mode.lower()
+            
+            if node_hardware_defaults and len(node_hardware_defaults) > 0:
+                if not node_discovery_mode or node_discovery_mode != 'homogeneous':
+                    group_names = list(node_hardware_defaults.keys())
                     errors.append(
                         create_error_msg(
                             input_file_path,
-                            "slurm config_paths",
-                            f"config_path for {k} - {v} does not exist"
-                            ))
-
+                            "slurm_cluster configuration inconsistency",
+                            f"'node_hardware_defaults' is specified for groups {group_names}, but 'node_discovery_mode' is not set to 'homogeneous'. "
+                            f"Current mode: {node_discovery_mode if node_discovery_mode else 'not set (defaults to heterogeneous)'}. "
+                            f"Either set 'node_discovery_mode: \"homogeneous\"' to use the hardware specifications, "
+                            f"or remove 'node_hardware_defaults' to use heterogeneous discovery."
+                        ))
+        
+        cnfg_src = [clst.get('config_sources', {}) for clst in data.get('slurm_cluster')]
+        skip_conf_validation = os.path.exists("/opt/omnia/input/.skip_slurm_conf_validation")
+        cnfg_src = [clst.get('config_sources', {}) for clst in data.get('slurm_cluster')]
+        skip_merge_list = [clst.get('skip_merge', False) for clst in data.get('slurm_cluster')]
+        for idx, cfg_path_dict in enumerate(cnfg_src):
+            skip_merge = skip_merge_list[idx]
+            for k,v in cfg_path_dict.items():
+                conf_dict = None
+                if isinstance(v, str):
+                    if not os.path.exists(v):
+                        errors.append(
+                            create_error_msg('omnia_config.yml', "slurm_cluster config_sources",
+                                f"provided conf path for {k} - {v} does not exist"))
+                        continue
+                    else: # path exists
+                        if not skip_merge and not skip_conf_validation:
+                            conf_dict, duplicate_keys = parse_slurm_conf(v, k, False)
+                            if duplicate_keys:
+                                errors.append(
+                                    create_error_msg('omnia_config.yml', "slurm_cluster->config_sources",
+                                        f"duplicate keys found in {k}.conf - {','.join(duplicate_keys)}"))
+                else:
+                    conf_dict = v
+                if conf_dict and not skip_conf_validation:
+                    validation_result = validate_config_types(conf_dict, k, module)
+                    if validation_result.get('type_errors'):
+                        errors.extend(validation_result['type_errors'])
+                    if validation_result.get('invalid_keys'):
+                        errors.append(
+                            create_error_msg('omnia_config.yml', "slurm_cluster->config_sources",
+                                f"{k}.conf invalid keys found - {','.join(validation_result['invalid_keys'])}"))
     return errors
 
 def check_is_service_cluster_functional_groups_defined(

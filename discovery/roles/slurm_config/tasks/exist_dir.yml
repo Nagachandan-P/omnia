@@ -1,4 +1,4 @@
-# Copyright 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+#  Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -12,17 +12,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 ---
+# Create directories if not exist
+- name: Check if directories exist
+  ansible.builtin.stat:
+    path: "{{ slurm_config_path }}/{{ item[0] }}{{ item[1] }}"
+  loop: "{{ product }}"
+  register: existing_dir
 
-- name: Pull image-build image
-  ansible.builtin.command:
-    cmd: "podman pull {{ image_build_el10 }}"
-  register: pull_result
-  retries: "{{ pull_image_retries }}"
-  delay: "{{ pull_image_delay }}"
-  until: pull_result.rc == 0
-  changed_when: "'Image is up to date' not in pull_result.stdout"
-
-- name: Fail if image not pulled successfully
-  ansible.builtin.fail:
-    msg: "{{ pull_result.stdout }}"
-  when: pull_result.rc != 0
+- name: Create directories if not exist
+  ansible.builtin.file: # noqa: risky-file-permissions
+    path: "{{ slurm_config_path }}/{{ item.item.0 }}{{ item.item.1 }}"
+    state: directory
+  loop: "{{ existing_dir.results }}"
+  when: not item.stat.exists
