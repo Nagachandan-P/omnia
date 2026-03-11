@@ -692,10 +692,32 @@ def process_target_spec(
             )
 
     if target_roles:
-        target_configs[target_file] = {
-            role_key: {schema.CLUSTER: pkgs}
-            for role_key, pkgs in target_roles.items()
-        }
+        # Special validation for UCX and OpenMPI targets
+        target_file_name = os.path.basename(target_file).replace('.json', '')
+        
+        # Check if we should generate this target
+        should_generate = True
+        
+        if target_file_name in ['ucx', 'openmpi']:
+            # Check if main package exists for these specific targets
+            main_package_found = False
+            for target_key, packages in target_roles.items():
+                package_names = [pkg.get("package") for pkg in packages]
+                if target_file_name in package_names:
+                    main_package_found = True
+                    break
+            
+            # Skip generation only for UCX/OpenMPI if main package missing
+            if not main_package_found:
+                logger.debug("Skipping %s: main package '%s' not found", target_file, target_file_name)
+                should_generate = False
+        
+        # Generate target config only if validation passes
+        if should_generate:
+            target_configs[target_file] = {
+                role_key: {schema.CLUSTER: pkgs}
+                for role_key, pkgs in target_roles.items()
+            }
 
 
 def write_config_file(file_path: str, config: Dict) -> None:
