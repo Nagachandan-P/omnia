@@ -130,9 +130,6 @@ def validate_build_stream_config(input_file_path, data,
         errors.append(create_error_msg(build_stream_yml, "enable_build_stream",
                                        msg.ENABLE_BUILD_STREAM_BOOLEAN_MSG))
 
-    if errors or not enable_build_stream:
-        return errors
-
     # Load network_spec.yml to get admin IP and netmask
     network_spec_path = create_file_path(input_file_path, file_names["network_spec"])
     network_spec_data = load_yaml_as_json(network_spec_path, omnia_base_dir, project_name, logger, module)
