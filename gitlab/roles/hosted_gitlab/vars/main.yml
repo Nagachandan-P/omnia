@@ -282,17 +282,17 @@ gitlab_cert_status_msg: |
   - Certificates will be reused (idempotent operation)
   {% endif %}
 
-gitlab_ca_export_msg:
-  - "========================================"
-  - "CA Certificate Exported"
-  - "========================================"
-  - ""
-  - "Certificate path: {{ gitlab_ca_export_path }}"
-  - ""
-  - "Download this certificate and import it into your browser"
-  - "to avoid 'Not Secure' warnings when accessing GitLab."
-  - ""
-  - "========================================"
+gitlab_ca_export_msg: |
+   -"========================================"
+   - "CA Certificate Exported"
+   - "========================================"
+   - ""
+   - "Certificate path: {{ gitlab_ca_export_path }}"
+   - ""
+   - "Download this certificate and import it into your browser"
+   - "to avoid 'Not Secure' warnings when accessing GitLab."
+   - ""
+   - "========================================"
 
 # OIM API Server Configuration
 oim_api_verify_ssl: true
@@ -323,5 +323,7 @@ gitlab_deployment_complete_msg:
   - ""
   - "Service:    {{ gitlab_ctl_command }} (start|stop|status|reconfigure)"
   - "Runner:     {{ gitlab_runner_container_name }}.service (Quadlet systemd service, persists across reboots)"
+  - ""
+  - "IMPORTANT: For any new GitLab reconfiguration, run cleanup_gitlab.yml before running gitlab.yml"
   - ""
   - "============================================"
