@@ -1,29 +1,34 @@
 # Validation
 
-The Validation workflow provides comprehensive input and output validation for all Build Stream operations.
+The Validation workflow provides comprehensive validation for built images on provided testbeds specified in the PXE mapping file.
 
 ## What It Does
 
 The Validation workflow provides:
-- Input schema validation for all API requests
-- Output validation for generated artifacts
-- Cross-workflow dependency validation
-- Security and compliance checking
-- Quality assurance and testing integration
+- **validate_image_on_test** - Validates built images on testbeds
+- Testbed deployment from PXE mapping file configuration
+- Image boot testing and functionality validation
+- Network connectivity and service validation
+- Performance and resource utilization testing
+- Compliance and security validation on target hardware
 
 ## Inputs/Outputs
 
 **Inputs:**
-- API request payloads and parameters
-- Generated artifacts and configurations
-- Build outputs and container images
-- Security scan results and reports
+- Built container images from Build Image workflow
+- User-specified testbeds from catalog for validation
+- PXE mapping file with testbed configurations
+- Test validation criteria and test scripts
+- Network and hardware specifications
+- Expected service configurations
 
 **Outputs:**
-- Validation reports and results
-- Error details and correction suggestions
-- Compliance status and recommendations
-- Quality metrics and measurements
+- Testbed deployment results and status
+- Image boot validation reports
+- Service functionality test results
+- Performance metrics and benchmarks
+- Error diagnostics and troubleshooting guides
+- Compliance validation reports
 
 ## Key Logic Locations
 
@@ -35,101 +40,155 @@ The Validation workflow provides:
 - `core/validate/services.py` - Validation processing services
 
 **Main Components:**
-- **ValidateUseCase** - Orchestrates validation processes
-- **SchemaValidator** - Handles JSON schema validation
-- **SecurityValidator** - Performs security compliance checks
-- **QualityValidator** - Assesses output quality
+- **ValidateImageOnTestUseCase** - Orchestrates image validation on testbeds
+- **PXEMappingParser** - Parses PXE mapping file for testbed configurations
+- **TestbedDeployer** - Deploys images to testbeds via PXE
+- **ImageBootValidator** - Validates image boot and startup
+- **ServiceValidator** - Tests service functionality
+- **PerformanceValidator** - Measures performance metrics
+- **ComplianceValidator** - Checks compliance on target hardware
 
 ## Validation Types
 
-**Input Validation:**
-- JSON schema validation for API requests
-- Parameter type and range checking
-- Authentication and authorization verification
-- File format and size validation
+**Image Boot Validation:**
+- PXE boot configuration validation
+- Image loading and initialization testing
+- Kernel and initrd validation
+- Boot sequence verification
+- Hardware compatibility checking
 
-**Output Validation:**
-- Generated file structure validation
-- Container image security scanning
-- Configuration file syntax checking
-- Dependency integrity verification
+**Service Validation:**
+- Service startup and registration testing
+- API endpoint accessibility validation
+- Database connectivity verification
+- Network service functionality testing
+- Inter-service communication validation
 
-**Cross-Workflow Validation:**
-- Catalog-to-repository dependency validation
-- Repository-to-image package validation
-- Image-to-deployment compatibility checking
-- End-to-end workflow validation
+**Performance Validation:**
+- CPU and memory utilization testing
+- Disk I/O and network throughput testing
+- Response time and latency measurement
+- Load testing and stress testing
+- Resource optimization validation
+
+**Compliance Validation:**
+- Security policy validation on target hardware
+- Regulatory compliance checking
+- Configuration standard validation
+- Access control verification
+- Audit trail validation
 
 ## Workflow Flow
 
-1. **Validation Request**: Client submits validation request
-2. **Schema Validation**: Input schemas validated against definitions
-3. **Security Checking**: Security policies and compliance verified
-4. **Quality Assessment**: Output quality metrics evaluated
-5. **Dependency Validation**: Cross-component dependencies verified
-6. **Report Generation**: Comprehensive validation reports created
-7. **Result Storage**: Validation results stored for audit trail
-8. **Notification**: Validation status notifications sent
+1. **Validation Request**: Client submits image validation request with specified testbeds from catalog
+2. **PXE Mapping Parsing**: Testbed configurations extracted from PXE mapping file
+3. **Testbed Configuration**: User-provided testbeds from catalog are configured for validation
+4. **Image Deployment**: Container image deployed to specified testbeds via PXE
+5. **Manual PXE Boot**: User runs `set_pxe_boot` utility to boot the images
+6. **Boot Validation**: Image boot sequence validated and monitored
+7. **Service Testing**: Deployed services tested for functionality
+8. **Performance Testing**: Performance metrics collected and analyzed
+9. **Compliance Checking**: Security and compliance validation performed
+10. **Report Generation**: Comprehensive validation reports created
+11. **Result Storage**: Validation results stored for audit trail
+12. **Notification**: Validation status notifications sent
 
-## Schema Management
+## Manual PXE Boot Step
 
-Schema validation includes:
-- **JSON Schema** - Standard JSON schema validation
-- **Custom Validators** - Business-specific validation rules
-- **Version Compatibility** - Schema version compatibility checking
-- **Extensible Rules** - Configurable validation policies
+After the `validate_image_on_test` API completes image deployment, users must manually run the `set_pxe_boot` utility from `omnia/utils/set_pxe_boot` to initiate the boot process:
+
+**Required Action:**
+```bash
+# Run the set_pxe_boot utility from omnia/utils to boot deployed images
+omnia/utils/set_pxe_boot --testbed <testbed_id> -i <image_name>
+```
+
+**Purpose:**
+- Configures PXE boot settings for the deployed images
+- Initiates the boot sequence on selected testbeds
+- Enables monitoring and validation of the boot process
+- Provides manual control over boot timing and test execution
+
+**Parameters:**
+- `--testbed`: Target testbed identifier from PXE mapping file
+- `-i`: Image name to boot (from validation request)
+- Optional: `--timeout`: Boot timeout duration
+- Optional: `--debug`: Enable debug logging
+
+**Integration Notes:**
+- Must be run after `validate_image_on_test` API completes successfully
+- Prepares testbeds for automated boot validation monitoring
+- Enables subsequent boot validation, service testing, and performance measurement
+
+## PXE Mapping Management
+
+PXE mapping configuration includes:
+- **Testbed Definitions** - Hardware specifications and capabilities
+- **Network Configuration** - IP addresses and network settings
+- **Boot Parameters** - Kernel parameters and boot options
+- **Storage Configuration** - Disk layouts and mount points
+- **Validation Criteria** - Test requirements and success criteria
 
 ## Security Validation
 
 Security checks include:
-- **Vulnerability Scanning** - Container image vulnerability analysis
-- **Credential Validation** - Secure credential verification
-- **Access Control** - Permission and authorization checking
-- **Compliance Checking** - Regulatory compliance validation
+- **Image Security Scanning** - Container image vulnerability analysis
+- **Testbed Security** - Testbed access control and isolation
+- **Network Security** - Network segmentation and firewall validation
+- **Data Protection** - Sensitive data protection on testbeds
+- **Compliance Checking** - Hardware and software compliance validation
 
 ## Quality Assurance
 
 Quality metrics include:
-- **Code Quality** - Generated code style and structure
-- **Configuration Validity** - Configuration file correctness
-- **Performance Metrics** - Resource usage and efficiency
-- **Reliability Checks** - Error handling and robustness
+- **Boot Reliability** - Image boot success rate and stability
+- **Service Availability** - Service uptime and accessibility
+- **Performance Metrics** - Response times and resource utilization
+- **Hardware Compatibility** - Hardware driver compatibility and performance
+- **Test Coverage** - Validation test completeness and effectiveness
 
 ## Integration Points
 
-- Validates inputs for all API endpoints
-- Checks outputs from all workflow stages
-- Integrates with external security scanning tools
-- Connects to compliance and audit systems
+- Integrates with Build Image workflow for image validation
+- Connects to PXE infrastructure for testbed deployment
+- Integrates with monitoring systems for performance metrics
+- Connects to testbed management systems for hardware control
+- Links to compliance systems for regulatory validation
 
 ## Configuration
 
 Validation configuration includes:
-- Schema definitions and versions
-- Security policies and thresholds
-- Quality standards and metrics
-- Compliance requirements and rules
+- PXE mapping file locations and formats
+- User-specified testbeds from catalog for validation
+- Validation test suites and test scripts
+- Performance thresholds and benchmarks
+- Compliance rules and security policies
 
 ## Error Handling
 
-- Detailed validation error reporting
-- Suggested corrections and fixes
-- Error categorization and prioritization
-- Automated retry for validation failures
+- Testbed deployment failure diagnostics
+- Image boot error analysis and troubleshooting
+- Service failure detection and recovery suggestions
+- Performance issue identification and optimization recommendations
+- Automated testbed recovery and retry mechanisms
 
 ## Reporting
 
 Validation reports provide:
-- Overall validation status summary
-- Detailed error and warning lists
-- Security vulnerability assessments
-- Quality metrics and trends
-- Compliance status and recommendations
+- Image validation status summary across testbeds
+- Boot performance and reliability metrics
+- Service functionality test results
+- Performance benchmarks and comparisons
+- Hardware compatibility assessment
+- Security and compliance validation status
+- Troubleshooting guides and recommendations
 
 ## Continuous Validation
 
 Ongoing validation includes:
-- Automated validation in CI/CD pipelines
-- Periodic security scanning
-- Continuous quality monitoring
-- Regular compliance checking
+- Automated image testing on new builds
+- Periodic testbed health and performance monitoring
+- Continuous hardware compatibility validation
+- Regular security and compliance checking
+- Performance regression testing
+- Testbed maintenance and optimization

@@ -1,6 +1,6 @@
 # Build Stream
 
-Build Stream is a RESTful API service that orchestrates the creation and management of build jobs for the Omnia infrastructure platform. It provides a centralized interface for managing software catalog parsing, local repository creation, image building, and validation workflows.
+**Build Stream** is a **RESTful API** (Representational State Transfer Application Programming Interface) service that orchestrates the creation and management of build jobs for the Omnia infrastructure platform. It provides a centralized interface for managing software catalog parsing, local repository creation, image building, and validation workflows.
 
 ## Architecture Overview
 
@@ -14,7 +14,7 @@ Build Stream follows a clean architecture pattern with clear separation of conce
 
 ## High-Level Workflow
 
-1. **Authentication**: JWT-based authentication secures all API endpoints
+1. **Authentication**: **JWT** (JSON Web Token)-based authentication secures all API endpoints
 2. **Job Creation**: Clients submit build requests through the jobs API
 3. **Stage Processing**: Jobs are broken into stages (catalog parsing, local repo, build image, validation)
 4. **Async Execution**: Stages execute asynchronously with result polling
@@ -33,7 +33,7 @@ Key configuration areas:
 - Database connections (PostgreSQL)
 - Artifact storage backend (file system or in-memory)
 - Vault endpoints and authentication
-- CORS and server settings
+- **CORS** (Cross-Origin Resource Sharing) and server settings
 
 ## Getting Started
 
@@ -58,8 +58,8 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 
 # Set environment variables
-export HOST=0.0.0.0
-export PORT=8000
+export HOST=<host ip>
+export PORT=<port>
 
 # Run development server
 uvicorn main:app --reload
@@ -70,6 +70,8 @@ pytest
 
 **API Documentation:**
 - See Omnia ReadTheDocs for complete API documentation
+- Local development docs: `http://localhost:${PORT}/docs`
+- Local ReDoc: `http://localhost:${PORT}/redoc`
 
 ### Architecture Components
 
@@ -102,13 +104,15 @@ Each major workflow area has dedicated documentation:
 - **Build Image** - Container image build orchestration
 - **Validation** - Input validation and output verification
 
+See the `doc/` directory for detailed workflow documentation.
+
 ## Dependencies
 
 Build Stream uses FastAPI with the following key dependencies:
 - FastAPI/Uvicorn for web framework
-- SQLAlchemy for database ORM
-- Dependency Injector for IoC container
-- PyJWT for authentication
+- SQLAlchemy for database **ORM** (Object-Relational Mapping)
+- Dependency Injector for **IoC** (Inversion of Control) container
+- PyJWT for **JWT** (JSON Web Token) authentication
 - Ansible for infrastructure automation
 - Vault client for secret management
 
@@ -119,5 +123,4 @@ For troubleshooting and development guidance:
 2. Review API logs for error details
 3. Consult the audit trail for job execution history
 4. Refer to the health check endpoint: `/health`
-5. See [tests README](tests/README.md) for pytest guidance and test execution
 
