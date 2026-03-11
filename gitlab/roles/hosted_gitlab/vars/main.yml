@@ -282,18 +282,6 @@ gitlab_cert_status_msg: |
   - Certificates will be reused (idempotent operation)
   {% endif %}
 
-gitlab_ca_export_msg:
-  - "========================================"
-  - "CA Certificate Exported"
-  - "========================================"
-  - ""
-  - "Certificate path: {{ gitlab_ca_export_path }}"
-  - ""
-  - "Download this certificate and import it into your browser"
-  - "to avoid 'Not Secure' warnings when accessing GitLab."
-  - ""
-  - "========================================"
-
 # OIM API Server Configuration
 oim_api_verify_ssl: true
 gitlab_bs_cert_path: "/opt/omnia/build_stream_ssl/ssl/bs_cert.pem"

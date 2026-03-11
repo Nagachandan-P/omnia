@@ -135,8 +135,4 @@
   changed_when: false
   when: ansible_facts['os_family'] == 'RedHat'
 
-- name: Display CA certificate export location
-  ansible.builtin.debug:
-    msg: "{{ gitlab_ca_export_msg }}"
-    verbosity: 2
-  when: _certs_need_generation
+
