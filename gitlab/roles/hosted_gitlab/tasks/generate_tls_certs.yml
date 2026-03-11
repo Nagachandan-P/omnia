@@ -134,5 +134,3 @@
   ansible.builtin.command: update-ca-trust
   changed_when: false
   when: ansible_facts['os_family'] == 'RedHat'
-
-
