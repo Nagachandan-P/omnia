@@ -63,6 +63,7 @@ def load_software_config(config_path):
     Returns:
       - allowed_by_arch: {arch -> set(bundle_name)}
       - bundle_roles: {bundle_name -> list(role_name)}
+      - versions_by_name: {bundle_name -> version_string}
     """
     config = load_json(config_path)
 
@@ -70,6 +71,8 @@ def load_software_config(config_path):
         'x86_64': set(),
         'aarch64': set(),
     }
+
+    versions_by_name = {}
 
     for software in config.get('softwares', []):
         name = software.get('name')
@@ -79,6 +82,8 @@ def load_software_config(config_path):
         for arch in arches:
             if arch in allowed_by_arch:
                 allowed_by_arch[arch].add(name)
+        if software.get('version'):
+            versions_by_name[name] = software.get('version')
 
     # bundle_roles is defined by top-level keys like "slurm_custom", "service_k8s", etc.
     # Each is a list of objects with {"name": "<role>"}.
@@ -95,7 +100,7 @@ def load_software_config(config_path):
         if role_names:
             bundle_roles[bundle_name] = role_names
 
-    return allowed_by_arch, bundle_roles
+    return allowed_by_arch, bundle_roles, versions_by_name
 
 
 def _extract_arch_from_pxe_group(pxe_group: str):
@@ -125,7 +130,34 @@ def _append_unique_source(pkg_sources, source):
     if source not in pkg_sources:
         pkg_sources.append(source)
 
-def collect_packages_from_config(config_dir, allowed_bundles_by_arch):
+def _render_templated_url(template: str, bundle_name: str, versions_by_name: dict) -> str:
+    """Render very simple Jinja-like templates used in config URLs.
+
+    Supports patterns:
+      - {{ <bundle>_version }}
+      - {{ <bundle>_version.split('.')[:2] | join('.') }}
+    """
+    if not template or '{{' not in template:
+        return template
+
+    version = versions_by_name.get(bundle_name)
+    if not version:
+        return ''
+
+    major_minor = '.'.join(version.split('.')[:2])
+
+    # Replace the split/join pattern first
+    pattern_mm = re.compile(r"\{\{\s*" + re.escape(bundle_name) + r"_version\.split\(\s*'\.'\s*\)\s*\[:2\]\s*\|\s*join\(\s*'\.'\s*\)\s*\}\}")
+    rendered = pattern_mm.sub(major_minor, template)
+
+    # Replace plain version token
+    pattern_v = re.compile(r"\{\{\s*" + re.escape(bundle_name) + r"_version\s*\}\}")
+    rendered = pattern_v.sub(version, rendered)
+
+    # If anything templated remains, return empty to signal unresolved
+    return '' if '{{' in rendered else rendered
+
+def collect_packages_from_config(config_dir, allowed_bundles_by_arch, versions_by_name):
     """Collect all packages from config JSON files, filtered by allowed bundles per arch."""
     # pylint: disable=too-many-locals,too-many-branches,too-many-nested-blocks
     packages = defaultdict(lambda: {
@@ -196,15 +228,32 @@ def collect_packages_from_config(config_dir, allowed_bundles_by_arch):
                             )
                     elif pkg_type in ['tarball', 'manifest', 'iso']:
                         url = pkg.get('url', '')
-                        if url and '{{' not in url:  # Skip templated URLs for now
+                        # Try to resolve templated URLs using versions from software_config
+                        resolved_url = url
+                        if url and '{{' in url:
+                            resolved_url = _render_templated_url(url, bundle_name, versions_by_name)
+
+                        if resolved_url:
                             _append_unique_source(
                                 packages[key]['sources'],
                                 {
                                     'Architecture': arch,
-                                    'Uri': url
+                                    'Uri': resolved_url
                                 }
                             )
-                        packages[key]['url'] = url
+                        packages[key]['url'] = resolved_url or url
+                        # Populate package version:
+                        # - tarball: only for ucx/openmpi from software_config
+                        # - iso: restore previous behavior to include Version from software_config when present
+                        if pkg_type == 'tarball':
+                            if (
+                                pkg_name in ('ucx', 'openmpi')
+                                and versions_by_name.get(bundle_name)
+                            ):
+                                packages[key]['version'] = versions_by_name[bundle_name]
+                        elif pkg_type == 'iso':
+                            if versions_by_name.get(bundle_name):
+                                packages[key]['version'] = versions_by_name[bundle_name]
                     elif pkg_type == 'git':
                         url = pkg.get('url', '')
                         version = pkg.get('version', '')
@@ -222,7 +271,7 @@ def generate_catalog(input_dir, software_config_path, pxe_mapping_file):
     # pylint: disable=too-many-locals,too-many-branches,too-many-nested-blocks
 
     # Load allowed software bundles from software_config.json
-    allowed_bundles_by_arch, bundle_roles = load_software_config(software_config_path)
+    allowed_bundles_by_arch, bundle_roles, versions_by_name = load_software_config(software_config_path)
     print("Allowed software bundles by arch: x86_64={}, aarch64={}".format(
         sorted(allowed_bundles_by_arch.get('x86_64', set())),
         sorted(allowed_bundles_by_arch.get('aarch64', set()))
@@ -232,7 +281,7 @@ def generate_catalog(input_dir, software_config_path, pxe_mapping_file):
     pxe_groups = load_pxe_functional_groups(pxe_mapping_file)
     print("PXE functional groups: {}".format(pxe_groups))
 
-    packages = collect_packages_from_config(input_dir, allowed_bundles_by_arch)
+    packages = collect_packages_from_config(input_dir, allowed_bundles_by_arch, versions_by_name)
 
     # Convert sets to lists for JSON serialization
     for pkg_data in packages.values():
@@ -444,6 +493,10 @@ def create_package_entry(pkg_data):
     if pkg_data['tag']:
         entry["Tag"] = pkg_data['tag']
         entry["Version"] = pkg_data['tag']
+
+    # For non-image packages, include a Version when known
+    if pkg_data.get('version') and 'Version' not in entry and pkg_data['type'] != 'manifest':
+        entry["Version"] = pkg_data['version']
 
     if pkg_data['sources']:
         entry["Sources"] = pkg_data['sources']
