@@ -503,7 +503,7 @@ parse-catalog:
       fi
 
       CATALOG_SIZE=$(stat -c%s "${CATALOG_PATH}" 2>/dev/null || stat -f%z "${CATALOG_PATH}" 2>/dev/null)
-      
+
       echo "  Uploading and parsing catalog file..."
       echo "  ------------------------------------------------------------"
       echo "  File: ${CATALOG_PATH}"
@@ -821,8 +821,9 @@ build-images:
 
         BUILD_STAGES=$(jq -r '.stages[]? | select(.stage_name | startswith("build-image")) | .stage_state' status_response.json 2>/dev/null || echo "")
         JOB_STATE=$(jq -r '.job_state // "UNKNOWN"' status_response.json)
-        
-        BUILD_STATUS=$(jq -r '[.stages[]? | select(.stage_name | startswith("build-image")) | "\(.stage_name | split("-") | last)=\(.stage_state)"] | join(", ")' status_response.json 2>/dev/null || echo "N/A")
+
+        BUILD_STATUS=$(jq -r '[.stages[]? | select(.stage_name | startswith("build-image")) |
+          "\(.stage_name | split("-") | last)=\(.stage_state)"] | join(", ")' status_response.json 2>/dev/null || echo "N/A")
 
         echo "  [Poll ${ATTEMPT}/${MAX_POLL_ATTEMPTS}] Job: ${JOB_STATE} | Builds: ${BUILD_STATUS}"
 
@@ -850,7 +851,8 @@ build-images:
             TERMINAL_REACHED=true
             echo ""
             echo "  Final Build Status:"
-            jq '.stages[]? | select(.stage_name | startswith("build-image")) | {stage: .stage_name, state: .stage_state, started: .started_at, ended: .ended_at}' status_response.json 2>/dev/null
+            jq '.stages[]? | select(.stage_name | startswith("build-image")) |
+              {stage: .stage_name, state: .stage_state, started: .started_at, ended: .ended_at}' status_response.json 2>/dev/null
             break
           fi
         fi
@@ -910,7 +912,7 @@ deploy-and-validate:
       fi
 
       IMAGE_KEY=$(jq -r '.image_key' roles_response.json)
-      
+
       echo "  Step 1/2: Trigger image validation on test environment..."
       echo "  ------------------------------------------------------------"
       echo "  Image Key: ${IMAGE_KEY}"
@@ -980,7 +982,8 @@ deploy-and-validate:
             STAGE_COMPLETED=true
             echo ""
             echo "  Final Validation Status:"
-            jq '.stages[]? | select(.stage_name == "validate-image-on-test") | {stage: .stage_name, state: .stage_state, started: .started_at, ended: .ended_at}' status_response.json 2>/dev/null
+            jq '.stages[]? | select(.stage_name == "validate-image-on-test") |
+              {stage: .stage_name, state: .stage_state, started: .started_at, ended: .ended_at}' status_response.json 2>/dev/null
             break
             ;;
           FAILED|CANCELLED)
