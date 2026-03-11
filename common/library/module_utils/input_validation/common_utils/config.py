@@ -40,7 +40,7 @@ ADDITIONAL_PACKAGES_SUPPORTED_SUBGROUPS = {
         "service_kube_control_plane", "service_kube_control_plane_first", "service_kube_node"
     ],
     "aarch64": [
-         "slurm_node", "login_node", "login_compiler_node"
+        "slurm_control_node", "slurm_node", "login_node", "login_compiler_node"
     ]
 }
 

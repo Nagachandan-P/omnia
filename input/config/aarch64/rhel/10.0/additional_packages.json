@@ -4,6 +4,11 @@
 
         ]
     },
+    "slurm_control_node": {
+        "cluster": [
+
+        ]
+    },
     "slurm_node": {
         "cluster": [
 

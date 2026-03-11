@@ -36,22 +36,22 @@
 - name: Create oim group
   when:
     - not oim_group_status | default(false) | bool
-    - "'local_repo' in (omnia_run_tags | default(ansible_run_tags) | default([])) or 'all' in (ansible_run_tags | default([]))"
+    - "'local_repo' in (omnia_run_tags | default(ansible_run_tags) | default([]))"
   ansible.builtin.import_playbook: ../utils/create_container_group.yml
   vars:
     oim_group: true
   tags:
-    - always
+    - local_repo
 
 - name: Local repo subscription validation
   hosts: localhost
   connection: local
   gather_facts: false
   tags:
-    - always
+    - local_repo
   tasks:
     - name: Run subscription validation tasks
-      when: "'local_repo' in (omnia_run_tags | default(ansible_run_tags) | default([])) or 'all' in (ansible_run_tags | default([]))"
+      when: "'local_repo' in (omnia_run_tags | default(ansible_run_tags) | default([]))"
       block:
         - name: Include metadata vars
           ansible.builtin.include_vars: "/opt/omnia/.data/oim_metadata.yml"
@@ -88,26 +88,26 @@
   connection: ssh
   gather_facts: false
   tags:
-    - always
+    - local_repo
   tasks:
     - name: Check rhel subscription enabled or not
       ansible.builtin.include_role:
         name: validate_subscription
         tasks_from: check_rhel_subscription.yml
-      when: "'local_repo' in (hostvars['localhost']['omnia_run_tags'] | default(ansible_run_tags) | default([])) or 'all' in (ansible_run_tags | default([]))"
+      when: "'local_repo' in (hostvars['localhost']['omnia_run_tags'] | default(ansible_run_tags) | default([]))"
 
 - name: Configure RHEL repository URLs
   hosts: localhost
   connection: local
   gather_facts: false
   tags:
-    - always
+    - local_repo
   tasks:
     - name: Configure RHEL os URLS for codeready-builder baseoc appstream repositories
       ansible.builtin.include_role:
         name: validate_subscription
         tasks_from: configure_rhel_os_urls.yml
-      when: "'local_repo' in (omnia_run_tags | default(ansible_run_tags) | default([])) or 'all' in (ansible_run_tags | default([]))"
+      when: "'local_repo' in (omnia_run_tags | default(ansible_run_tags) | default([]))"
 
 - name: Validate omnia input config
   hosts: localhost
