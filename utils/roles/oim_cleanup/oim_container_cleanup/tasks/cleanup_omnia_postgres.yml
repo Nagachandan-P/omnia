@@ -76,16 +76,6 @@
     force_delete: true
   when: postgres_info.containers | length > 0
 
-- name: Remove omnia_postgres cleanup directories
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-    force: true
-  loop: "{{ postgres_cleanup_directory }}"
-  register: postgres_directory_deletion
-  until: postgres_directory_deletion is not failed
-  retries: "{{ max_retries }}"
-
 - name: Check if omnia.target exists before cleaning postgres service entries
   ansible.builtin.stat:
     path: "{{ omnia_target }}"
