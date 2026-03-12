@@ -215,7 +215,10 @@
 
     - name: Display LDMS store daemon restart status
       ansible.builtin.debug:
-        msg: "{{ 'LDMS store daemon pod restarted successfully and is ready' if (ldms_store_pod_ready.resources | default([]) | length > 0) else 'LDMS store daemon pod restart failed or not ready within timeout' }}"
+        msg: >
+          {{ ldms_store_pod_ready_msg
+          if (ldms_store_pod_ready.resources | default([]) | length > 0)
+          else ldms_store_pod_not_ready_msg }}
       when:
         - ldms_store_running | default(false) | bool
         - ldms_conf_file.stat.exists | default(false)
