@@ -1,114 +1,98 @@
-# Image Building
+# OS Image Building
 
-The Image Building workflow orchestrates container image creation for the Omnia platform components.
+The OS Image Building workflow orchestrates operating system image creation for functional roles in the Omnia platform.
 
 ## What It Does
 
-The Image Building workflow provides:
-- Container image build orchestration
-- Multi-architecture image support (x86_64, aarch64)
-- Docker and Podman integration
-- Build context management and optimization
-- Image security scanning and validation
-- Registry push and distribution management
+The OS Image Building workflow provides:
+- OS image build orchestration for functional roles
+- Multi-architecture OS image support (x86_64, aarch64)
+- Package installation and configuration management
 
 ## Inputs/Outputs
 
 **Inputs:**
-- Build specifications and Dockerfiles
-- Package lists from local repositories
-- Build parameters and configurations
-- Security scanning requirements
+- Catalog files defining functional roles and packages
+- Generated input configuration files
+- PXE mapping file for deployment configuration
 
 **Outputs:**
-- Built container images
-- Image metadata and manifests
-- Security scan reports
-- Registry push confirmations
-- Build logs and artifacts
+- Built OS images for functional roles
+- OS image metadata and manifests
+- Package installation logs and validation reports
+- OS image deployment configurations
 
 ## Key Logic Locations
 
 **Primary Files:**
-- `api/build_image/routes.py` - HTTP endpoints for build operations
-- `orchestrator/build_image/use_cases/` - Build orchestration logic
-- `core/build_image/entities.py` - Build domain entities
-- `core/build_image/repositories.py` - Build data access
-- `core/build_image/services.py` - Build management services
+- `api/build_image/routes.py` - HTTP endpoints for OS build operations
+- `orchestrator/build_image/use_cases/` - OS build orchestration logic
+- `core/build_image/entities.py` - OS build domain entities
+- `core/build_image/repositories.py` - OS build data access
+- `core/build_image/services.py` - OS build management services
 
 **Main Components:**
-- **BuildImageUseCase** - Orchestrates image build processes
-- **BuildService** - Manages build execution and monitoring
-- **MultiArchBuilder** - Handles multi-architecture builds
-- **SecurityScanner** - Performs image security analysis
+- **BuildOSImageUseCase** - Orchestrates OS image build processes for functional roles
+- **OSService** - Manages OS build execution and monitoring
+- **MultiArchOSBuilder** - Handles multi-architecture OS builds
+- **PackageInstaller** - Manages package installation and configuration
 
 ## Workflow Flow
 
-1. **Build Request**: Client submits image build request
-2. **Build Context Preparation**: Dockerfiles and dependencies assembled
-3. **Multi-Arch Setup**: Build configurations prepared for target architectures
-4. **Build Execution**: Container images built using Docker/Podman
-5. **Security Scanning**: Built images scanned for vulnerabilities
-6. **Manifest Creation**: Multi-architecture manifests generated
-7. **Registry Push**: Images pushed to container registries
-8. **Validation**: Final image validation and testing
+1. **Build Request**: Client submits image build request for functional roles
+2. **OS Context Preparation**: Base functional role packages assembled
+3. **Multi-Arch Setup**: OS build configurations prepared for target architectures
+4. **Package Installation**: Functional role packages installed and configured
+5. **OS Customization**: System settings and configurations applied
+6. **Image Creation**: OS images built and optimized for deployment
 
 ## Architecture Support
 
 Supports multiple CPU architectures:
 - **x86_64** - Standard 64-bit Intel/AMD processors
 - **aarch64** - 64-bit ARM processors
-- **Multi-arch manifests** - Single image supporting multiple architectures
+
 
 ## Build Optimization
 
 Optimizations include:
-- **Layer caching** - Reusing unchanged layers across builds
+- **Package caching** - Reusing downloaded packages across builds
 - **Parallel builds** - Concurrent building for multiple architectures
-- **Context optimization** - Minimizing build context size
-- **Dependency caching** - Caching package downloads
+- **Dependency resolution** - Efficient package dependency management
 
 ## Security Features
 
 Security capabilities include:
-- **Vulnerability scanning** - Automated security analysis
-- **Base image validation** - Verified base image sources
-- **Signature verification** - Package integrity checks
-- **Runtime security** - Secure container configurations
+- **Package verification** - Automated package integrity validation
+- **Base OS validation** - Verified base OS sources and configurations
+- **Signature verification** - Package signature and checksum validation
+
 
 ## Integration Points
 
 - Receives packages from local repository workflow
 - Integrates with validation workflow for quality checks
-- Uses Vault for registry credentials
-- Connects to container registries for distribution
+- Uses Vault for secure credential management
+- Connects with deployment systems for functional role provisioning
 
 ## Configuration
 
 Build configuration includes:
-- Build parameters and environment variables
-- Registry endpoints and credentials
-- Security scanning policies
-- Architecture-specific settings
+- OS build parameters and environment variables
+- Functional role specifications and requirements
+- Package installation policies and configurations
+- Architecture-specific OS settings
 
 ## Error Handling
 
-- Detailed build error reporting
+- Detailed OS build error reporting
 - Step-by-step build progress tracking
 - Rollback capabilities for failed builds
 - Automated retry for transient failures
 
 ## Monitoring
 
-- Real-time build progress monitoring
+- Real-time OS build progress monitoring
 - Resource usage tracking (CPU, memory, storage)
 - Build success/failure metrics
-- Security scan result tracking
-
-## Registry Integration
-
-Supports multiple container registries:
-- **Docker Hub** - Public container registry
-- **Harbor** - Enterprise container registry
-- **Artifactory** - JFrog container registry
-- **Custom registries** - Organization-specific registries
+- Package installation result tracking

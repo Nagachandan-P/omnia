@@ -7,9 +7,7 @@ The Jobs workflow manages the complete lifecycle of build jobs in Build Stream, 
 The Jobs workflow provides:
 - Job creation with idempotency guarantees
 - Stage-based execution with state management
-- Real-time job monitoring and status tracking
-- Audit trail for all job operations
-- Result polling and notification handling
+- Job monitoring and status tracking
 
 ## Inputs/Outputs
 
@@ -50,31 +48,35 @@ The Jobs workflow provides:
 7. **Result Collection**: Results polled and stored
 8. **Audit Logging**: All operations logged for traceability
 
+## Prerequisites
+
+To run jobs, the following infrastructure components are required:
+
+- **PostgreSQL Database**: Used for persistent storage of job metadata and status
+- **S3-compatible Object Storage**: Utilized for storing build artifacts, such as catalog files and build images  
+- **Message Queue (e.g., RabbitMQ, Kafka)**: Enables asynchronous communication between job components and facilitates scalable processing
+- **Container Runtime (e.g., Docker, containerd)**: Required for building and validating container images
+
+These components must be properly configured and accessible to the BuildStreaM service for successful job execution.
+
+## API Documentation
+
+- See Omnia ReadTheDocs for complete API documentation
+- Local development docs: `http://localhost:${PORT}/docs`
+- Local ReDoc: `http://localhost:${PORT}/redoc`
+
 ## Stage Types
 
-Jobs support multiple stage types:
-- **catalog_roles** - Software catalog processing
-- **local_repo** - Local repository creation
-- **build_image** - Container image building
-- **validate** - Input/output validation
+Jobs support multiple stages:
+- **parse-catalog** - Software catalog processing
+- **generate-input-files** - Input file generation
+- **create-local-repository** - Local repository creation
+- **build-image-x86_64** - x86_64 OS image building
+- **build-image-aarch64** - aarch64 OS image building
+- **validate-image-on-test** - Image validation testing
 
 ## Error Handling
 
 - Invalid state transitions are rejected
-- Failed stages can be retried based on configuration
 - Comprehensive error reporting with context
 - Audit trail captures all error events
-
-## Monitoring
-
-- Job status available via `/api/v1/jobs/{job_id}` endpoint
-- List all jobs with filtering options
-- Real-time status updates through result polling
-- Detailed audit trail for compliance reporting
-
-## Integration Points
-
-- Integrates with all other workflows as stages
-- Uses Vault for secure credential access
-- Stores artifacts in configured artifact store
-- Emits events for external system integration

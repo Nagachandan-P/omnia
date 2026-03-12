@@ -32,9 +32,6 @@ The Catalog workflow provides:
 - `api/parse_catalog/routes.py` - Catalog parsing endpoints
 - `orchestrator/catalog/use_cases/parse_catalog.py` - Catalog parsing logic
 - `orchestrator/catalog/use_cases/generate_input_files.py` - Input file generation
-- `core/catalog/entities.py` - Catalog domain entities
-- `core/catalog/repositories.py` - Catalog data access
-- `generate_catalog.py` - Standalone catalog generation script
 
 **Main Components:**
 - **ParseCatalogUseCase** - Handles catalog parsing and validation
@@ -56,6 +53,8 @@ The Catalog workflow provides:
 ## Package Categorization
 
 Packages are categorized into:
+- **Base OS Bundles**: Operating system packages (e.g., rhel)
+- **Driver Bundles**: Hardware driver packages (e.g., nvidia_gpu_driver)
 - **Functional Bundles**: Core service packages (service_k8s, slurm_custom, additional_packages)
 - **Infrastructure Bundles**: CSI and infrastructure packages (csi_driver_powerscale)
 - **Miscellaneous**: Additional packages that don't fit other categories
@@ -71,21 +70,5 @@ Packages are categorized into:
 
 Catalog processing is configured through:
 - Package mapping files
-- Role templates
-- Platform-specific configurations
+- Adapter policy configurations
 - Validation rules and schemas
-
-## Error Handling
-
-- Comprehensive schema validation for catalogs
-- Detailed error reporting for invalid packages
-- Graceful handling of missing dependencies
-- Rollback capabilities for failed processing
-
-## Standalone Script
-
-The `generate_catalog.py` script provides:
-- Command-line catalog generation
-- Batch processing capabilities
-- Integration with external CI/CD pipelines
-- Detailed logging and error reporting

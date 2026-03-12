@@ -70,8 +70,6 @@ pytest
 
 **API Documentation:**
 - See Omnia ReadTheDocs for complete API documentation
-- Local development docs: `http://localhost:${PORT}/docs`
-- Local ReDoc: `http://localhost:${PORT}/redoc`
 
 ### Architecture Components
 
