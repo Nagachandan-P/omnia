@@ -26,9 +26,9 @@ local_repo_config_syntax_fail_msg: "Failed. Syntax errors present in local_repo_
 build_stream_config_file: "{{ input_project_dir }}/build_stream_config.yml"
 build_stream_cleanup_warning: |
   WARNING: Build Stream is enabled in your configuration.
-  
-  Before proceeding with OIM cleanup, it is recommended to run cleanup_gitlab.yml first.
-  
+
+  Before proceeding with OIM cleanup, it is required to run cleanup_gitlab.yml first for cleaning up the hosted gitlab deployment.
+
   The cleanup will continue automatically after 10 seconds...
   Press Ctrl+C to cancel if you need to run cleanup_gitlab.yml first.
 build_stream_pause_seconds: 10

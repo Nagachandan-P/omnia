@@ -45,7 +45,7 @@
 - name: Load build stream configuration
   ansible.builtin.include_vars:
     file: "{{ build_stream_config_file }}"
-  when: 
+  when:
     - hostvars['localhost']['input_project_dir'] is defined
 
 - name: Warn about GitLab cleanup when build stream is enabled
