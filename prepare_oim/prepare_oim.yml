@@ -73,6 +73,7 @@
               {%- if 'slurm_custom' in sw_names %}{% set _ = tags.append('slurm_custom') %}{% endif -%}
               {%- if 'csi_driver_powerscale' in sw_names %}{% set _ = tags.append('csi_driver_powerscale') %}{% endif -%}
               {%- if 'ldms' in sw_names %}{% set _ = tags.append('ldms') %}{% endif -%}
+              {%- if 'service_k8s' in sw_names %}{% set _ = tags.append('service_k8s') %}{% endif -%}
               {{ tags | unique }}
 
         - name: Check telemetry configuration and add idrac_telemetry tag if enabled
