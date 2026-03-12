@@ -150,9 +150,9 @@
         - ldms_conf_file.stat.exists | default(false)
         - ldms_bin_file.stat.exists | default(false)
 
-    - name: Wait 20 seconds before restarting store daemon
+    - name: Wait before restarting store daemon
       ansible.builtin.pause:
-        seconds: 10
+        seconds: "{{ ldms_store_restart_wait_seconds }}"
       when:
         - ldms_running | default(false) | bool
         - ldms_conf_file.stat.exists | default(false)
