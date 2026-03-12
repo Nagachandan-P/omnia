@@ -35,6 +35,10 @@
 
         1. local_repo_config.yml
 
+            - Set rhel_subscription_repo_config_x86_64 (list of RHEL subscription repos for x86_64)
+
+            - Set rhel_subscription_repo_config_aarch64 (list of RHEL subscription repos for aarch64)
+
             - Set additional_repos_x86_64 (list of extra repo URLs or file paths for x86_64)
 
             - Set additional_repos_aarch64 (list of extra repo URLs or file paths for aarch64)
@@ -70,6 +74,23 @@
               Homogeneous without specs | One node per group queried, specs shared 1 per group
 
               also provide node_hardware_defaults for groups where you want to apply specs
+
+
+            - New sample fields under slurm_cluster for Slurm cgroup and NodeName definitions:
+
+              NodeName entries (list of nodes with CPUs/RealMemory)
+
+              cgroup settings (CgroupPlugin and constrain flags)
+
+              These fields are added and populated with default values when using config_source; adjust them manually as needed for your cluster.
+
+
+        4. software_config.json
+
+            - Migrated as-is from backup during upgrade
+
+            - Review and manually update as needed before proceeding.
+
 
       Optional: NFS cleanup (only if you are reprovisioning the cluster)
 
