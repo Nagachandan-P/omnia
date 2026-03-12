@@ -5,7 +5,7 @@
     "Identifier": "image-build",
     "FunctionalLayer": [
       {
-        "Name": "login_compiler_node_x86_64",
+        "Name": "login_compiler_node_aarch64",
         "FunctionalPackages": [
           "package_id_1",
           "package_id_12",
