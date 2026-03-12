@@ -13,6 +13,20 @@
 # limitations under the License.
 ---
 
+- name: Set default postgres_backup parameter
+  ansible.builtin.set_fact:
+    postgres_backup: "{{ postgres_backup | default(true) }}"
+
+- name: Display cleanup mode
+  ansible.builtin.debug:
+    msg: "{{ postgres_cleanup_mode_msg }}"
+
+- name: Wait task to promt user to preserve the postgres credentails.
+  ansible.builtin.pause:
+    prompt: "{{ postgres_credentials_backup_msg }}"
+    seconds: "{{ wait_delay }}"
+  when: postgres_backup | bool
+
 - name: Import pre-requisite tasks
   ansible.builtin.include_tasks: pre_requisite.yml
   tags: always

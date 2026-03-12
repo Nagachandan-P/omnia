@@ -185,11 +185,6 @@
             command: rm -f /tmp/init_build_stream_db.sql
           changed_when: false
 
-      rescue:
-        - name: Postgres | rescue | cleanup on failure
-          ansible.builtin.fail:
-            msg: "{{ postgres_container_failure_msg }}"
-
     - name: Remove temporary initialization directory
       ansible.builtin.file:
         path: "{{ temp_init_dir.path }}"
