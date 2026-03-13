@@ -99,20 +99,19 @@
     - podman_volumes_output.stdout | length > 0
 
 - name: Remove Postgres-related Podman volumes when postgres_backup=false
-  ansible.builtin.command:
-    cmd: "podman volume rm {{ item }} --force"
+  containers.podman.podman_volume:
+    name: "{{ item }}"
+    state: absent
+    force: true
   loop: "{{ postgres_volumes | default([]) }}"
   when:
     - not postgres_backup | bool
     - postgres_volumes is defined
     - postgres_volumes | length > 0
-  register: volume_removal
-  changed_when: volume_removal.rc == 0
-  failed_when: false
 
 - name: Log preserved volumes when postgres_backup=true
   ansible.builtin.debug:
-    msg: "PRESERVED: Postgres volumes retained (postgres_backup=true): {{ postgres_volumes | default([]) }}"
+    msg: "{{ postgres_preserved_volumes_msg }}"
   when:
     - postgres_backup | bool
     - postgres_volumes is defined
@@ -131,15 +130,12 @@
 
 - name: Log preserved data directories when postgres_backup=true
   ansible.builtin.debug:
-    msg: "PRESERVED: Postgres data directories retained (postgres_backup=true): {{ postgres_cleanup_directory }}"
+    msg: "{{ postgres_preserved_msg }}"
   when: postgres_backup | bool
 
 - name: Log deleted resources when postgres_backup=false
   ansible.builtin.debug:
-    msg:
-      - "DELETED: Postgres data directories removed (postgres_backup=false)"
-      - "Directories: {{ postgres_cleanup_directory }}"
-      - "Volumes: {{ postgres_volumes | default([]) }}"
+    msg: "{{ postgres_deleted_msg }}"
   when: not postgres_backup | bool
 
 - name: Check if omnia.target exists before cleaning postgres service entries
