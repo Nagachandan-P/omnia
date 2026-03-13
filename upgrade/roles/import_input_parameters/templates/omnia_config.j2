@@ -113,7 +113,7 @@ slurm_cluster:
 {% for _cluster in _slurm_cluster %}
   - cluster_name: {{ _cluster.cluster_name | default('') }}
     nfs_storage_name: {{ _cluster.nfs_storage_name | default('') }}
-    # skip_merge: True
+    # skip_merge: False
 
     # Uncomment to enable homogeneous discovery mode
     # node_discovery_mode: "homogeneous"
@@ -135,39 +135,14 @@ slurm_cluster:
 {% if _cluster.config_sources is defined and (_cluster.config_sources | length > 0) %}
 
     config_sources:
-{% set _supported = ['slurm', 'cgroup', 'slurmdbd', 'gres'] %}
 {% for _conf_name, _conf_val in _cluster.config_sources.items() %}
-{% if _conf_name in _supported %}
-{% if _conf_name == 'cgroup' and (_conf_val is mapping) %}
-    #    NodeName:
-    #      - NodeName: newnode1
-    #        CPUs: 16
-    #        RealMemory: 64000
-    #      - NodeName: newnode2
-    #        CPUs: 16
-    #        RealMemory: 64000
-      cgroup:
-        CgroupPlugin: {{ _conf_val.CgroupPlugin | default('autodetect') }}
-{% for _k, _v in _conf_val.items() %}
-{% if _k not in ['AllowedRAMSpace', 'CgroupPlugin', 'ConstrainCores', 'ConstrainDevices', 'ConstrainRAMSpace', 'ConstrainSwapSpace'] %}
-        {{ _k }}: {{ _v }}
-{% endif %}
-{% endfor %}
-        ConstrainCores: {{ _conf_val.ConstrainCores | default(true) }}
-        ConstrainDevices: {{ _conf_val.ConstrainDevices | default(true) }}
-        ConstrainRAMSpace: {{ _conf_val.ConstrainRAMSpace | default(true) }}
-        ConstrainSwapSpace: {{ _conf_val.ConstrainSwapSpace | default(true) }}
-{% if _conf_val.AllowedRAMSpace is defined %}
-        ### AllowedRAMSpace: {{ _conf_val.AllowedRAMSpace }}       This is not supported in 2.1, just attached for reference
-{% endif %}
-{% elif _conf_val is mapping %}
+{% if _conf_val is mapping %}
       {{ _conf_name }}:
 {% for _k, _v in _conf_val.items() %}
         {{ _k }}: {{ _v }}
 {% endfor %}
 {% else %}
       {{ _conf_name }}: {{ _conf_val }}
-{% endif %}
 {% endif %}
 {% endfor %}
     #   OR

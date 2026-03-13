@@ -57,7 +57,8 @@
 
             - Populate location to point to your Slurm config bundle (local path or remote URL)
 
-            - New variable: skip_merge (set to true to skip merging configs during upgrade when using external bundles)
+            - New variable: skip_merge (boolean, default: false,  If skip_merge is set to true for a configuration source path,
+              that configuration file will be applied directly without merging with defaults or existing configurations)
 
             - New variable: node_discovery_mode: 'Homogeneous' or 'Heterogeneous'
 
@@ -79,10 +80,6 @@
             - New sample fields under slurm_cluster for Slurm cgroup and NodeName definitions:
 
               NodeName entries (list of nodes with CPUs/RealMemory)
-
-              cgroup settings (CgroupPlugin and constrain flags)
-
-              These fields are added and populated with default values when using config_source; adjust them manually as needed for your cluster.
 
 
         4. software_config.json
