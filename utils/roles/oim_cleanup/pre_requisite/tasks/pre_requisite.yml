@@ -58,7 +58,7 @@
     msg: "{{ postgres_cleanup_mode_msg }}"
   when: enable_build_stream
 
-- name: Wait task to promt user to preserve the postgres credentails.
+- name: Wait task to prompt user to preserve the postgres credentials.
   ansible.builtin.pause:
     prompt: "{{ postgres_credentials_backup_msg }}"
     seconds: "{{ wait_delay }}"
