@@ -90,11 +90,14 @@
   register: podman_volumes_output
   changed_when: false
   failed_when: false
+  when:
+    - not postgres_backup | bool
 
 - name: Parse Podman volumes
   ansible.builtin.set_fact:
     postgres_volumes: "{{ (podman_volumes_output.stdout | from_json) | selectattr('Name', 'search', postgres_container_name) | map(attribute='Name') | list }}"
   when:
+    - not postgres_backup | bool
     - podman_volumes_output.rc == 0
     - podman_volumes_output.stdout | length > 0
 
