@@ -25,3 +25,15 @@ postgres_credentials_backup_msg: "Warning: Record or back up the Postgres creden
  They will be required later to restore data when running the prepare_oim playbook after oim_cleanup."
 wait_delay: 30
 postgres_cleanup_mode_msg: "Postgres cleanup mode: {{ 'PRESERVE data (postgres_backup=true)' if postgres_backup | bool else 'DELETE data (postgres_backup=false)' }}"
+
+# Build stream configuration
+build_stream_config_file: "{{ input_project_dir }}/build_stream_config.yml"
+build_stream_cleanup_warning: |
+  WARNING: Build Stream is enabled in your configuration.
+
+  Before proceeding with OIM cleanup, it is required to run cleanup_gitlab.yml first for cleaning up the hosted gitlab deployment.
+
+  The cleanup will continue automatically after 10 seconds...
+  Press Ctrl+C to cancel if you need to run cleanup_gitlab.yml first.
+build_stream_pause_seconds: 10
+
