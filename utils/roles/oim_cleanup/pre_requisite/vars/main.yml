@@ -24,7 +24,8 @@ local_repo_config_syntax_fail_msg: "Failed. Syntax errors present in local_repo_
 postgres_credentials_backup_msg: "Warning: Record or back up the Postgres credentials.
  They will be required later to restore data when running the prepare_oim playbook after oim_cleanup."
 wait_delay: 30
-postgres_cleanup_mode_msg: "Postgres cleanup mode: {{ 'PRESERVE data (postgres_backup=true)' if postgres_backup | bool else 'DELETE data (postgres_backup=false)' }}"
+postgres_cleanup_mode_msg: "Postgres cleanup mode: {{ 'PRESERVE data (postgres_backup=true)'
+ if postgres_backup | bool else 'DELETE data (postgres_backup=false)' }}"
 
 # Build stream configuration
 build_stream_config_file: "{{ input_project_dir }}/build_stream_config.yml"
@@ -36,4 +37,3 @@ build_stream_cleanup_warning: |
   The cleanup will continue automatically after 10 seconds...
   Press Ctrl+C to cancel if you need to run cleanup_gitlab.yml first.
 build_stream_pause_seconds: 10
-

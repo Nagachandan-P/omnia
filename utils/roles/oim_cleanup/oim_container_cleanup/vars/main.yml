@@ -159,7 +159,8 @@ postgres_cleanup_directory:
   - "{{ omnia_nfs_share }}/omnia/postgres"
 
 postgres_container_name: omnia_postgres
-postgres_cleanup_mode_msg: "Postgres cleanup mode: {{ 'PRESERVE data (postgres_backup=true)' if postgres_backup | bool else 'DELETE data (postgres_backup=false)' }}"
+postgres_cleanup_mode_msg: "Postgres cleanup mode: {{ 'PRESERVE data (postgres_backup=true)'
+ if postgres_backup | bool else 'DELETE data (postgres_backup=false)' }}"
 
 # Usage: cleanup_note.yml
 oim_cleanup_note: |
