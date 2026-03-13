@@ -56,12 +56,6 @@
     state: directory
     mode: "{{ postgres_dir_mode }}"
 
-- name: Create log directory for omnia_postgres
-  ansible.builtin.file:
-    path: "{{ postgres_log_dir }}"
-    state: directory
-    mode: "{{ postgres_dir_mode }}"
-
 # Pull container image
 - name: Pull omnia_postgres image from Docker Hub
   containers.podman.podman_image:
