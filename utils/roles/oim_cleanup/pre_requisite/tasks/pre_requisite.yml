@@ -49,7 +49,7 @@
   when:
     - hostvars['localhost']['input_project_dir'] is defined
 
-- name: enable_build_stream from file build_stream_config.yml
+- name: Enable_build_stream from file build_stream_config.yml
   ansible.builtin.set_fact:
     enable_build_stream: "{{ build_stream_config.enable_build_stream | default(false) }}"
 
@@ -62,7 +62,7 @@
   ansible.builtin.pause:
     prompt: "{{ postgres_credentials_backup_msg }}"
     seconds: "{{ wait_delay }}"
-  when: 
+  when:
     - postgres_backup | bool
     - enable_build_stream
 
