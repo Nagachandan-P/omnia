@@ -1038,8 +1038,8 @@
           "x86_64"
         ],
         "Type": "image",
-        "Tag": "1.0",
-        "Version": "1.0"
+        "Tag": "1.2",
+        "Version": "1.2"
       },
       "package_id_38": {
         "Name": "docker.io/dellhpcomniaaisolution/kafkapump",
@@ -1053,8 +1053,8 @@
           "x86_64"
         ],
         "Type": "image",
-        "Tag": "1.0",
-        "Version": "1.0"
+        "Tag": "1.2",
+        "Version": "1.2"
       },
       "package_id_39": {
         "Name": "docker.io/dellhpcomniaaisolution/victoriapump",
@@ -1068,8 +1068,8 @@
           "x86_64"
         ],
         "Type": "image",
-        "Tag": "1.0",
-        "Version": "1.0"
+        "Tag": "1.2",
+        "Version": "1.2"
       },
       "package_id_40": {
         "Name": "cryptography==45.0.7",
