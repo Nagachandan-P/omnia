@@ -45,10 +45,12 @@
 
 - name: Cleanup build_stream container
   ansible.builtin.import_tasks: cleanup_build_stream.yml
+  when: "{{ hostvars['localhost']['enable_build_stream'] }}"
   tags: build_stream
 
 - name: Cleanup omnia_postgres container
   ansible.builtin.import_tasks: cleanup_omnia_postgres.yml
+  when: "{{ hostvars['localhost']['enable_build_stream'] }}"
   tags: postgres
 
 - name: Cleanup common configuration

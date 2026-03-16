@@ -38,6 +38,7 @@
   ansible.builtin.systemd_service:
     name: "{{ item }}"
     state: stopped
+  failed_when: false
   loop: "{{ postgres_services }}"
   when:
     - item in ansible_facts.services
