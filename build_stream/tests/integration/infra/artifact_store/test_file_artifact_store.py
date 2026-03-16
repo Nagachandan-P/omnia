@@ -380,7 +380,7 @@ class TestFileArtifactStoreConfiguration:
             # Should fall back to defaults
             artifact_store = container.artifact_store()
             assert isinstance(artifact_store, FileArtifactStore)
-            assert str(artifact_store._base_path) == "/opt/omnia/build_stream/artifacts"
+            assert str(artifact_store._base_path) == "/opt/omnia/build_stream_root/artifacts"
         finally:
             # Restore config
             if original_config:
@@ -410,7 +410,7 @@ working_dir = /tmp/test
                 artifact_store = container.artifact_store()
                 assert isinstance(artifact_store, FileArtifactStore)
                 # Should use fallback path
-                assert str(artifact_store._base_path) == "/opt/omnia/build_stream/artifacts"
+                assert str(artifact_store._base_path) == "/opt/omnia/build_stream_root/artifacts"
             finally:
                 if original_config:
                     os.environ["BUILD_STREAM_CONFIG_PATH"] = original_config

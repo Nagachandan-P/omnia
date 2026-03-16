@@ -18,13 +18,11 @@ import uuid
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import HTTPException, Security
-from fastapi.security import HTTPAuthorizationCredentials
+from fastapi import HTTPException
 
 from api.local_repo.dependencies import (
     get_local_repo_correlation_id,
     get_create_local_repo_use_case,
-    get_local_repo_client_id,
 )
 from core.jobs.value_objects import CorrelationId
 
@@ -87,36 +85,10 @@ class TestGetCreateLocalRepoUseCase:
         assert type(use_case1) == type(use_case2)
 
 
-class TestAuthenticationDependencies:
-    """Tests for authentication dependencies."""
+class TestGetCreateLocalRepoUseCaseFactory:
+    """Tests for get_create_local_repo_use_case dependency factory behavior."""
 
-    def test_bearer_token_validation(self):
-        """Test Bearer token validation."""
-        # The dependency should extract ClientId from bearer token
-        client_id = get_local_repo_client_id("Bearer test-token-123")
-        assert str(client_id) == "test-token-123"
-
-    def test_invalid_scheme_raises_exception(self):
-        """Test that invalid scheme raises HTTPException."""
-        # Should raise HTTPException for non-bearer scheme
-        with pytest.raises(HTTPException) as exc_info:
-            get_local_repo_client_id("Basic dGVzdDoxMjM=")
-
-        assert exc_info.value.status_code == 401
-        assert "Invalid authorization header format" in str(exc_info.value.detail)
-
-    def test_missing_token_raises_exception(self):
-        """Test that missing token raises HTTPException."""
-        # Should raise HTTPException for empty token
-        with pytest.raises(HTTPException) as exc_info:
-            get_local_repo_client_id("Bearer ")
-
-        assert exc_info.value.status_code == 401
-        assert "Missing authentication token" in str(exc_info.value.detail)
-
-    def test_long_token_truncated(self):
-        """Test that long tokens are truncated to 128 chars."""
-        long_token = "x" * 200
-        client_id = get_local_repo_client_id(f"Bearer {long_token}")
-        assert len(str(client_id)) == 128
+    def test_returns_callable(self):
+        """Test that get_create_local_repo_use_case is callable."""
+        assert callable(get_create_local_repo_use_case)
 

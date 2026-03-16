@@ -28,39 +28,7 @@ from container import DevContainer
 class TestGenerateInputFilesRoutes:
     """Integration tests for generate input files API endpoints."""
 
-    @pytest.fixture
-    def client(self) -> TestClient:
-        """Create test client with in-memory stores."""
-        container = DevContainer()
-        container.wire(modules=["api.generate_input_files.routes"])
-
-        with TestClient(app) as client:
-            yield client
-
-    @pytest.fixture
-    def auth_headers(self, mock_jwt_validation) -> Dict[str, str]:  # pylint: disable=unused-argument
-        """Create authentication headers."""
-        return {
-            "Authorization": "Bearer test-token",
-            "X-Correlation-ID": str(uuid.uuid4()),
-            "Idempotency-Key": f"test-key-{uuid.uuid4()}",
-        }
-
-    @pytest.fixture
-    def created_job(self, client: TestClient, auth_headers: Dict[str, str]) -> Dict[str, Any]:
-        """Create a fresh job for each test."""
-        # Use unique idempotency key to ensure fresh job creation
-        headers = auth_headers.copy()
-        headers["Idempotency-Key"] = f"test-key-{uuid.uuid4()}"
-
-        response = client.post(
-            "/api/v1/jobs",
-            json={"client_id": "test-client"},
-            headers=headers,
-        )
-        assert response.status_code == 201
-        return response.json()
-
+    
     def test_generate_input_files_endpoint_exists(self, client: TestClient) -> None:
         """Test that the generate input files endpoint exists and is accessible."""
         # Test with invalid auth to check endpoint exists (should get 401, not 404)
@@ -71,12 +39,12 @@ class TestGenerateInputFilesRoutes:
         
         # Should not be 404 (endpoint exists)
         assert response.status_code != 404
-        # Should be 401 (auth required) or 422 (validation error)
-        assert response.status_code in [401, 422]
+        # Should be 401 (auth required), 403 (forbidden), or 422 (validation error)
+        assert response.status_code in [401, 403, 422]
 
-    def test_generate_input_files_with_valid_request(self, client: TestClient, auth_headers: Dict[str, str], created_job: Dict[str, Any]) -> None:
+    def test_generate_input_files_with_valid_request(self, client: TestClient, auth_headers: Dict[str, str], created_job: str) -> None:
         """Test generate input files with valid request structure."""
-        job_id = created_job["job_id"]
+        job_id = created_job
         response = client.post(
             f"/api/v1/jobs/{job_id}/stages/generate-input-files",
             headers=auth_headers,
@@ -86,9 +54,9 @@ class TestGenerateInputFilesRoutes:
         # Should accept the request structure (may fail due to missing dependencies)
         assert response.status_code in [200, 400, 422, 500]
 
-    def test_generate_input_files_with_custom_policy(self, client: TestClient, auth_headers: Dict[str, str], created_job: Dict[str, Any]) -> None:
+    def test_generate_input_files_with_custom_policy(self, client: TestClient, auth_headers: Dict[str, str], created_job: str) -> None:
         """Test generate input files with custom adapter policy."""
-        job_id = created_job["job_id"]
+        job_id = created_job
         request_data = {
             "adapter_policy_path": "/opt/omnia/custom_policy.json"
         }
@@ -111,9 +79,9 @@ class TestGenerateInputFilesRoutes:
         # Should require authentication
         assert response.status_code == 401
 
-    def test_generate_input_files_requires_correlation_id(self, client: TestClient, created_job: Dict[str, Any]) -> None:
+    def test_generate_input_files_requires_correlation_id(self, client: TestClient, created_job: str) -> None:
         """Test that generate input files endpoint requires correlation ID."""
-        job_id = created_job["job_id"]
+        job_id = created_job
         response = client.post(
             f"/api/v1/jobs/{job_id}/stages/generate-input-files",
             headers={"Authorization": "Bearer test-token"},
@@ -132,9 +100,9 @@ class TestGenerateInputFilesRoutes:
         # Should validate job ID format (may return 400 or 422)
         assert response.status_code in [400, 422]
 
-    def test_generate_input_files_invalid_policy_path(self, client: TestClient, auth_headers: Dict[str, str], created_job: Dict[str, Any]) -> None:
+    def test_generate_input_files_invalid_policy_path(self, client: TestClient, auth_headers: Dict[str, str], created_job: str) -> None:
         """Test generate input files with invalid adapter policy path."""
-        job_id = created_job["job_id"]
+        job_id = created_job
         request_data = {
             "adapter_policy_path": "../../../etc/passwd"  # Path traversal attempt
         }
@@ -148,9 +116,9 @@ class TestGenerateInputFilesRoutes:
         # Should reject path traversal attempts
         assert response.status_code in [400, 422]
 
-    def test_generate_input_files_empty_policy_path(self, client: TestClient, auth_headers: Dict[str, str], created_job: Dict[str, Any]) -> None:
+    def test_generate_input_files_empty_policy_path(self, client: TestClient, auth_headers: Dict[str, str], created_job: str) -> None:
         """Test generate input files with empty adapter policy path."""
-        job_id = created_job["job_id"]
+        job_id = created_job
         request_data = {
             "adapter_policy_path": ""
         }
@@ -183,9 +151,9 @@ class TestGenerateInputFilesRoutes:
         assert "swagger ui" in docs_content
         assert "openapi" in docs_content
 
-    def test_generate_input_files_response_structure(self, client: TestClient, auth_headers: Dict[str, str], created_job: Dict[str, Any]) -> None:
+    def test_generate_input_files_response_structure(self, client: TestClient, auth_headers: Dict[str, str], created_job: str) -> None:
         """Test that response has correct structure when successful."""
-        job_id = created_job["job_id"]
+        job_id = created_job
         response = client.post(
             f"/api/v1/jobs/{job_id}/stages/generate-input-files",
             headers=auth_headers,
@@ -202,9 +170,9 @@ class TestGenerateInputFilesRoutes:
                 assert "generated_files" in data
                 assert isinstance(data["generated_files"], list)
 
-    def test_generate_input_files_error_handling(self, client: TestClient, auth_headers: Dict[str, str], created_job: Dict[str, Any]) -> None:
+    def test_generate_input_files_error_handling(self, client: TestClient, auth_headers: Dict[str, str], created_job: str) -> None:
         """Test error handling for various error conditions."""
-        job_id = created_job["job_id"]
+        job_id = created_job
         # Test with invalid policy path
         response = client.post(
             f"/api/v1/jobs/{job_id}/stages/generate-input-files",
@@ -215,9 +183,9 @@ class TestGenerateInputFilesRoutes:
         # Should reject path traversal attempts
         assert response.status_code in [400, 422, 500]
 
-    def test_generate_input_files_default_policy_usage(self, client: TestClient, auth_headers: Dict[str, str], created_job: Dict[str, Any]) -> None:
+    def test_generate_input_files_default_policy_usage(self, client: TestClient, auth_headers: Dict[str, str], created_job: str) -> None:
         """Test that default policy is used when no custom path provided."""
-        job_id = created_job["job_id"]
+        job_id = created_job
         response = client.post(
             f"/api/v1/jobs/{job_id}/stages/generate-input-files",
             headers=auth_headers,

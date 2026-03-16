@@ -17,68 +17,43 @@
 import pytest
 from fastapi import HTTPException
 
-from api.jobs.dependencies import get_client_id, get_idempotency_key
+from api.dependencies import get_client_id, get_idempotency_key
 from core.jobs.value_objects import ClientId
 
 
 class TestGetClientId:
     """Tests for get_client_id dependency function."""
 
-    def test_valid_bearer_token_returns_client_id(self):
-        """Valid bearer token should return ClientId with token value."""
-        authorization = "Bearer test-client-123"
+    def test_valid_token_data_returns_client_id(self):
+        """Valid token data should return ClientId."""
+        token_data = {"client_id": "test-client-123"}
 
-        client_id = get_client_id(authorization)
+        client_id = get_client_id(token_data)
 
         assert isinstance(client_id, ClientId)
         assert client_id.value == "test-client-123"
 
-    def test_bearer_token_with_spaces_trimmed(self):
-        """Bearer token with spaces should preserve spaces after Bearer prefix."""
-        authorization = "Bearer   test-client-123   "
+    def test_token_data_with_different_client(self):
+        """Token data with different client should return correct ClientId."""
+        token_data = {"client_id": "another-client"}
 
-        client_id = get_client_id(authorization)
+        client_id = get_client_id(token_data)
 
-        assert client_id.value == "test-client-123   "
+        assert client_id.value == "another-client"
 
-    def test_long_token_truncated_to_128_chars(self):
-        """Long token should be truncated to 128 characters."""
-        long_token = "a" * 200
-        authorization = f"Bearer {long_token}"
+    def test_missing_client_id_raises_error(self):
+        """Missing client_id key should raise KeyError."""
+        token_data = {"scopes": ["job:write"]}
 
-        client_id = get_client_id(authorization)
+        with pytest.raises(KeyError):
+            get_client_id(token_data)
 
-        assert len(client_id.value) == 128
-        assert client_id.value == long_token[:128]
+    def test_empty_client_id_raises_value_error(self):
+        """Empty client_id should raise ValueError from ClientId validation."""
+        token_data = {"client_id": ""}
 
-    def test_missing_bearer_prefix_raises_401(self):
-        """Missing Bearer prefix should raise 401 HTTPException."""
-        authorization = "InvalidFormat test-token"
-
-        with pytest.raises(HTTPException) as exc_info:
-            get_client_id(authorization)
-
-        assert exc_info.value.status_code == 401
-        assert "Invalid authorization header format" in exc_info.value.detail
-
-    def test_empty_token_raises_401(self):
-        """Empty token should raise 401 HTTPException."""
-        authorization = "Bearer "
-
-        with pytest.raises(HTTPException) as exc_info:
-            get_client_id(authorization)
-
-        assert exc_info.value.status_code == 401
-        assert "Missing authentication token" in exc_info.value.detail
-
-    def test_bearer_only_raises_401(self):
-        """Bearer prefix only should raise 401 HTTPException."""
-        authorization = "Bearer"
-
-        with pytest.raises(HTTPException) as exc_info:
-            get_client_id(authorization)
-
-        assert exc_info.value.status_code == 401
+        with pytest.raises(ValueError):
+            get_client_id(token_data)
 
 
 class TestGetIdempotencyKey:

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Shared fixtures for ValidateImageOnTest API integration tests."""
+"""Shared fixtures for Generate Input Files API integration tests."""
 
 import os
 from pathlib import Path
@@ -20,13 +20,7 @@ from typing import Dict
 
 import pytest
 
-from fastapi.testclient import TestClient
-from api.dependencies import verify_token
-
-from infra.id_generator import UUIDv4Generator
-from core.jobs.value_objects import StageState
-
-
+# Use file-based SQLite database for integration tests
 @pytest.fixture(scope="function")
 def client(tmp_path):
     """Create test client with fresh container for each test."""
@@ -46,6 +40,7 @@ def client(tmp_path):
             "scopes": ["job:write", "job:read"]
         }
 
+    from api.dependencies import verify_token
     app.dependency_overrides[verify_token] = mock_verify_token
     
     # Create database tables before starting test client
@@ -64,6 +59,7 @@ def client(tmp_path):
     engine = session_module._get_engine()
     Base.metadata.create_all(engine)
     
+    from fastapi.testclient import TestClient
     with TestClient(app) as test_client:
         yield test_client
 
@@ -74,6 +70,7 @@ def client(tmp_path):
 @pytest.fixture(name="uuid_generator")
 def uuid_generator_fixture():
     """UUID generator for test fixtures."""
+    from infra.id_generator import UUIDv4Generator
     return UUIDv4Generator()
 
 
@@ -100,59 +97,3 @@ def created_job(client, auth_headers) -> str:
     response = client.post("/api/v1/jobs", json=payload, headers=auth_headers)
     assert response.status_code == 201
     return response.json()["job_id"]
-
-
-@pytest.fixture
-def job_with_completed_build_image(client, auth_headers, created_job, monkeypatch) -> str:
-    """Create a job with a completed build-image stage."""
-    from core.jobs.entities import Stage
-    from core.jobs.value_objects import JobId, StageName, StageType
-    
-    # Mock the stage repository to return a completed build-image stage
-    def mock_find_by_job_and_name(self, job_id, stage_name):
-        # Handle JobId objects or string job_id
-        job_id_str = str(job_id)
-        
-        if stage_name.value == StageType.BUILD_IMAGE_X86_64.value:
-            stage = Stage(
-                job_id=JobId(job_id_str),
-                stage_name=StageName(StageType.BUILD_IMAGE_X86_64.value),
-                stage_state=StageState.COMPLETED,
-                attempt=1
-            )
-            return stage
-        elif stage_name.value == StageType.VALIDATE_IMAGE_ON_TEST.value:
-            stage = Stage(
-                job_id=JobId(job_id_str),
-                stage_name=StageName(StageType.VALIDATE_IMAGE_ON_TEST.value),
-                stage_state=StageState.PENDING,
-                attempt=1
-            )
-            return stage
-        return None
-    
-    # Apply the mock - in dev mode, it uses container's stage repository
-    from container import container
-    monkeypatch.setattr(
-        container.stage_repository().__class__,
-        "find_by_job_and_name",
-        mock_find_by_job_and_name
-    )
-    
-    return created_job
-
-
-@pytest.fixture
-def nfs_queue_dir(tmp_path):
-    """Create temporary NFS queue directory structure."""
-    requests_dir = tmp_path / "requests"
-    results_dir = tmp_path / "results"
-    archive_dir = tmp_path / "archive" / "results"
-    processing_dir = tmp_path / "processing"
-
-    requests_dir.mkdir(parents=True)
-    results_dir.mkdir(parents=True)
-    archive_dir.mkdir(parents=True)
-    processing_dir.mkdir(parents=True)
-
-    return tmp_path
