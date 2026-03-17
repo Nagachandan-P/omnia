@@ -505,15 +505,14 @@ display_supported_use_cases() {
     echo -e "${BLUE} Please choose the type of Omnia shared path in Omnia Infrastructure Manager (OIM): ${NC}"
     echo -e "${BLUE} It is recommended to use a external NFS share for the Omnia shared path. ${NC}"
     echo -e "${BLUE} If you are not using NFS, make sure enough space is available on the disk. ${NC}"
-    echo -e "${YELLOW} Using a Extrenal NFS share is mandatory for Omnia shared path if you are planning to have high availability in OIM or require K8s service cluster. ${NC}"
     echo -e "\nSupported Use Cases:\n"
 
     # Table content
     {
         echo -e "Share Option\tType\tDescription\tAdditional Info"
-        echo -e "${GREEN}NFS\tExternal\tExternal NFS server(outside OIM) created by user\tMust be reachable from OIM and service nodes. Mounts on OIM. Recommended for HA and hierarchical clusters.${NC}"
-        echo -e "NFS\tInternal\tNFS server created by user in OIM\tUsed only for flat provisioning. No HA or k8s service cluster support. No mount performed."
-        echo -e "Local\tDisk\tDisk storage in OIM\tUsed only for flat provisioning. No HA or hierarchical support."
+        echo -e "${GREEN}NFS\tExternal\tExternal NFS server(outside OIM) created by user\tUsed only for flat provisioning. Mounts on OIM. ${NC}"
+        echo -e "NFS\tInternal\tNFS server created by user in OIM\tUsed only for flat provisioning. No mount performed."
+        echo -e "Local\tDisk\tDisk storage in OIM\tUsed only for flat provisioning."
     } | column -t -s $'\t'
 }
 
