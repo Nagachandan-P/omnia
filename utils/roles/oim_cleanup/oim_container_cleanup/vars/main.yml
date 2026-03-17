@@ -158,6 +158,7 @@ playbook_watcher_service_file: "/etc/systemd/system/playbook_watcher.service"
 build_stream_cleanup_failure_msg:
   - "Build stream cleanup failed due to directory locks."
   - "[Manual Intervention Required]"
+  - "Logout of core container and perform below operations in OIM"
   - "1. Force stop the playbook watcher service:"
   - "   - systemctl stop playbook_watcher.service"
   - "   - systemctl disable playbook_watcher.service"
