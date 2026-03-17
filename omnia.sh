@@ -512,7 +512,7 @@ display_supported_use_cases() {
         echo -e "Share Option\tType\tDescription\tAdditional Info"
         echo -e "${GREEN}NFS\tExternal\tExternal NFS server(outside OIM) created by user\tUsed only for flat provisioning. Mounts on OIM. ${NC}"
         echo -e "NFS\tInternal\tNFS server created by user in OIM\tUsed only for flat provisioning. No mount performed."
-        echo -e "Local\tDisk\tDisk storage in OIM\tUsed only for flat provisioning."
+        echo -e "Local\tDisk\tDisk storage in OIM\tUsed only for flat provisioning. Directory to be created by user."
     } | column -t -s $'\t'
 }
 
