@@ -155,22 +155,17 @@ build_stream_container_name: omnia_build_stream
 playbook_watcher_service_file: "/etc/systemd/system/playbook_watcher.service"
 
 # Build stream cleanup failure message
-build_stream_cleanup_failure_msg: |
-  Build stream cleanup failed due to directory locks.
-  
-  [Manual Intervention Required]
-  
-  1. Force stop the playbook watcher service:
-     - systemctl stop playbook_watcher.service
-     - systemctl disable playbook_watcher.service
-     
-  2. Check for processes using the directory: Example:
-     - lsof +D {{ omnia_nfs_share }}/log/build_stream
-     
-  3. Force remove these directories:
-     - {{ build_stream_cleanup_directory | join(', ') }}
-  
-  After manual cleanup, you can safely retry the oim cleanup playbook from omnia_core.
+build_stream_cleanup_failure_msg:
+  - "Build stream cleanup failed due to directory locks."
+  - "[Manual Intervention Required]"
+  - "1. Force stop the playbook watcher service:"
+  - "   - systemctl stop playbook_watcher.service"
+  - "   - systemctl disable playbook_watcher.service"
+  - "2. Check for processes using the directory: Example:"
+  - "   - lsof +D {{ omnia_nfs_share }}/log/build_stream"
+  - "3. Force remove these directories:"
+  - "   - {{ build_stream_cleanup_directory | join(', ') }}"
+  - "After manual cleanup, you can safely retry the oim cleanup playbook from omnia_core."
 
 # Usage: cleanup_postgres.yml
 postgres_cleanup_directory:
