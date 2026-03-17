@@ -2285,6 +2285,7 @@ rollback_omnia_core() {
         exit 1
     fi
 
+    if ! podman exec -u root omnia_core test -d "$selected_backup" 2>/dev/null; then
         echo -e "${RED}ERROR: Backup directory does not exist: $selected_backup${NC}"
         exit 1
     fi
