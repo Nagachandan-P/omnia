@@ -104,6 +104,11 @@
   until: directory_deletion is not failed
   retries: "{{ max_retries }}"
   loop: "{{ build_stream_cleanup_directory }}"
+  rescue:
+    - name: Fail cleanup if directory removal fails due to locks
+      ansible.builtin.fail:
+        msg: |
+          {{ build_stream_cleanup_failure_msg }}
 
 - name: Check if target file exists
   ansible.builtin.stat:
