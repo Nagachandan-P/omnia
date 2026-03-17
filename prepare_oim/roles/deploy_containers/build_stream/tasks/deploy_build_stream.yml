@@ -134,10 +134,12 @@
     - "{{ build_stream_ssl_key }}"
   no_log: true
 
-- name: Check certificate expiration
-  ansible.builtin.command: |
-    openssl x509 -enddate -noout -in {{ build_stream_ssl_cert }}
-  register: cert_enddate
+- name: Check certificate expiration and validity
+  ansible.builtin.shell: |
+    set -o pipefail
+    # Check if certificate is valid and not expired
+    openssl x509 -checkend 86400 -noout -in {{ build_stream_ssl_cert }}
+  register: cert_validity
   changed_when: false
   failed_when: false
   when: cert_files_check.results | selectattr('stat.exists') | list | length == 2
@@ -164,17 +166,27 @@
   when: cert_files_check.results | selectattr('stat.exists') | list | length == 2
   no_log: true
 
+- name: Debug certificate validation results
+  ansible.builtin.debug:
+    msg:
+      - "Files exist: {{ cert_files_check.results | selectattr('stat.exists') | list | length }}"
+      - "Cert validity RC: {{ cert_validity.rc | default('undefined') }}"
+      - "Key match RC: {{ cert_key_match.rc | default('undefined') }}"
+      - "SAN check RC: {{ cert_san.rc | default('undefined') }}"
+      - "Hostname in SAN: {{ cert_san.stdout is search('DNS:' + ansible_hostname) if cert_san.stdout is defined else 'undefined' }}"
+    verbosity: 2
+
 - name: Determine if certificate regeneration is needed
   ansible.builtin.set_fact:
     cert_regeneration_needed: >-
       {{
         (cert_files_check.results | selectattr('stat.exists') | list | length != 2) or
-        (cert_enddate.rc != 0) or
-        (cert_key_match.rc != 0) or
-        (cert_san.rc != 0) or
-        (cert_san.stdout is not search('DNS:' + ansible_hostname)) or
-        (cert_san.stdout is not search('IP:' + admin_ip)) or
-        (cert_enddate.stdout is not search('GMT'))
+        (cert_files_check.results | selectattr('stat.exists') | list | length == 2 and (
+          (cert_validity is defined and cert_validity.rc != 0) or
+          (cert_key_match is defined and cert_key_match.rc != 0) or
+          (cert_san is defined and cert_san.rc != 0) or
+          (cert_san is defined and cert_san.stdout is defined and not (cert_san.stdout is search('DNS:' + ansible_hostname)))
+        ))
       }}
   no_log: true
 
@@ -198,7 +210,7 @@
     -subj "/C=US/ST=State/L=City/O=Omnia/CN={{ ansible_hostname }}"
     -addext "subjectAltName=DNS:{{ ansible_hostname }},DNS:localhost,IP:{{ ansible_default_ipv4.address }},IP:127.0.0.1,IP:{{ build_stream_host_ip }}"
   changed_when: true
-  when: cert_regeneration_needed | default(true)
+  when: cert_regeneration_needed | bool
   no_log: true
 
 - name: Set permissions on SSL certificates (only when newly generated)
@@ -208,7 +220,7 @@
   loop:
     - "{{ build_stream_ssl_cert }}"
     - "{{ build_stream_ssl_key }}"
-  when: cert_regeneration_needed | default(true)
+  when: cert_regeneration_needed | bool
   no_log: true
 
 - name: Set execute permission on JWT key generation script
