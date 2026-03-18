@@ -93,21 +93,15 @@ validate_version_string() {
 
 # Function to get version for metadata (from git tag or default)
 get_metadata_version() {
-    # Prefer the provided version (e.g., target upgrade version); fall back to git tag only if no default passed
     local default_version="${1:-$omnia_release}"
-    local git_tag_version=""
-
-    if [ -n "$default_version" ]; then
-        echo "$default_version"
-        return 0
-    fi
-
+    local git_tag_version
+    
     git_tag_version=$(get_version_from_git_tag)
-
+    
     if [ -n "$git_tag_version" ] && validate_version_string "$git_tag_version"; then
         echo "$git_tag_version"
     else
-        echo "$omnia_release"
+        echo "$default_version"
     fi
 }
 
@@ -139,41 +133,14 @@ OMNIA_VERSION=""  # Will be read from metadata
 TARGET_OMNIA_VERSION=""  # Target version for upgrade
 TARGET_CONTAINER_TAG=""  # Target container tag for upgrade
 
-# Centralized version list (in chronological order, including RCs)
-ALL_OMNIA_VERSIONS=("2.0.0.0" "2.1.0.0-rc1" "2.1.0.0-rc2" "2.1.0.0-rc3" "2.1.0.0")
-
-# Hardcoded upgrade paths (source -> space-separated targets)
-declare -A UPGRADE_PATHS=(
-    ["2.0.0.0"]="2.1.0.0 2.1.0.0-rc2 2.1.0.0-rc3"
-    ["2.1.0.0-rc1"]="2.1.0.0-rc3"
-    ["2.1.0.0-rc2"]="2.1.0.0 2.1.0.0-rc3"
-    ["2.1.0.0-rc3"]="2.1.0.0"
+# Centralized version list (in chronological order)
+# Note: Include RC milestones so upgrades from RC to RC/GA appear
+ALL_OMNIA_VERSIONS=(
+    "2.0.0.0"
+    "2.1.0.0-rc1"
+    "2.1.0.0-rc2"
+    "2.1.0.0"
 )
-
-get_hardcoded_upgrade_targets() {
-    local current_version="$1"
-    local targets=()
-    if [ -n "${UPGRADE_PATHS[$current_version]}" ]; then
-        for t in ${UPGRADE_PATHS[$current_version]}; do
-            targets+=("$t")
-        done
-    fi
-    printf '%s\n' "${targets[@]}"
-}
-
-get_hardcoded_rollback_targets() {
-    local current_version="$1"
-    local targets=()
-    # Invert the upgrade map: any source that targets the current version becomes a rollback option
-    for src in "${!UPGRADE_PATHS[@]}"; do
-        for tgt in ${UPGRADE_PATHS[$src]}; do
-            if [ "$tgt" = "$current_version" ]; then
-                targets+=("$src")
-            fi
-        done
-    done
-    printf '%s\n' "${targets[@]}"
-}
 
 # Container-side paths (used inside podman exec commands)
 CONTAINER_INPUT_DIR="/opt/omnia/input"
@@ -195,6 +162,10 @@ get_available_upgrade_versions() {
         fi
         
         if [ "$found_current" = true ]; then
+            # Skip RC targets; only offer GA paths
+            if [[ "$version" == *-rc* ]]; then
+                continue
+            fi
             available_versions+=("$version")
             
             # Generate description based on upgrade type
@@ -217,12 +188,20 @@ get_available_upgrade_versions() {
 # Function to get available rollback versions (lower than current)
 get_available_rollback_versions() {
     local current_version="$1"
+    local normalized_current_version="${current_version%%-rc*}"
+    if [ -z "$normalized_current_version" ]; then
+        normalized_current_version="$current_version"
+    fi
     local available_versions=()
     
-    # Find versions lower than current (include RCs as distinct versions)
+    # Find versions lower than current
     for version in "${ALL_OMNIA_VERSIONS[@]}"; do
-        if [ "$version" = "$current_version" ]; then
+        if [ "$version" = "$normalized_current_version" ]; then
             break
+        fi
+        # Skip RC targets for rollback choices
+        if [[ "$version" == *-rc* ]]; then
+            continue
         fi
         available_versions+=("$version")
     done
@@ -358,11 +337,19 @@ validate_container_image() {
 # Function to get container tag from omnia version
 get_container_tag_from_version() {
     local version="$1"
+
+    # Explicit mapping: 2.1.0.0-rc1 stays on pre-GA tag 1.0
+    if [[ "$version" == "2.1.0.0-rc1" ]]; then
+        echo "1.0"
+        return
+    fi
+
     case "$version" in
         2.0.*)
             echo "1.0"
             ;;
         *)
+            # All other versions (including rc2/GA) use major.minor as tag
             echo "$(echo "$version" | awk -F. '{print $1"."$2}')"
             ;;
     esac
@@ -398,7 +385,7 @@ update_metadata_with_git_tag() {
         fi
 
         if [ -f '"'$CONTAINER_METADATA_FILE'"' ]; then
-            if grep -q '^omnia_version:' '"'$CONTAINER_METADATA_FILE'"'; then
+            if grep -q "^omnia_version:" '"'$CONTAINER_METADATA_FILE'"'; then
                 sed -i "s/^omnia_version:.*/omnia_version: $metadata_version/" '"'$CONTAINER_METADATA_FILE'"'
             else
                 echo "omnia_version: $metadata_version" >> '"'$CONTAINER_METADATA_FILE'"'
@@ -1305,38 +1292,9 @@ init_ssh_config() {
     local ssh_port=2222
 
     mkdir -p "$HOME/.ssh"
-    local known_hosts_file="$HOME/.ssh/known_hosts"
-    touch "$known_hosts_file"
-
-    # Purge stale host keys for the container SSH endpoint before re-adding
-    ssh-keygen -f "$known_hosts_file" -R "omnia_core" >/dev/null 2>&1 || true
-    ssh-keygen -f "$known_hosts_file" -R "localhost" >/dev/null 2>&1 || true
-    ssh-keygen -f "$known_hosts_file" -R "[localhost]:$ssh_port" >/dev/null 2>&1 || true
-    ssh-keygen -f "$known_hosts_file" -R "127.0.0.1" >/dev/null 2>&1 || true
-    ssh-keygen -f "$known_hosts_file" -R "[127.0.0.1]:$ssh_port" >/dev/null 2>&1 || true
-    ssh-keygen -f "$known_hosts_file" -R "::1" >/dev/null 2>&1 || true
-    ssh-keygen -f "$known_hosts_file" -R "[::1]:$ssh_port" >/dev/null 2>&1 || true
-
-    # Refresh host key entries for localhost/port 2222 used by the omnia_core SSH proxy
-    ssh-keyscan -p "$ssh_port" localhost 2>/dev/null | grep -v "^#" >> "$known_hosts_file" || true
-    ssh-keyscan -p "$ssh_port" 127.0.0.1 2>/dev/null | grep -v "^#" >> "$known_hosts_file" || true
-    ssh-keyscan -p "$ssh_port" ::1 2>/dev/null | grep -v "^#" >> "$known_hosts_file" || true
-}
-
-wait_for_container_ssh() {
-    local ssh_port=2222
-    local max_wait=60
-    local waited=0
-
-    while [ $waited -lt $max_wait ]; do
-        if ssh -p "$ssh_port" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=2 -o BatchMode=yes omnia_core "echo ready" >/dev/null 2>&1; then
-            return 0
-        fi
-        sleep 2
-        waited=$((waited + 2))
-    done
-
-    return 1
+    touch "$HOME/.ssh/known_hosts"
+    ssh-keygen -R "[localhost]:$ssh_port" >/dev/null 2>&1 || true
+    ssh-keyscan -p "$ssh_port" localhost 2>/dev/null | grep -v "^#" >> "$HOME/.ssh/known_hosts" || true
 }
 
 remove_container_omnia_sh() {
@@ -1384,12 +1342,7 @@ start_container_session() {
     update_metadata_with_git_tag "$omnia_release"
 
     # Entering Omnia-core container
-    if ! wait_for_container_ssh; then
-        echo -e "${RED}ERROR: SSH service in omnia_core not reachable on port 2222 after waiting.${NC}"
-        return 1
-    fi
-
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null omnia_core
+    ssh omnia_core
 }
 
 show_help() {
@@ -1950,17 +1903,37 @@ upgrade_omnia_core() {
     echo ""
     echo "Available upgrade options:"
     echo "========================="
-    echo "Note: Ensure the target omnia_core image for the listed container tag is loaded locally before proceeding."
     
-    # Hardcoded upgrade targets based on current version
+    # Get available upgrade versions dynamically
+    local upgrade_output
+    upgrade_output=$(get_available_upgrade_versions "$OMNIA_VERSION")
+    
+    # Parse output into versions and descriptions
     local available_versions=()
+    local version_descriptions=()
+    local line_count=0
+    local total_lines
+    
+    # Count total lines
+    total_lines=$(echo "$upgrade_output" | wc -l)
+    
+    # Split into versions and descriptions (first half = versions, second half = descriptions)
+    local mid_line=$((total_lines / 2))
+    local line_num=0
+    
     while IFS= read -r line; do
-        [ -n "$line" ] && available_versions+=("$line")
-    done < <(get_hardcoded_upgrade_targets "$OMNIA_VERSION")
+        line_num=$((line_num + 1))
+        if [ $line_num -le $mid_line ]; then
+            available_versions+=("$line")
+        else
+            version_descriptions+=("$line")
+        fi
+    done <<< "$upgrade_output"
     
     # Check if any upgrade options are available
     if [ ${#available_versions[@]} -eq 0 ]; then
-        echo -e "${GREEN}Already at latest or no mapped upgrade path from $OMNIA_VERSION${NC}"
+        echo -e "${GREEN}Already at latest version $OMNIA_VERSION${NC}"
+        echo "No upgrade options available."
         exit 0
     fi
     
@@ -1968,7 +1941,14 @@ upgrade_omnia_core() {
     for i in "${!available_versions[@]}"; do
         local target_version="${available_versions[$i]}"
         local target_container_tag=$(get_container_tag_from_version "$target_version")
-        echo "$((i+1)). Upgrade to $target_version (container tag: $target_container_tag)"
+        
+        # Check if target image exists locally
+        local image_status="✓ Available"
+        if ! podman inspect "omnia_core:$target_container_tag" >/dev/null 2>&1; then
+            image_status="✗ Missing (build required)"
+        fi
+        
+        echo "$((i+1)). Upgrade to $target_version (container tag: $target_container_tag) [$image_status]"
     done
     
     # Prompt user to select upgrade version
@@ -2276,104 +2256,74 @@ rollback_omnia_core() {
     
     local current_version=$(podman exec -u root omnia_core grep '^omnia_version:' /opt/omnia/.data/oim_metadata.yml 2>/dev/null | cut -d':' -f2 | tr -d ' \t\n\r')
     
-    # Source rollback info solely from metadata: upgrade_backup_dir
+    # Use upgrade_backup_dir from metadata as the authoritative rollback target
     local selected_backup
-    selected_backup=$(podman exec -u root omnia_core bash -c "if [ -f '$CONTAINER_METADATA_FILE' ]; then grep '^upgrade_backup_dir:' '$CONTAINER_METADATA_FILE' | cut -d':' -f2- | tr -d ' \t' ; fi" 2>/dev/null)
-
+    selected_backup=$(podman exec -u root omnia_core grep '^upgrade_backup_dir:' /opt/omnia/.data/oim_metadata.yml 2>/dev/null | cut -d':' -f2- | tr -d ' \t\n\r')
     if [ -z "$selected_backup" ]; then
-        echo -e "${RED}ERROR: No upgrade_backup_dir found in metadata.${NC}"
-        exit 1
-    fi
-
-    if ! podman exec -u root omnia_core test -d "$selected_backup" 2>/dev/null; then
-        echo -e "${RED}ERROR: Backup directory does not exist: $selected_backup${NC}"
+        echo -e "${RED}ERROR: upgrade_backup_dir not found in metadata; cannot determine rollback target.${NC}"
         exit 1
     fi
 
     local selected_version
-    local backup_basename
-    backup_basename=$(basename "$selected_backup")
-    if [[ "$backup_basename" =~ ^version_(.+)$ ]]; then
-        selected_version="${BASH_REMATCH[1]}"
-    else
-        echo -e "${RED}ERROR: Unable to derive version from backup directory: $selected_backup${NC}"
+    selected_version=$(echo "$selected_backup" | sed -n 's/.*version_\([^/]*\).*/\1/p')
+    if [ -z "$selected_version" ]; then
+        echo -e "${RED}ERROR: Could not derive rollback version from upgrade_backup_dir: $selected_backup${NC}"
         exit 1
     fi
 
     local selected_container_tag=$(get_container_tag_from_version "$selected_version")
-
-    # If already at the same version as the backup, abort early
-    if [ "$current_version" = "$selected_version" ]; then
-        echo -e "${YELLOW}INFO: Current version ($current_version) already matches backup version ($selected_version). No rollback needed.${NC}"
-        rm -f "$lock_file" >/dev/null 2>&1 || true
-        exit 0
-    fi
+    local current_container_tag=$(get_container_tag_from_version "$current_version")
 
     echo ""
-    echo "Available rollback version:"
-    echo "=========================="
-    echo "Note: Ensure the target omnia_core image for the listed container tag is loaded locally before proceeding."
-    echo "  1. Rollback to version $selected_version (container tag: $selected_container_tag)"
-    
-    echo ""
-    echo "Selected rollback: Version $selected_version"
-    echo -n "Are you sure you want to rollback to version $selected_version? [y/N]: "
+    echo "Rollback target derived from metadata:"
+    echo "  - Version: $selected_version"
+    echo "  - Backup path: $selected_backup"
+    echo "  - Container tag: $selected_container_tag"
+    echo -n "Proceed with rollback using this backup? [y/N]: "
     read -r confirm
-    
     if [[ ! "$confirm" =~ ^[yY] ]]; then
         echo "Rollback cancelled by user."
         exit 0
     fi
-    
+
     # Pre-validation: Check if target container image exists locally
     if ! validate_container_image "$selected_version" "$selected_container_tag" "rollback"; then
         exit 1
     fi
-    
-    # Check if container tag change is needed
-    local current_container_tag=$(get_container_tag_from_version "$current_version")
-    if [ "$current_container_tag" = "$selected_container_tag" ]; then
-        echo -e "${BLUE}Rollback within same container tag ($selected_container_tag)${NC}"
-        echo -e "${BLUE}Will restart container instead of swapping${NC}"
-        
-        # Restore from backup before same-tag restart
-        if ! restore_from_backup "$selected_backup"; then
-            echo "[ERROR] [ROLLBACK] Failed to restore from backup: $selected_backup"
-            exit 1
-        fi
-        
-        # Perform same-tag rollback (container restart only)
-        if ! rollback_same_tag "$selected_version" "$current_version"; then
-            echo "[ERROR] [ROLLBACK] Rollback failed in same-tag rollback"
-            exit 1
-        fi
-        
-        # Update metadata, clear locks, and enter container after same-tag rollback
-        update_metadata_with_git_tag "$selected_version"
-        rm -f "$lock_file" >/dev/null 2>&1 || true
-        echo "[INFO] Rollback lock file removed before starting container session"
 
-        local upgrade_guard_lock_path
-        upgrade_guard_lock_path=$(get_upgrade_guard_lock_path)
-        rm -f "$upgrade_guard_lock_path" >/dev/null 2>&1 || true
-        echo "[INFO] [ROLLBACK] Cleared upgrade guard lock: $upgrade_guard_lock_path"
-
-        init_ssh_config
-        remove_container_omnia_sh
-        start_container_session
-        exit 0
-    else
-        echo -e "${BLUE}Container tag change required ($current_container_tag -> $selected_container_tag)${NC}"
-        echo -e "${BLUE}Will perform full container swap${NC}"
-        # Continue with existing container swap logic
-    fi
-    
     # Validate selected backup exists
     if ! podman exec -u root omnia_core test -d "$selected_backup" 2>/dev/null; then
         echo -e "${RED}ERROR: Backup directory does not exist: $selected_backup${NC}"
         exit 1
     fi
-    
+
+    echo ""
+    if [ "$current_container_tag" = "$selected_container_tag" ]; then
+        echo -e "${BLUE}Rollback within same container tag ($selected_container_tag)${NC}"
+        echo -e "${BLUE}Will restart container instead of swapping${NC}"
+
+        # Perform same-tag rollback (container restart only)
+        if ! rollback_same_tag "$selected_version" "$current_version"; then
+            echo "[ERROR] [ROLLBACK] Rollback failed in same-tag rollback"
+            exit 1
+        fi
+
+        echo "[INFO] [ROLLBACK] Rollback completed successfully"
+        echo "[INFO] [ROLLBACK] Version rolled back to: $selected_version"
+        exit 0
+    else
+        echo -e "${BLUE}Container tag change: ${current_container_tag} -> ${selected_container_tag}${NC}"
+        echo "[INFO] [ROLLBACK] Starting rollback process..."
+    fi
+
+    # Capture metadata version from backup for later verification
+    local backup_metadata_version
+    backup_metadata_version=$(podman exec -u root omnia_core grep '^omnia_version:' "$selected_backup/metadata/oim_metadata.yml" 2>/dev/null | cut -d':' -f2 | tr -d ' \t\n\r')
+    if [ -z "$backup_metadata_version" ]; then
+        echo -e "${RED}ERROR: Backup metadata does not contain omnia_version in $selected_backup/metadata/oim_metadata.yml${NC}"
+        exit 1
+    fi
+
     echo ""
     echo "[INFO] [ROLLBACK] Starting rollback process..."
     
@@ -2447,16 +2397,16 @@ rollback_omnia_core() {
     if ! restore_from_backup "$selected_backup"; then
         echo -e "${RED}ERROR: Failed to restore from backup.${NC}"
         display_cleanup_instructions
-        exit 1
+        exit
     fi
     
     # Step 7: Verify container version
     echo ""
-    echo "[INFO] [ROLLBACK] Step 7: Verifying container version..."
+    echo "[INFO] [ROLLBACK] Step 7: Verifying container version from restored metadata..."
     local verify_version=$(podman exec -u root omnia_core grep '^omnia_version:' /opt/omnia/.data/oim_metadata.yml 2>/dev/null | cut -d':' -f2 | tr -d ' \t\n\r')
     
-    if [ "$verify_version" != "$selected_version" ]; then
-        echo -e "${RED}ERROR: Version verification failed. Expected: $selected_version, Found: $verify_version${NC}"
+    if [ "$verify_version" != "$backup_metadata_version" ]; then
+        echo -e "${RED}ERROR: Version verification failed. Expected: $backup_metadata_version, Found: $verify_version${NC}"
         display_cleanup_instructions
         exit 1
     fi
@@ -2475,7 +2425,7 @@ rollback_omnia_core() {
     echo -e "${GREEN}✓ Container is running and healthy${NC}"
     echo -e "${GREEN}✓ Configuration restored from backup${NC}"
     echo ""
-    
+
     # Update metadata with git tag version from inside container
     update_metadata_with_git_tag "$selected_version"
     
