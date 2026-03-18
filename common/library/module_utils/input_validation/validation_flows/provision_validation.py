@@ -733,20 +733,17 @@ def validate_admin_ips_against_network_spec(pxe_mapping_file_path, network_spec_
 
     return errors
 
-def validate_aarch64_local_path_compatibility(pxe_mapping_file_path, input_file_path, omnia_base_dir, project_name):
+def validate_aarch64_local_path_compatibility(pxe_mapping_file_path):
     """
     Validates that aarch64 nodes are not present when using local share path.
     
     Args:
         pxe_mapping_file_path (str): Path to the PXE mapping file.
-        input_file_path (str): Path to the input file.
-        omnia_base_dir (str): Base directory of Omnia.
-        project_name (str): Name of the project.
         
     Raises:
         ValueError: If aarch64 nodes are found with local share path configuration.
     """
-    # Check metadata file for omnia_Share_option
+    # Check metadata file for omnia_share_option
     metadata_path = "/opt/omnia/.data/oim_metadata.yml"
     
     # Default to Local if metadata doesn't exist or omnia_Share_option is not set
@@ -868,7 +865,7 @@ def validate_provision_config(
             validate_functional_groups_separation(pxe_mapping_file_path)
             validate_parent_service_tag_hierarchy(pxe_mapping_file_path)
             validate_slurm_login_compiler_prefix(pxe_mapping_file_path)
-            validate_aarch64_local_path_compatibility(pxe_mapping_file_path, input_file_path, omnia_base_dir, project_name)
+            validate_aarch64_local_path_compatibility(pxe_mapping_file_path)
 
             # Validate ADMIN_IPs against network_spec.yml ranges
             network_spec_path = create_file_path(input_file_path, file_names["network_spec"])
