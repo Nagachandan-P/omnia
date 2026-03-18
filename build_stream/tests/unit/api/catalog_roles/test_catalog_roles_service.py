@@ -29,7 +29,7 @@ from core.jobs.exceptions import UpstreamStageNotCompletedError
 from core.artifacts.entities import ArtifactRecord
 from core.artifacts.exceptions import ArtifactNotFoundError
 from core.artifacts.value_objects import ArtifactDigest, ArtifactKey, ArtifactKind, ArtifactRef
-from core.jobs.value_objects import JobId, StageName, StageType
+from core.jobs.value_objects import JobId, StageName, StageType, StageState
 
 
 def _make_job_id() -> JobId:
@@ -39,7 +39,7 @@ def _make_job_id() -> JobId:
 def _make_artifact_ref(key_value: str = "catalog/abc123/root-jsons.zip") -> ArtifactRef:
     return ArtifactRef(
         key=ArtifactKey(key_value),
-        digest=ArtifactDigest("abc123"),
+        digest=ArtifactDigest("a" * 64),
         size_bytes=100,
         uri=f"memory://{key_value}",
     )
@@ -58,46 +58,103 @@ def _make_artifact_record(job_id: JobId, ref: ArtifactRef) -> ArtifactRecord:
     )
 
 
-def _make_zip_with_functional_layer(roles: dict, path: str = "x86_64/rhel/9.5/functional_layer.json") -> bytes:
+def _make_zip_with_functional_layer(roles_data: dict, path: str = "x86_64/rhel/9.5/functional_layer.json") -> bytes:
     """Create an in-memory zip archive containing a functional_layer.json."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(path, json.dumps(roles))
+        zf.writestr(path, json.dumps(roles_data))
     return buf.getvalue()
 
 
 class TestCatalogRolesServiceGetRoles:
     """Tests for CatalogRolesService.get_roles."""
 
-    def _make_service(self, artifact_store=None, artifact_metadata_repo=None):
+    def _make_service(self, artifact_store=None, artifact_metadata_repo=None, stage_repo=None, job_repo=None):
+        # Create mock stage that is completed
+        if stage_repo is None:
+            stage_repo = MagicMock()
+            mock_stage = MagicMock()
+            mock_stage.stage_state = StageState.COMPLETED
+            stage_repo.find_by_job_and_name.return_value = mock_stage
+        
         return CatalogRolesService(
             artifact_store=artifact_store or MagicMock(),
             artifact_metadata_repo=artifact_metadata_repo or MagicMock(),
+            stage_repo=stage_repo,
+            job_repo=job_repo or MagicMock(),
         )
+    
+    def _make_service_with_artifacts(self, roles_data: dict, job_id=None, catalog_data=None):
+        """Helper to create a service with both root-jsons and catalog-file artifacts set up."""
+        if job_id is None:
+            job_id = _make_job_id()
+        
+        # Create root-jsons artifact
+        ref = _make_artifact_ref()
+        record = _make_artifact_record(job_id, ref)
+        zip_bytes = _make_zip_with_functional_layer(roles_data)
+        
+        # Create catalog-file artifact
+        if catalog_data is None:
+            catalog_data = {
+                "Catalog": {
+                    "Identifier": "test-image",
+                    "FunctionalPackages": {
+                        "pkg1": {"Architecture": ["x86_64"]},
+                        "pkg2": {"Architecture": ["x86_64", "aarch64"]}
+                    }
+                }
+            }
+        catalog_ref = ArtifactRef(
+            key=ArtifactKey("catalog/def456/catalog-file.json"),
+            digest=ArtifactDigest("b" * 64),
+            size_bytes=1024,
+            uri="file:///catalog/def456/catalog-file.json",
+        )
+        catalog_record = ArtifactRecord(
+            id="record-2",
+            job_id=job_id,
+            stage_name=StageName(StageType.PARSE_CATALOG.value),
+            label="catalog-file",
+            artifact_ref=catalog_ref,
+            kind=ArtifactKind.FILE,
+            content_type="application/json",
+        )
+        
+        metadata_repo = MagicMock()
+        def find_by_job_stage_and_label(job_id, stage_name, label):
+            if label == "root-jsons":
+                return record
+            elif label == "catalog-file":
+                return catalog_record
+            return None
+        metadata_repo.find_by_job_stage_and_label.side_effect = find_by_job_stage_and_label
+        
+        artifact_store = MagicMock()
+        def retrieve(key, kind):
+            if key.value == "catalog/abc123/root-jsons.zip":
+                return zip_bytes
+            elif key.value == "catalog/def456/catalog-file.json":
+                return json.dumps(catalog_data).encode()
+            raise ArtifactNotFoundError(key=key)
+        artifact_store.retrieve.side_effect = retrieve
+        
+        return self._make_service(artifact_store, metadata_repo), job_id
 
     def test_returns_sorted_roles_from_functional_layer(self):
         """Returns sorted role names from functional_layer.json in the archive."""
-        job_id = _make_job_id()
-        ref = _make_artifact_ref()
-        record = _make_artifact_record(job_id, ref)
-
         roles_data = {
             "Slurm Worker": {"packages": []},
             "Compiler": {"packages": []},
             "K8S Controller": {"packages": []},
         }
-        zip_bytes = _make_zip_with_functional_layer(roles_data)
+        
+        service, job_id = self._make_service_with_artifacts(roles_data)
+        result = service.get_roles(job_id)
 
-        metadata_repo = MagicMock()
-        metadata_repo.find_by_job_stage_and_label.return_value = record
-
-        artifact_store = MagicMock()
-        artifact_store.retrieve.return_value = zip_bytes
-
-        service = self._make_service(artifact_store, metadata_repo)
-        roles = service.get_roles(job_id)
-
-        assert roles == ["Compiler", "K8S Controller", "Slurm Worker"]
+        assert result["roles"] == ["Compiler", "K8S Controller", "Slurm Worker"]
+        assert result["image_key"] == "test-image"
+        assert set(result["architectures"]) == {"x86_64", "aarch64"}
 
     def test_raises_when_no_artifact_record(self):
         """Raises UpstreamStageNotCompletedError when no root-jsons record exists."""
@@ -210,29 +267,16 @@ class TestCatalogRolesServiceGetRoles:
 
     def test_returns_empty_list_for_empty_functional_layer(self):
         """Returns empty list when functional_layer.json has no roles."""
-        job_id = _make_job_id()
-        ref = _make_artifact_ref()
-        record = _make_artifact_record(job_id, ref)
+        service, job_id = self._make_service_with_artifacts({})
+        result = service.get_roles(job_id)
 
-        zip_bytes = _make_zip_with_functional_layer({})
-
-        metadata_repo = MagicMock()
-        metadata_repo.find_by_job_stage_and_label.return_value = record
-
-        artifact_store = MagicMock()
-        artifact_store.retrieve.return_value = zip_bytes
-
-        service = self._make_service(artifact_store, metadata_repo)
-        roles = service.get_roles(job_id)
-
-        assert roles == []
+        assert result["roles"] == []
+        assert result["image_key"] == "test-image"
+        assert set(result["architectures"]) == {"x86_64", "aarch64"}
 
     def test_uses_first_functional_layer_found_in_archive(self):
         """Uses the first functional_layer.json found when multiple arch dirs exist."""
-        job_id = _make_job_id()
-        ref = _make_artifact_ref()
-        record = _make_artifact_record(job_id, ref)
-
+        # Create custom zip with multiple functional_layer.json files
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.writestr(
@@ -244,19 +288,58 @@ class TestCatalogRolesServiceGetRoles:
                 json.dumps({"RoleX": {}, "RoleY": {}}),
             )
         zip_bytes = buf.getvalue()
-
+        
+        job_id = _make_job_id()
+        ref = _make_artifact_ref()
+        record = _make_artifact_record(job_id, ref)
+        
+        # Create catalog-file artifact
+        catalog_data = {
+            "Catalog": {
+                "Identifier": "test-image",
+                "Architectures": ["x86_64"]
+            }
+        }
+        catalog_ref = ArtifactRef(
+            key=ArtifactKey("catalog/def456/catalog-file.json"),
+            digest=ArtifactDigest("b" * 64),
+            size_bytes=1024,
+            uri="file:///catalog/def456/catalog-file.json",
+        )
+        catalog_record = ArtifactRecord(
+            id="record-2",
+            job_id=job_id,
+            stage_name=StageName(StageType.PARSE_CATALOG.value),
+            label="catalog-file",
+            artifact_ref=catalog_ref,
+            kind=ArtifactKind.FILE,
+            content_type="application/json",
+        )
+        
         metadata_repo = MagicMock()
-        metadata_repo.find_by_job_stage_and_label.return_value = record
-
+        def find_by_job_stage_and_label(job_id, stage_name, label):
+            if label == "root-jsons":
+                return record
+            elif label == "catalog-file":
+                return catalog_record
+            return None
+        metadata_repo.find_by_job_stage_and_label.side_effect = find_by_job_stage_and_label
+        
         artifact_store = MagicMock()
-        artifact_store.retrieve.return_value = zip_bytes
-
+        def retrieve(key, kind):
+            if key.value == "catalog/abc123/root-jsons.zip":
+                return zip_bytes
+            elif key.value == "catalog/def456/catalog-file.json":
+                return json.dumps(catalog_data).encode()
+            raise ArtifactNotFoundError(key=key)
+        artifact_store.retrieve.side_effect = retrieve
+        
         service = self._make_service(artifact_store, metadata_repo)
-        roles = service.get_roles(job_id)
+        result = service.get_roles(job_id)
 
         # Should return roles from whichever functional_layer.json is found first
-        assert isinstance(roles, list)
-        assert len(roles) == 2
+        assert isinstance(result["roles"], list)
+        assert len(result["roles"]) == 2
 
     def test_queries_correct_stage_and_label(self):
         """Verifies the metadata repo is queried with the correct stage and label."""

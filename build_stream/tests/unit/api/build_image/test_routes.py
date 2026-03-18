@@ -94,8 +94,8 @@ class TestBuildImageRoutes:
         response = create_build_image(
             job_id=test_job_id,
             request_body=request_body,
+            token_data={"client_id": "client-456"},
             use_case=use_case,
-            client_id=ClientId("client-456"),
             correlation_id=CorrelationId(test_correlation_id)
         )
 
@@ -134,7 +134,7 @@ class TestBuildImageRoutes:
                 job_id="",  # Invalid empty job ID
                 request_body=request_body,
                 use_case=use_case,
-                client_id=ClientId("client-456"),
+                token_data={"client_id": "client-456"},
                 correlation_id=CorrelationId(create_test_uuid())
             )
 
@@ -160,7 +160,7 @@ class TestBuildImageRoutes:
                 job_id=create_test_uuid(),
                 request_body=request_body,
                 use_case=use_case,
-                client_id=ClientId("client-456"),
+                token_data={"client_id": "client-456"},
                 correlation_id=CorrelationId(create_test_uuid())
             )
 
@@ -185,7 +185,7 @@ class TestBuildImageRoutes:
                 job_id=create_test_uuid(),
                 request_body=request_body,
                 use_case=use_case,
-                client_id=ClientId("client-456"),
+                token_data={"client_id": "client-456"},
                 correlation_id=CorrelationId(create_test_uuid())
             )
 
@@ -210,7 +210,7 @@ class TestBuildImageRoutes:
                 job_id=create_test_uuid(),
                 request_body=request_body,
                 use_case=use_case,
-                client_id=ClientId("client-456"),
+                token_data={"client_id": "client-456"},
                 correlation_id=CorrelationId(create_test_uuid())
             )
 
@@ -235,7 +235,7 @@ class TestBuildImageRoutes:
                 job_id=create_test_uuid(),
                 request_body=request_body,
                 use_case=use_case,
-                client_id=ClientId("client-456"),
+                token_data={"client_id": "client-456"},
                 correlation_id=CorrelationId(create_test_uuid())
             )
 
@@ -260,7 +260,7 @@ class TestBuildImageRoutes:
                 job_id=create_test_uuid(),
                 request_body=request_body,
                 use_case=use_case,
-                client_id=ClientId("client-456"),
+                token_data={"client_id": "client-456"},
                 correlation_id=CorrelationId(create_test_uuid())
             )
 
@@ -285,7 +285,7 @@ class TestBuildImageRoutes:
                 job_id=create_test_uuid(),
                 request_body=request_body,
                 use_case=use_case,
-                client_id=ClientId("client-456"),
+                token_data={"client_id": "client-456"},
                 correlation_id=CorrelationId(create_test_uuid())
             )
 
@@ -310,7 +310,7 @@ class TestBuildImageRoutes:
                 job_id=create_test_uuid(),
                 request_body=request_body,
                 use_case=use_case,
-                client_id=ClientId("client-456"),
+                token_data={"client_id": "client-456"},
                 correlation_id=CorrelationId(create_test_uuid())
             )
 
@@ -333,7 +333,7 @@ class TestBuildImageRoutes:
                 job_id=create_test_uuid(),
                 request_body=request_body,
                 use_case=use_case,
-                client_id=ClientId("client-456"),
+                token_data={"client_id": "client-456"},
                 correlation_id=CorrelationId(create_test_uuid())
             )
 

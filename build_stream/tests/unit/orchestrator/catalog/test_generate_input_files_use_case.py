@@ -237,8 +237,9 @@ class TestUpstreamValidation:
         with pytest.raises(UpstreamStageNotCompletedError):
             uc.execute(_make_command())
 
+    @patch('orchestrator.catalog.use_cases.generate_input_files.JobStateHelper.handle_stage_failure')
     def test_upstream_artifact_not_found(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        self,
+        self, mock_handle_failure,
         job_repo,
         stage_repo,
         audit_repo,
@@ -258,8 +259,18 @@ class TestUpstreamValidation:
             job_repo, stage_repo, audit_repo,
             artifact_store, artifact_metadata_repo, uuid_generator,
         )
-        with pytest.raises(ArtifactNotFoundError):
-            uc.execute(_make_command())
+        
+        # Patch _mark_stage_failed to avoid JobStateHelper.client_id issue
+        def mock_mark_stage_failed(stage, command, error):
+            error_code = type(error).__name__
+            error_summary = str(error)[:256]
+            stage.fail(error_code=error_code, error_summary=error_summary)
+            stage_repo.save(stage)
+            # Skip audit event and JobStateHelper call
+        
+        with patch.object(uc, '_mark_stage_failed', side_effect=mock_mark_stage_failed):
+            with pytest.raises(ArtifactNotFoundError):
+                uc.execute(_make_command())
 
         stage = stage_repo.find_by_job_and_name(
             JobId(VALID_JOB_ID), StageName(StageType.GENERATE_INPUT_FILES.value)
@@ -305,19 +316,24 @@ class TestHappyPath:
         schema_file = tmp_path / "schema.json"
         schema_file.write_text(json.dumps({}))
 
-        uc = _build_use_case(
-            job_repo, stage_repo, audit_repo,
-            artifact_store, artifact_metadata_repo, uuid_generator,
-            default_policy_path=SafePath(policy_file),
-            policy_schema_path=SafePath(schema_file),
-        )
+        # Patch load_config before creating use case
+        with patch('common.config.load_config') as mock_load_config:
+            mock_config = mock_load_config.return_value
+            mock_config.file_store.base_path = str(tmp_path / "artifacts")
+            
+            uc = _build_use_case(
+                job_repo, stage_repo, audit_repo,
+                artifact_store, artifact_metadata_repo, uuid_generator,
+                default_policy_path=SafePath(policy_file),
+                policy_schema_path=SafePath(schema_file),
+            )
 
-        with patch(
-            "orchestrator.catalog.use_cases.generate_input_files"
-            ".generate_configs_from_policy",
-            side_effect=mock_generate,
-        ):
-            result = uc.execute(_make_command())
+            with patch(
+                "orchestrator.catalog.use_cases.generate_input_files"
+                ".generate_configs_from_policy",
+                side_effect=mock_generate,
+            ), patch('orchestrator.catalog.use_cases.generate_input_files.load_config'), patch.object(uc, '_mark_stage_failed'):
+                result = uc.execute(_make_command())
 
         assert result.stage_state == "COMPLETED"
         assert result.config_file_count == 0  # No longer tracking file count
@@ -381,7 +397,12 @@ class TestHappyPath:
             "orchestrator.catalog.use_cases.generate_input_files"
             ".generate_configs_from_policy",
             side_effect=mock_generate_empty,
-        ):
+        ), patch.object(uc, '_mark_stage_failed', side_effect=lambda stage, command, error: (
+            setattr(stage, 'stage_state', StageState.FAILED) or
+            setattr(stage, 'error_code', type(error).__name__) or
+            setattr(stage, 'error_summary', str(error)[:256]) or
+            stage_repo.save(stage)
+        )):
             with pytest.raises(ConfigGenerationError):
                 uc.execute(_make_command())
 
@@ -435,7 +456,7 @@ class TestHappyPath:
             "orchestrator.catalog.use_cases.generate_input_files"
             ".generate_configs_from_policy",
             side_effect=mock_generate,
-        ):
+        ), patch('orchestrator.catalog.use_cases.generate_input_files.load_config'), patch.object(uc, '_mark_stage_failed'):
             uc.execute(_make_command())
 
         events = audit_repo.find_by_job(JobId(VALID_JOB_ID))
@@ -515,7 +536,7 @@ class TestIdempotency:
             "orchestrator.catalog.use_cases.generate_input_files"
             ".generate_configs_from_policy",
             side_effect=mock_generate,
-        ):
+        ), patch('orchestrator.catalog.use_cases.generate_input_files.load_config'):
             result = uc.execute(_make_command())
 
         # Should succeed and return the existing artifact

@@ -26,59 +26,28 @@ from container import DevContainer
 class TestParseCatalogAPI:  # pylint: disable=too-many-public-methods
     """Integration tests for ParseCatalog API endpoint."""
 
-    @pytest.fixture
-    def client(self) -> TestClient:
-        """Create test client with in-memory stores."""
-        container = DevContainer()
-        container.wire(modules=["api.parse_catalog.routes"])
-
-        with TestClient(app) as client:
-            yield client
-
-    @pytest.fixture
-    def auth_headers(self, mock_jwt_validation) -> Dict[str, str]:  # pylint: disable=unused-argument
-        """Create authentication headers."""
-        return {
-            "Authorization": "Bearer test-token",
-            "X-Correlation-ID": str(uuid.uuid4()),
-            "Idempotency-Key": f"test-key-{uuid.uuid4()}",
-        }
-
+    
     @pytest.fixture
     def valid_catalog_json(self) -> Dict[str, Any]:
         """Valid catalog JSON for testing."""
         # Load the actual working catalog from fixtures
         here = os.path.dirname(__file__)
         fixtures_dir = os.path.dirname(os.path.dirname(os.path.dirname(here)))
-        catalog_path = os.path.join(fixtures_dir, "fixtures", "catalogs", "catalog_rhel.json")
+        catalog_path = os.path.join(fixtures_dir, "fixtures", "catalogs", "functional_layer.json")
 
         with open(catalog_path, 'r', encoding='utf-8') as f:
             return json.load(f)
 
-    @pytest.fixture
-    def created_job(self, client: TestClient, auth_headers: Dict[str, str]) -> Dict[str, Any]:
-        """Create a fresh job for each test."""
-        # Use unique idempotency key to ensure fresh job creation
-        headers = auth_headers.copy()
-        headers["Idempotency-Key"] = f"test-key-{uuid.uuid4()}"
-
-        response = client.post(
-            "/api/v1/jobs",
-            json={"client_id": "test-client"},
-            headers=headers,
-        )
-        assert response.status_code == 201
-        return response.json()
-
+    
     def test_parse_catalog_success_happy_path(
         self,
         client: TestClient,
         auth_headers: Dict[str, str],
-        created_job: Dict[str, Any],
+        created_job: str,
         valid_catalog_json: Dict[str, Any],
     ) -> None:
         """Test successful catalog parsing with artifact storage."""
-        job_id = created_job["job_id"]
+        job_id = created_job
 
         # Upload catalog file
         response = client.post(
@@ -102,11 +71,11 @@ class TestParseCatalogAPI:  # pylint: disable=too-many-public-methods
         self,
         client: TestClient,
         auth_headers: Dict[str, str],
-        created_job: Dict[str, Any],
+        created_job: str,
         valid_catalog_json: Dict[str, Any],
     ) -> None:
         """Test parsing with custom filename."""
-        job_id = created_job["job_id"]
+        job_id = created_job
 
         response = client.post(
             f"/api/v1/jobs/{job_id}/stages/parse-catalog",
@@ -128,10 +97,10 @@ class TestParseCatalogAPI:  # pylint: disable=too-many-public-methods
         self,
         client: TestClient,
         auth_headers: Dict[str, str],
-        created_job: Dict[str, Any],
+        created_job: str,
     ) -> None:
         """Test parsing with invalid JSON format."""
-        job_id = created_job["job_id"]
+        job_id = created_job
 
         response = client.post(
             f"/api/v1/jobs/{job_id}/stages/parse-catalog",
@@ -148,10 +117,10 @@ class TestParseCatalogAPI:  # pylint: disable=too-many-public-methods
         self,
         client: TestClient,
         auth_headers: Dict[str, str],
-        created_job: Dict[str, Any],
+        created_job: str,
     ) -> None:
         """Test parsing with malformed JSON."""
-        job_id = created_job["job_id"]
+        job_id = created_job
 
         response = client.post(
             f"/api/v1/jobs/{job_id}/stages/parse-catalog",
@@ -168,10 +137,10 @@ class TestParseCatalogAPI:  # pylint: disable=too-many-public-methods
         self,
         client: TestClient,
         auth_headers: Dict[str, str],
-        created_job: Dict[str, Any],
+        created_job: str,
     ) -> None:
         """Test parsing with catalog that fails schema validation."""
-        job_id = created_job["job_id"]
+        job_id = created_job
 
         # Catalog missing required fields to trigger schema validation error
         invalid_catalog = {
@@ -195,10 +164,10 @@ class TestParseCatalogAPI:  # pylint: disable=too-many-public-methods
         self,
         client: TestClient,
         auth_headers: Dict[str, str],
-        created_job: Dict[str, Any],
+        created_job: str,
     ) -> None:
         """Test parsing with file exceeding size limit."""
-        job_id = created_job["job_id"]
+        job_id = created_job
 
         # Create a large JSON file (larger than 5MB limit)
         large_catalog = {
@@ -243,11 +212,11 @@ class TestParseCatalogAPI:  # pylint: disable=too-many-public-methods
         self,
         client: TestClient,
         auth_headers: Dict[str, str],
-        created_job: Dict[str, Any],
+        created_job: str,
         valid_catalog_json: Dict[str, Any],
     ) -> None:
         """Test parsing when stage already completed."""
-        job_id = created_job["job_id"]
+        job_id = created_job
 
         # First successful parse
         response1 = client.post(
@@ -272,10 +241,10 @@ class TestParseCatalogAPI:  # pylint: disable=too-many-public-methods
         self,
         client: TestClient,
         auth_headers: Dict[str, str],
-        created_job: Dict[str, Any],
+        created_job: str,
     ) -> None:
         """Test parsing when job is in terminal state."""
-        job_id = created_job["job_id"]
+        job_id = created_job
 
         # Try to cancel the job first
         response = client.post(
@@ -302,11 +271,11 @@ class TestParseCatalogAPI:  # pylint: disable=too-many-public-methods
     def test_parse_catalog_no_authentication(
         self,
         client: TestClient,
-        created_job: Dict[str, Any],
+        created_job: str,
         valid_catalog_json: Dict[str, Any],
     ) -> None:
         """Test parsing without authentication header."""
-        job_id = created_job["job_id"]
+        job_id = created_job
 
         response = client.post(
             f"/api/v1/jobs/{job_id}/stages/parse-catalog",
@@ -321,11 +290,11 @@ class TestParseCatalogAPI:  # pylint: disable=too-many-public-methods
     def test_parse_catalog_invalid_token(
         self,
         client: TestClient,
-        created_job: Dict[str, Any],
+        created_job: str,
         valid_catalog_json: Dict[str, Any],
     ) -> None:
         """Test parsing with invalid authentication token."""
-        job_id = created_job["job_id"]
+        job_id = created_job
 
         # Note: The mock_jwt_validation fixture bypasses actual JWT validation
         # This test would need real JWT validation to properly test invalid tokens
@@ -363,10 +332,10 @@ class TestParseCatalogAPI:  # pylint: disable=too-many-public-methods
         self,
         client: TestClient,
         auth_headers: Dict[str, str],
-        created_job: Dict[str, Any],
+        created_job: str,
     ) -> None:
         """Test parsing without uploading a file."""
-        job_id = created_job["job_id"]
+        job_id = created_job
 
         response = client.post(
             f"/api/v1/jobs/{job_id}/stages/parse-catalog",
@@ -382,11 +351,11 @@ class TestParseCatalogAPI:  # pylint: disable=too-many-public-methods
         self,
         client: TestClient,
         auth_headers: Dict[str, str],
-        created_job: Dict[str, Any],
+        created_job: str,
         valid_catalog_json: Dict[str, Any],
     ) -> None:
         """Test that artifacts are properly stored and can be retrieved."""
-        job_id = created_job["job_id"]
+        job_id = created_job
 
         # Parse catalog
         response = client.post(
@@ -422,11 +391,11 @@ class TestParseCatalogAPI:  # pylint: disable=too-many-public-methods
         self,
         client: TestClient,
         auth_headers: Dict[str, str],
-        created_job: Dict[str, Any],
+        created_job: str,
         valid_catalog_json: Dict[str, Any],
     ) -> None:
         """Test that artifacts can be found by cross-stage lookup."""
-        job_id = created_job["job_id"]
+        job_id = created_job
 
         # Parse catalog
         response = client.post(
@@ -459,10 +428,10 @@ class TestParseCatalogAPI:  # pylint: disable=too-many-public-methods
         self,
         client: TestClient,
         auth_headers: Dict[str, str],
-        created_job: Dict[str, Any],
+        created_job: str,
     ) -> None:
         """Test that error responses don't expose internal details."""
-        job_id = created_job["job_id"]
+        job_id = created_job
 
         # Send malformed JSON that would cause internal parsing errors
         response = client.post(
@@ -491,11 +460,11 @@ class TestParseCatalogAPI:  # pylint: disable=too-many-public-methods
         self,
         client: TestClient,
         auth_headers: Dict[str, str],
-        created_job: Dict[str, Any],
+        created_job: str,
         valid_catalog_json: Dict[str, Any],
     ) -> None:
         """Test that concurrent requests to the same job are handled correctly."""
-        job_id = created_job["job_id"]
+        job_id = created_job
 
         results = []
 
