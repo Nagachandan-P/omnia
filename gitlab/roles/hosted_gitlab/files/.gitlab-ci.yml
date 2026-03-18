@@ -1122,7 +1122,7 @@ summary:
             "build-image-aarch64": 4,
             "validate-image-on-test": 5
           };
-        
+
         # Sort stages by execution order, then by name
         .stages | sort_by([stage_order[.stage_name] // 999, .stage_name])[] |
         "  |    \(.stage_name): \(.stage_state)" +
