@@ -208,7 +208,7 @@ class JobStateHelper:
             )
             audit_repo.save(event)
 
-            # Commit sessions if repositories have active sessions
+            # Commit sessions if repositories have active  sessions
             if hasattr(job_repo, 'session') and job_repo.session:
                 job_repo.session.commit()
             if hasattr(audit_repo, 'session') and audit_repo.session:
