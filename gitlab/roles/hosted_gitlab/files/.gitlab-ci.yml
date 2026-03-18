@@ -1110,9 +1110,24 @@ summary:
       echo "  +-----------------------------------------------------------+"
       echo "  |  Stage Results:                                           |"
 
-      jq -r '.stages[]? | "  |    \(.stage_name): \(.stage_state)" +
-               (if .error_code then "  [\(.error_code)]" else "" end)' \
-        final_status.json 2>/dev/null || echo "  |    (no stage data)"
+      # Sort stages in chronological execution order
+      jq -r '
+        # Define stage execution order
+        def stage_order:
+          {
+            "parse-catalog": 1,
+            "generate-input-files": 2,
+            "create-local-repository": 3,
+            "build-image-x86_64": 4,
+            "build-image-aarch64": 4,
+            "validate-image-on-test": 5
+          };
+        
+        # Sort stages by execution order, then by name
+        .stages | sort_by([stage_order[.stage_name] // 999, .stage_name])[] |
+        "  |    \(.stage_name): \(.stage_state)" +
+        (if .error_code then "  [\(.error_code)]" else "" end)
+      ' final_status.json 2>/dev/null || echo "  |    (no stage data)"
 
       echo "  +-----------------------------------------------------------+"
 
