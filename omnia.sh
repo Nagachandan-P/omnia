@@ -2274,11 +2274,20 @@ rollback_omnia_core() {
     local selected_container_tag=$(get_container_tag_from_version "$selected_version")
     local current_container_tag=$(get_container_tag_from_version "$current_version")
 
+    # Check if target image exists locally and inform user before confirmation
+    local image_status="✓ Available"
+    if ! podman inspect "omnia_core:$selected_container_tag" >/dev/null 2>&1; then
+        image_status="✗ Missing (build required)"
+        echo -e "${RED}ERROR: Required image omnia_core:$selected_container_tag is not available locally.${NC}"
+        echo -e "${YELLOW}Please build or load the image before retrying rollback.${NC}"
+        exit 1
+    fi
+
     echo ""
     echo "Rollback target derived from metadata:"
     echo "  - Version: $selected_version"
     echo "  - Backup path: $selected_backup"
-    echo "  - Container tag: $selected_container_tag"
+    echo "  - Container tag: $selected_container_tag ($image_status)"
     echo -n "Proceed with rollback using this backup? [y/N]: "
     read -r confirm
     if [[ ! "$confirm" =~ ^[yY] ]]; then
