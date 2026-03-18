@@ -2397,7 +2397,7 @@ rollback_omnia_core() {
     if ! restore_from_backup "$selected_backup"; then
         echo -e "${RED}ERROR: Failed to restore from backup.${NC}"
         display_cleanup_instructions
-        exit
+        exit 1
     fi
     
     # Step 7: Verify container version
