@@ -96,14 +96,21 @@
   when: podinfo.containers | length > 0
 
 - name: Remove build_stream cleanup directories
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-    force: true
-  register: directory_deletion
-  until: directory_deletion is not failed
-  retries: "{{ max_retries }}"
-  loop: "{{ build_stream_cleanup_directory }}"
+  block:
+    - name: Remove each build_stream cleanup directory
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+        force: true
+      register: directory_deletion
+      until: directory_deletion is not failed
+      retries: "{{ max_retries }}"
+      loop: "{{ build_stream_cleanup_directory }}"
+  rescue:
+    - name: Fail cleanup if directory removal fails due to locks
+      ansible.builtin.fail:
+        msg: |
+          {{ build_stream_cleanup_failure_msg }}
 
 - name: Check if target file exists
   ansible.builtin.stat:
