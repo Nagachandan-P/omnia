@@ -40,7 +40,7 @@
       when:
         - kubectl_apply_result is defined
         - kubectl_apply_result.stdout_lines is defined
-    
+
     - name: Wait for idrac telemetry receiver to be ready
       kubernetes.core.k8s_info:
         api_version: v1
@@ -81,22 +81,22 @@
       delegate_to: "{{ kube_vip }}"
       register: ldms_statefulset_info
       failed_when: false
-      
+
     - name: Set LDMS running state
       ansible.builtin.set_fact:
         ldms_running: "{{ ldms_statefulset_info.resources is defined and ldms_statefulset_info.resources | length > 0 }}"
-    
+
     - name: Check if decomp.json exists
       ansible.builtin.stat:
         path: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/ldms/nersc-ldms-aggr/scripts/decomp.json"
-      register: decompose_json_stat
-    
+      register: decomp_json_stat
+
     - name: Copy decompose.json if it doesn't exist
       ansible.builtin.copy:
         src: files/scripts/decomp.json
         dest: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/ldms/nersc-ldms-aggr/scripts/decomp.json"
         mode: "{{ hostvars['localhost']['file_permissions_644'] }}"
-      when: not decompose_json_stat.stat.exists
+      when: not decomp_json_stat.stat.exists
 
     - name: Restart LDMS aggregator StatefulSet
       kubernetes.core.k8s:
