@@ -291,7 +291,7 @@ def mark_stage_as_failed(
             db_session.close()
 
     except Exception as e:
-        logger.warning("Failed to mark stage as failed: %s", e)
+        log_secure_info("warning", "Failed to mark stage as failed: %s", str(e))
         if db_session:
             db_session.rollback()
 
