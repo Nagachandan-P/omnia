@@ -215,11 +215,12 @@ def validate_build_stream_config(input_file_path, data,
             try:
                 context = ssl._create_unverified_context()
                 socket.setdefaulttimeout(2)
-                with client.HTTPSConnection(build_stream_host_ip, port_int, timeout=2, context=context) as conn:
-                    conn.request("GET", "/health")
-                    resp = conn.getresponse()
-                    if resp.status not in [200, 401, 403, 404, 500]:
-                        raise ValueError(f"Unexpected HTTP status {resp.status}")
+                conn = client.HTTPSConnection(build_stream_host_ip, port_int, timeout=2, context=context)
+                conn.request("GET", "/health")
+                resp = conn.getresponse()
+                conn.close()
+                if resp.status not in [200, 401, 403, 404, 500]:
+                    raise ValueError(f"Unexpected HTTP status {resp.status}")            
             except Exception as exc:  # pylint: disable=broad-except
                 errors.append(create_error_msg(
                     build_stream_yml,
