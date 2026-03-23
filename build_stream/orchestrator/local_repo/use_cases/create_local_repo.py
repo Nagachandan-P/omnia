@@ -241,7 +241,7 @@ class CreateLocalRepoUseCase:
         except (InputFilesMissingError, InputDirectoryInvalidError) as exc:
             try:
                 error_code = type(exc).__name__.upper()
-                error_summary = exc.message
+                error_summary = "Input preparation failed"
                 stage.start()
                 stage.fail(
                     error_code=error_code,
