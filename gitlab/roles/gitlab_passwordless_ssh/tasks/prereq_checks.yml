@@ -20,12 +20,7 @@
       register: repo_check
       changed_when: false
   rescue:
-    - name: Parse repository errors
-      ansible.builtin.set_fact:
-        repo_errors: "{{ repo_check.stderr_lines | select('match', 'Errors during downloading metadata') | list }}"
-        failed_repos: "{{ repo_check.stderr_lines | select('search', 'docker-ce-stable') | list | map('regex_replace', '.*', 'docker-ce-stable') | list }}"
-        
-    - name: Display detailed repository failure information
+    - name: Fail with repository error message
       ansible.builtin.fail:
         msg: |
           {{ gitlab_repo_check_fail_msg }}

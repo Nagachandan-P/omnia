@@ -41,19 +41,15 @@ gitlab_repo_check_fail_msg: >
   Fix repository issues before re-running gitlab.yml.
 
 gitlab_repo_error_details_msg: >
-  Specific errors detected:
-  {% for error in repo_errors %}
-  - {{ error }}
-  {% endfor %}
+  Command 'dnf makecache' failed with return code {{ repo_check.rc }}.
   
-  Failed repositories:
-  {% for repo in failed_repos %}
-  - {{ repo }}
-  {% endfor %}
+  Error output:
+  {{ repo_check.stderr | default('No stderr output') }}
   
-  Suggested actions:
+  Please fix repository issues before re-running gitlab.yml.
+  Common solutions:
   1. Check network connectivity and DNS resolution
-  2. Disable problematic repositories temporarily: dnf config-manager --set-disabled <repo-name>
+  2. Disable problematic repositories: dnf config-manager --set-disabled <repo-name>
   3. Verify proxy settings if applicable
   4. Run 'dnf clean all && dnf makecache' to refresh
 
