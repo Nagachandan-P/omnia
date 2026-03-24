@@ -23,7 +23,7 @@
     - name: Display detailed repository failure information
       ansible.builtin.debug:
         msg: "{{ gitlab_repo_check_fail_msg }}"
-      
+     
     - name: Abort playbook due to repository connectivity issues
       ansible.builtin.fail:
         msg: "{{ gitlab_repo_fail_msg }}"
