@@ -46,6 +46,13 @@ powervault_config:
   port: {{ pv.port | default('') }}
   isci_initiators: {{ pv.isci_initiators | default('') }}
   volume_id: {{ pv.volume_id | default('') }}
+{% else %}
+#powervault_config:
+#  ip:
+#    - 172.1.2.3
+#  port: 3260
+#  isci_initiators: iqn.initiator.com.example:7d7d7d7d7d7
+#  volume_id: 00c0ff4343f1f1f1001c8c4e6901000000
 {% endif %}
 
 # -----------------------------NFS------------------------------------------------
