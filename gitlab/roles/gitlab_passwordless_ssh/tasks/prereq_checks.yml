@@ -22,10 +22,7 @@
   rescue:
     - name: Fail with repository error message
       ansible.builtin.fail:
-        msg: |
-          {{ gitlab_repo_check_fail_msg }}
-          
-          {{ gitlab_repo_error_details_msg }}
+        msg: "{{ gitlab_repo_check_fail_msg }}"
 
 - name: Install sshpass on localhost
   block:
