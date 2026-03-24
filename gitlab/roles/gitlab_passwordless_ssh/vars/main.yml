@@ -29,18 +29,18 @@ gitlab_sshpass_install_fail_msg: >
 gitlab_repo_check_fail_msg: |
   Repository check failed. One or more repositories in /etc/yum.repos.d/ are not reachable.
   
-  Command 'dnf makecache' failed with return code {{ repo_check.rc }}.
+  - Command 'dnf makecache' failed with return code {{ repo_check.rc }}
   
   Error output:
   {{ repo_check.stderr | default('No stderr output') }}
   
   Please check:
-  1. Network connectivity to repository servers
-  2. Repository configuration in /etc/yum.repos.d/
-  3. DNS resolution
+  - Network connectivity to repository servers
+  - Repository configuration in /etc/yum.repos.d/
+  - DNS resolution
   
-  Run 'dnf makecache' manually to see detailed error messages.
-  Fix repository issues before re-running gitlab.yml.
+  - Run 'dnf makecache' manually to see detailed error messages
+  - Fix repository issues before re-running gitlab.yml
   
   Additional solutions:
   - Disable problematic repositories: dnf config-manager --set-disabled <repo-name>
