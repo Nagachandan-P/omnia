@@ -38,6 +38,19 @@ import yaml
 from argon2 import PasswordHasher, Type  # noqa: E0611 pylint: disable=no-name-in-module
 from api.logging_utils import log_secure_info
 
+# Patch JSONB to JSON for SQLite integration tests
+# This must be done before any model imports
+import sys
+from sqlalchemy import JSON
+
+# Create a mock postgresql module if it doesn't exist
+if 'sqlalchemy.dialects.postgresql' not in sys.modules:
+    postgresql_module = type(sys)('postgresql')
+    sys.modules['sqlalchemy.dialects.postgresql'] = postgresql_module
+
+# Patch JSONB to use JSON for SQLite compatibility
+sys.modules['sqlalchemy.dialects.postgresql'].JSONB = JSON
+
 # Configure logging for integration tests
 logging.basicConfig(
     level=logging.INFO,

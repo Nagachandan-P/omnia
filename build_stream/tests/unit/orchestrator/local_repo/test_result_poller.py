@@ -61,12 +61,21 @@ def mock_uuid_generator_fixture():
 
 
 @pytest.fixture
+def mock_job_repo_fixture():
+    """Mock JobRepository."""
+    repo = MagicMock()
+    return repo
+
+
+@pytest.fixture
 def result_poller(
-    mock_result_service_fixture, mock_stage_repo_fixture, mock_audit_repo_fixture, mock_uuid_generator_fixture
+    mock_result_service_fixture, mock_job_repo_fixture, mock_stage_repo_fixture,
+    mock_audit_repo_fixture, mock_uuid_generator_fixture
 ):
     """Create LocalRepoResultPoller instance with mocked dependencies."""
     return LocalRepoResultPoller(
         result_service=mock_result_service_fixture,
+        job_repo=mock_job_repo_fixture,
         stage_repo=mock_stage_repo_fixture,
         audit_repo=mock_audit_repo_fixture,
         uuid_generator=mock_uuid_generator_fixture,

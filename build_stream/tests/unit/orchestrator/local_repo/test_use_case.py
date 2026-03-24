@@ -21,12 +21,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from core.jobs.entities import Job, Stage
-from core.jobs.exceptions import JobNotFoundError
+from core.jobs.exceptions import JobNotFoundError, UpstreamStageNotCompletedError
 from core.jobs.value_objects import (
     ClientId,
     CorrelationId,
     JobId,
     StageName,
+    StageState,
     StageType,
 )
 from core.localrepo.exceptions import InputFilesMissingError
@@ -81,14 +82,34 @@ def command_fixture(job_id, client_id, correlation_id):
     )
 
 
+@pytest.fixture(name="upstream_stage")
+def upstream_stage_fixture(job_id):
+    """Provide a COMPLETED generate-input-files stage (upstream prerequisite)."""
+    upstream = Stage(
+        job_id=job_id,
+        stage_name=StageName(StageType.GENERATE_INPUT_FILES.value),
+    )
+    upstream.start()
+    upstream.complete()
+    return upstream
+
+
 @pytest.fixture(name="use_case")
-def use_case_fixture(job, stage):
+def use_case_fixture(job, stage, upstream_stage):
     """Provide a CreateLocalRepoUseCase with mocked dependencies."""
     job_repo = MagicMock()
     job_repo.find_by_id.return_value = job
 
     stage_repo = MagicMock()
-    stage_repo.find_by_job_and_name.return_value = stage
+
+    def _find_by_job_and_name(job_id_arg, stage_name_arg):
+        if stage_name_arg.value == StageType.GENERATE_INPUT_FILES.value:
+            return upstream_stage
+        if stage_name_arg.value == StageType.CREATE_LOCAL_REPOSITORY.value:
+            return stage
+        return None
+
+    stage_repo.find_by_job_and_name.side_effect = _find_by_job_and_name
 
     audit_repo = MagicMock()
 
@@ -167,9 +188,14 @@ class TestCreateLocalRepoUseCase:
         with pytest.raises(JobNotFoundError):
             use_case.execute(command)
 
-    def test_execute_stage_not_found(self, use_case, command):
-        """Missing stage should raise JobNotFoundError."""
-        use_case._stage_repo.find_by_job_and_name.return_value = None
+    def test_execute_stage_not_found(self, use_case, command, upstream_stage):
+        """Missing stage should raise error."""
+        def _find_upstream_only(job_id_arg, stage_name_arg):
+            if stage_name_arg.value == StageType.GENERATE_INPUT_FILES.value:
+                return upstream_stage
+            return None
+
+        use_case._stage_repo.find_by_job_and_name.side_effect = _find_upstream_only
 
         with pytest.raises(JobNotFoundError):
             use_case.execute(command)

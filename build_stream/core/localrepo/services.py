@@ -165,11 +165,10 @@ class InputFileService:
                         arch,
                         software_csv_path,
                     )
-                except (PermissionError, FileNotFoundError, IsADirectoryError) as exc:
+                except (PermissionError, FileNotFoundError, IsADirectoryError):
                     logger.warning(
-                        "Failed to remove software.csv for architecture %s: %s",
+                        "Failed to remove software.csv for architecture %s",
                         arch,
-                        str(exc),
                     )
             else:
                 logger.debug(

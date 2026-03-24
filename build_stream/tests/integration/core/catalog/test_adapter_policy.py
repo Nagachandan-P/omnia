@@ -305,34 +305,34 @@ class TestTransformPackage(unittest.TestCase):
 
     def test_no_transform_returns_copy(self):
         """No transform config should return a copy of the package."""
-        pkg = {"name": "test", "version": "1.0"}
+        pkg = {"name": "test", "version": "1.0", "type": "git"}
         result = transform_package(pkg, None)
         self.assertEqual(result, pkg)
         self.assertIsNot(result, pkg)
 
     def test_exclude_fields(self):
         """Should exclude specified fields."""
-        pkg = {"name": "test", "version": "1.0", "architecture": "x86_64"}
+        pkg = {"name": "test", "version": "1.0", "architecture": "x86_64", "type": "git"}
         transform = {schema.EXCLUDE_FIELDS: ["architecture"]}
         result = transform_package(pkg, transform)
-        self.assertEqual(result, {"name": "test", "version": "1.0"})
+        self.assertEqual(result, {"name": "test", "version": "1.0", "type": "git"})
 
     def test_rename_fields(self):
         """Should rename specified fields."""
-        pkg = {"name": "test", "ver": "1.0"}
+        pkg = {"name": "test", "ver": "1.0", "type": "git"}
         transform = {schema.RENAME_FIELDS: {"ver": "version"}}
         result = transform_package(pkg, transform)
-        self.assertEqual(result, {"name": "test", "version": "1.0"})
+        self.assertEqual(result, {"name": "test", "version": "1.0", "type": "git"})
 
     def test_exclude_and_rename_combined(self):
         """Should apply both exclude and rename."""
-        pkg = {"name": "test", "ver": "1.0", "arch": "x86_64"}
+        pkg = {"name": "test", "ver": "1.0", "arch": "x86_64", "type": "git"}
         transform = {
             schema.EXCLUDE_FIELDS: ["arch"],
             schema.RENAME_FIELDS: {"ver": "version"}
         }
         result = transform_package(pkg, transform)
-        self.assertEqual(result, {"name": "test", "version": "1.0"})
+        self.assertEqual(result, {"name": "test", "version": "1.0", "type": "git"})
 
 
 class TestApplySubstringFilter(unittest.TestCase):

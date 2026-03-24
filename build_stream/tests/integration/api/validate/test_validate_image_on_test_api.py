@@ -38,6 +38,7 @@ class TestValidateImageOnTestSuccess:
             response = client.post(
                 f"/api/v1/jobs/{job_with_completed_build_image}/stages/validate-image-on-test",
                 headers=auth_headers,
+                json={"image_key": "test-image-key"},
             )
 
         assert response.status_code == 202
@@ -52,12 +53,13 @@ class TestValidateImageOnTestSuccess:
         self, client, job_with_completed_build_image, unique_correlation_id,
         nfs_queue_dir
     ):
-        """Test correlation ID is returned in response."""
+        """Test that correlation ID is returned in response."""
         headers = {
             "Authorization": "Bearer test-client-123",
             "X-Correlation-Id": unique_correlation_id,
+            "Idempotency-Key": f"test-key-{uuid.uuid4()}",
         }
-
+        
         with patch(
             "infra.repositories.nfs_playbook_queue_request_repository"
             ".NfsPlaybookQueueRequestRepository.is_available",
@@ -70,13 +72,15 @@ class TestValidateImageOnTestSuccess:
             response = client.post(
                 f"/api/v1/jobs/{job_with_completed_build_image}/stages/validate-image-on-test",
                 headers=headers,
+                json={"image_key": "test-image-key"},
             )
 
         assert response.status_code == 202
-        assert response.json()["correlation_id"] == unique_correlation_id
+        data = response.json()
+        assert data["correlation_id"] == unique_correlation_id
 
     def test_queue_submission(
-        self, client, auth_headers, job_with_completed_build_image, monkeypatch
+        self, client, auth_headers, job_with_completed_build_image, nfs_queue_dir, monkeypatch
     ):
         """Test that validate request is submitted to queue."""
         # Create a mock for the queue service that tracks submissions
@@ -100,6 +104,7 @@ class TestValidateImageOnTestSuccess:
         response = client.post(
             f"/api/v1/jobs/{job_with_completed_build_image}/stages/validate-image-on-test",
             headers=auth_headers,
+            json={"image_key": "test-image-key"},
         )
         
         # Verify response
@@ -123,6 +128,7 @@ class TestValidateImageOnTestValidation:
         response = client.post(
             "/api/v1/jobs/invalid-uuid/stages/validate-image-on-test",
             headers=auth_headers,
+            json={"image_key": "test-image-key"},
         )
         assert response.status_code == 400
         detail = response.json()["detail"]
@@ -134,6 +140,7 @@ class TestValidateImageOnTestValidation:
         response = client.post(
             f"/api/v1/jobs/{fake_job_id}/stages/validate-image-on-test",
             headers=auth_headers,
+            json={"image_key": "test-image-key"},
         )
         assert response.status_code == 404
         detail = response.json()["detail"]
@@ -146,6 +153,7 @@ class TestValidateImageOnTestValidation:
         response = client.post(
             f"/api/v1/jobs/{created_job}/stages/validate-image-on-test",
             headers=auth_headers,
+            json={"image_key": "test-image-key"},
         )
         assert response.status_code == 412
         detail = response.json()["detail"]
@@ -166,6 +174,7 @@ class TestValidateImageOnTestAuthentication:
         response = client.post(
             f"/api/v1/jobs/{job_with_completed_build_image}/stages/validate-image-on-test",
             headers=headers,
+            json={"image_key": "test-image-key"},
         )
         assert response.status_code == 422
 
@@ -180,6 +189,7 @@ class TestValidateImageOnTestAuthentication:
         response = client.post(
             f"/api/v1/jobs/{job_with_completed_build_image}/stages/validate-image-on-test",
             headers=headers,
+            json={"image_key": "test-image-key"},
         )
         assert response.status_code == 401
 
@@ -194,6 +204,7 @@ class TestValidateImageOnTestAuthentication:
         response = client.post(
             f"/api/v1/jobs/{job_with_completed_build_image}/stages/validate-image-on-test",
             headers=headers,
+            json={"image_key": "test-image-key"},
         )
         assert response.status_code == 401
 
@@ -202,19 +213,20 @@ class TestValidateImageOnTestErrorHandling:
     """Error handling tests."""
 
     def test_queue_unavailable_returns_500(
-        self, client, auth_headers, job_with_completed_build_image
+        self, client, auth_headers, job_with_completed_build_image, monkeypatch
     ):
         """Test validate image when queue is unavailable."""
-        with patch(
-            "infra.repositories.nfs_playbook_queue_request_repository"
-            ".NfsPlaybookQueueRequestRepository.is_available",
-            return_value=False,
-        ):
-            response = client.post(
-                f"/api/v1/jobs/{job_with_completed_build_image}/stages/validate-image-on-test",
-                headers=auth_headers,
-            )
-
+        # Mock the queue service to be unavailable
+        monkeypatch.setattr(
+            "infra.repositories.nfs_playbook_queue_request_repository.NfsPlaybookQueueRequestRepository.is_available",
+            lambda self: False
+        )
+        
+        response = client.post(
+            f"/api/v1/jobs/{job_with_completed_build_image}/stages/validate-image-on-test",
+            headers=auth_headers,
+            json={"image_key": "test-image-key"},
+        )
         assert response.status_code == 500
         detail = response.json()["detail"]
         assert detail["error"] == "VALIDATION_EXECUTION_ERROR"
