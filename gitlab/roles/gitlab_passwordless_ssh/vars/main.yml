@@ -26,6 +26,20 @@ gitlab_sshpass_install_fail_msg: >
   Failed to install sshpass. Ensure AppStream and BaseOS repositories
   are configured and enabled on this host before running this playbook.
 
+gitlab_repo_check_success_msg: "All repositories are reachable. Package installation can proceed."
+
+gitlab_repo_check_fail_msg: >
+  Repository check failed. One or more repositories in /etc/yum.repos.d/ are not reachable.
+  
+  Please check:
+  1. Network connectivity to repository servers
+  2. Repository configuration in /etc/yum.repos.d/
+  3. Proxy settings if applicable
+  4. DNS resolution
+  
+  Run 'dnf makecache' manually to see detailed error messages.
+  Fix repository issues before re-running gitlab.yml.
+
 # Usage: generate_keypair. yml
 ssh_key_path: "/root/.ssh/omnia_gitlab"
 ssh_key_comment: "omnia_gitlab"
