@@ -756,12 +756,15 @@ def validate_aarch64_local_path_compatibility(pxe_mapping_file_path):
                 
             # Check omnia_share_option in metadata
             share_option = metadata.get("omnia_share_option", "Local")
-        except Exception:
+            print(f"DEBUG: omnia_share_option = {share_option}")  # Debug line
+        except Exception as e:
             # If there's an error reading metadata, assume Local
+            print(f"DEBUG: Exception reading metadata: {e}")  # Debug line
             pass
     
     # If share option is NFS, no need to check further
     if share_option.lower() == "nfs":
+        print("DEBUG: Share option is NFS, returning")  # Debug line
         return
     
     # Check for aarch64 nodes in PXE mapping file
@@ -775,16 +778,20 @@ def validate_aarch64_local_path_compatibility(pxe_mapping_file_path):
     fg_col = fieldname_map.get("FUNCTIONAL_GROUP_NAME")
     
     if not fg_col:
+        print("DEBUG: FUNCTIONAL_GROUP_NAME column not found")  # Debug line
         return
     
     aarch64_found = False
     for row in reader:
         fg_name = row.get(fg_col, "").strip() if row.get(fg_col) else ""
+        print(f"DEBUG: Checking functional group: {fg_name}")  # Debug line
         if fg_name and "aarch64" in fg_name.lower():
             aarch64_found = True
+            print(f"DEBUG: Found aarch64 in functional group: {fg_name}")  # Debug line
             break
     
     if aarch64_found:
+        print("DEBUG: Raising ValueError for aarch64 with local share path")  # Debug line
         raise ValueError(en_us_validation_msg.PXE_MAPPING_AARCH64_LOCAL_PATH_MSG)
 
 def validate_provision_config(
