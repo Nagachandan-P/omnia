@@ -40,6 +40,23 @@ gitlab_repo_check_fail_msg: >
   Run 'dnf makecache' manually to see detailed error messages.
   Fix repository issues before re-running gitlab.yml.
 
+gitlab_repo_error_details_msg: >
+  Specific errors detected:
+  {% for error in repo_errors %}
+  - {{ error }}
+  {% endfor %}
+  
+  Failed repositories:
+  {% for repo in failed_repos %}
+  - {{ repo }}
+  {% endfor %}
+  
+  Suggested actions:
+  1. Check network connectivity and DNS resolution
+  2. Disable problematic repositories temporarily: dnf config-manager --set-disabled <repo-name>
+  3. Verify proxy settings if applicable
+  4. Run 'dnf clean all && dnf makecache' to refresh
+
 # Usage: generate_keypair. yml
 ssh_key_path: "/root/.ssh/omnia_gitlab"
 ssh_key_comment: "omnia_gitlab"

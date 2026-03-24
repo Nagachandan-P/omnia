@@ -14,20 +14,23 @@
 ---
 
 - name: Check repository reachability
-  ansible.builtin.command: dnf makecache
-  register: repo_check
-  failed_when: repo_check.rc != 0
-  changed_when: false
-
-- name: Display repository check results
-  ansible.builtin.debug:
-    msg: "{{ gitlab_repo_check_success_msg }}"
-  when: repo_check.rc == 0
-
-- name: Fail with repository error message
-  ansible.builtin.fail:
-    msg: "{{ gitlab_repo_check_fail_msg }}"
-  when: repo_check.rc != 0
+  block:
+    - name: Run dnf makecache
+      ansible.builtin.command: dnf makecache
+      register: repo_check
+      changed_when: false
+  rescue:
+    - name: Parse repository errors
+      ansible.builtin.set_fact:
+        repo_errors: "{{ repo_check.stderr_lines | select('match', 'Errors during downloading metadata') | list }}"
+        failed_repos: "{{ repo_check.stderr_lines | select('match', 'repository.*:') | map('regex_replace', '.*repository \\'([^\\']+)\\'.*$', '\\1') | list }}"
+        
+    - name: Display detailed repository failure information
+      ansible.builtin.fail:
+        msg: |
+          {{ gitlab_repo_check_fail_msg }}
+          
+          {{ gitlab_repo_error_details_msg }}
 
 - name: Install sshpass on localhost
   block:
