@@ -403,7 +403,7 @@ class GenerateInputFilesUseCase:
     ) -> None:
         """Transition stage to FAILED with error details."""
         error_code = type(error).__name__
-        error_summary = str(error)[:256]
+        error_summary = "Processing failed"
         stage.fail(error_code=error_code, error_summary=error_summary)
         self._stage_repo.save(stage)
         self._emit_audit_event(

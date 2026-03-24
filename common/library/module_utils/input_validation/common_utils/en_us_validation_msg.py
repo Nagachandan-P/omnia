@@ -171,6 +171,11 @@ PXE_MAPPING_FILE_PATH_FAIL_MSG = ("File path is invalid. Please ensure the file 
                                  "not a directory.")
 PXE_MAPPING_FILE_EXT_FAIL_MSG = ("File path is invalid. Please ensure that the file ends with "
                                  ".csv extension")
+PXE_MAPPING_AARCH64_LOCAL_PATH_MSG = ("aarch64 nodes are present in pxe_mapping_file.csv but "
+                                      "local share path selected for omnia core container deployment. "
+                                      "aarch64 nodes require NFS share path. "
+                                      "Please redeploy omnia core container with NFS share path option or remove aarch64 nodes "
+                                      "from pxe_mapping_file.csv.")
 CLUSTER_OS_FAIL_MSG = "Cluster OS must be 'rhel' for RHEL Omnia Infrastructure Manager"
 
 # local_repo.yml
@@ -447,7 +452,7 @@ BUILD_STREAM_PORT_RANGE_MSG = "build_stream_port must be an integer between 1 an
 BUILD_STREAM_PORT_INUSE_MSG = (
     "Port {port} is already in use and is not serving build_stream on {host_ip}. Please choose another free port."
 )
-
+ 
 BUILD_STREAM_HOST_IP_REQUIRED_MSG = (
     "Field 'build_stream_host_ip' is mandatory in build_stream_config.yml. "
     "Please provide a valid IPv4 address (OIM admin IP or OIM public IP)."
