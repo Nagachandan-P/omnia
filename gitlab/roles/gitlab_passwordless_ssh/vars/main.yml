@@ -53,6 +53,8 @@ gitlab_repo_check_fail_msg: |
   
   ========================================
 
+gitlab_repo_fail_msg: "Repository check failed. See above error details."
+
 # Usage: generate_keypair. yml
 ssh_key_path: "/root/.ssh/omnia_gitlab"
 ssh_key_comment: "omnia_gitlab"

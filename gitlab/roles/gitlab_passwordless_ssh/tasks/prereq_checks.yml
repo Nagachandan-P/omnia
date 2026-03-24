@@ -15,14 +15,18 @@
 
 - name: Check repository reachability
   block:
-    - name: Run dnf makecache
+    - name: Verify all repositories are accessible
       ansible.builtin.command: dnf makecache
       register: repo_check
       changed_when: false
   rescue:
-    - name: Fail with repository error message
-      ansible.builtin.fail:
+    - name: Display detailed repository failure information
+      ansible.builtin.debug:
         msg: "{{ gitlab_repo_check_fail_msg }}"
+      
+    - name: Abort playbook due to repository connectivity issues
+      ansible.builtin.fail:
+        msg: "{{ gitlab_repo_fail_msg }}"
 
 - name: Install sshpass on localhost
   block:
