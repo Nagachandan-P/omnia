@@ -248,6 +248,8 @@ def mark_stage_as_failed(
 ):
     """Mark a stage as failed when validation fails at API layer.
     
+    Also marks the job as FAILED to maintain consistency with orchestrator behavior.
+    
     Args:
         job_id: The job identifier
         stage_name: The stage name (e.g., 'parse-catalog')
@@ -256,6 +258,7 @@ def mark_stage_as_failed(
         db_session: Database session (if None, creates new session)
     """
     from core.jobs.value_objects import JobId, StageName  # pylint: disable=import-outside-toplevel
+    from core.jobs.services import JobStateHelper  # pylint: disable=import-outside-toplevel
 
     try:
         # Get or create session
@@ -284,14 +287,47 @@ def mark_stage_as_failed(
             stage.fail(error_code=error_code, error_summary=error_summary)
             stage_repo.save(stage)
 
-            if _ENV == "prod":
+            # Commit after failing the stage
+            if _ENV == "prod" and db_session.is_active:
                 db_session.commit()
+
+            # Also mark the job as FAILED (same as orchestrator)
+            if _ENV == "prod":
+                from infra.id_generator import UUIDv4Generator  # pylint: disable=import-outside-toplevel
+                
+                job_repo = _create_sql_job_repo(db_session)
+                audit_repo = _create_sql_audit_repo(db_session)
+                uuid_generator = UUIDv4Generator()
+                
+                # Transition job to IN_PROGRESS first if it's CREATED
+                job = job_repo.find_by_id(JobId(job_id))
+                if job and job.job_state.value == "CREATED":
+                    job.start()
+                    job_repo.save(job)
+                    if db_session.is_active:
+                        db_session.commit()
+                
+                JobStateHelper.handle_stage_failure(
+                    job_repo=job_repo,
+                    audit_repo=audit_repo,
+                    uuid_generator=uuid_generator,
+                    job_id=JobId(job_id),
+                    stage_name=stage_name,
+                    error_code=error_code,
+                    error_summary=error_summary,
+                    correlation_id=str(uuid_generator.generate()),
+                    client_id="unknown",
+                )
+                
+                # Ensure the session is committed after JobStateHelper completes
+                if db_session.is_active:
+                    db_session.commit()
 
         if should_close and db_session:
             db_session.close()
 
     except Exception as e:
-        log_secure_info("warning", "Failed to mark stage as failed: %s", str(e))
+        log_secure_info("warning", "Failed to mark stage as failed: %s", str(e), job_id=job_id)
         if db_session:
             db_session.rollback()
 

@@ -107,12 +107,6 @@ async def parse_catalog(
             f"filename={file.filename}, size_bytes={len(contents)}",
             job_id=job_id,
         )
-        log_secure_info(
-            "debug",
-            f"Parse-catalog executing: job_id={job_id}, "
-            f"filename={file.filename}, size_bytes={len(contents)}, content_type={file.content_type}",
-            job_id=job_id,
-        )
 
         # Create service with injected use case
         service = ParseCatalogService(parse_catalog_use_case=parse_catalog_use_case)
