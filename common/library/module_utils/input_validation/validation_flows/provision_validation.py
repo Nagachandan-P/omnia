@@ -743,11 +743,6 @@ def validate_aarch64_local_path_compatibility(pxe_mapping_file_path):
     Raises:
         ValueError: If aarch64 nodes are found with local share path configuration.
     """
-    # Log that function was called
-    with open("/tmp/aarch64_validation_called.log", "w") as f:
-        f.write(f"validate_aarch64_local_path_compatibility called at {__import__('datetime').datetime.now()}\n")
-        f.write(f"PXE mapping file: {pxe_mapping_file_path}\n")
-    
     # Check metadata file for omnia_share_option
     metadata_path = "/opt/omnia/.data/oim_metadata.yml"
     
