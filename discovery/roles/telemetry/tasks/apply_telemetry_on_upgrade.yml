@@ -86,63 +86,60 @@
       ansible.builtin.set_fact:
         ldms_running: "{{ ldms_statefulset_info.resources is defined and ldms_statefulset_info.resources | length > 0 }}"
 
-    - name: Check if decomp.json exists
-      ansible.builtin.stat:
-        path: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/ldms/nersc-ldms-aggr/scripts/decomp.json"
-      register: decomp_json_stat
-
-    - name: Copy decompose.json if it doesn't exist
-      ansible.builtin.copy:
-        src: files/scripts/decomp.json
-        dest: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/ldms/nersc-ldms-aggr/scripts/decomp.json"
-        mode: "{{ hostvars['localhost']['file_permissions_644'] }}"
-      when: not decomp_json_stat.stat.exists
-
-    - name: Restart LDMS aggregator StatefulSet
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: apps/v1
-          kind: StatefulSet
-          metadata:
-            name: nersc-ldms-aggr
-            namespace: "{{ telemetry_namespace }}"
-          spec:
-            template:
-              metadata:
-                annotations:
-                  kubectl.kubernetes.io/restartedAt: "{{ ansible_date_time.iso8601 }}"
-      delegate_to: "{{ kube_vip }}"
-      failed_when: false
-      when:
-        - ldms_running | default(false) | bool
-        - ldms_conf_file.stat.exists | default(false)
-        - ldms_bin_file.stat.exists | default(false)
-
-    - name: Wait for LDMS aggregator pod to be ready after restart
+    - name: Check if LDMS store daemon is running on service k8s cluster
       kubernetes.core.k8s_info:
         api_version: v1
         kind: Pod
         namespace: "{{ telemetry_namespace }}"
         label_selectors:
-          - "app=nersc-ldms-aggr"
+          - "app=nersc-ldms-store"
+      delegate_to: "{{ kube_vip }}"
+      register: ldms_store_pod_info
+      failed_when: false
+      when:
+        - ldms_running | default(false) | bool
+
+    - name: Set LDMS store daemon running state
+      ansible.builtin.set_fact:
+        ldms_store_running: "{{ ldms_store_pod_info.resources is defined and ldms_store_pod_info.resources | length > 0 }}"
+      when:
+        - ldms_running | default(false) | bool
+
+    - name: Restart LDMS store daemon pod
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Pod
+        name: "{{ ldms_store_pod_info.resources[0].metadata.name }}"
+        namespace: "{{ telemetry_namespace }}"
+      delegate_to: "{{ kube_vip }}"
+      failed_when: false
+      when:
+        - ldms_store_running | default(false) | bool
+
+    - name: Wait for LDMS store daemon pod to be ready after restart
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Pod
+        namespace: "{{ telemetry_namespace }}"
+        label_selectors:
+          - "app=nersc-ldms-store"
         wait: true
         wait_condition:
           type: Ready
           status: "True"
         wait_timeout: 120
       delegate_to: "{{ kube_vip }}"
-      register: ldms_pod_ready
+      register: ldms_store_pod_ready
       failed_when: false
       when:
-        - ldms_running | default(false) | bool
-        - ldms_conf_file.stat.exists | default(false)
-        - ldms_bin_file.stat.exists | default(false)
+        - ldms_store_running | default(false) | bool
 
-    - name: Display LDMS aggregator restart status
+    - name: Display LDMS store daemon restart status
       ansible.builtin.debug:
-        msg: "{{ ldms_pod_ready_msg if (ldms_pod_ready.resources | default([]) | length > 0) else ldms_pod_not_ready_msg }}"
+        msg: >
+          {{ ldms_store_pod_ready_msg
+          if (ldms_store_pod_ready.resources | default([]) | length > 0)
+          else ldms_store_pod_not_ready_msg }}
       when:
-        - ldms_running | default(false) | bool
-        - ldms_conf_file.stat.exists | default(false)
-        - ldms_bin_file.stat.exists | default(false)
+        - ldms_store_running | default(false) | bool
