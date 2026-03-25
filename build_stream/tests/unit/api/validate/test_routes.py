@@ -137,6 +137,7 @@ class TestCreateValidateImageOnTest:
                 job_id=_uuid(),
                 request_body=ValidateImageOnTestRequest(image_key="test-image"),
                 token_data={"client_id": "test-client", "scopes": ["job:write"]},
+                use_case=use_case,
                 correlation_id=CorrelationId(corr_id),
                 _=None,
             )
@@ -160,6 +161,7 @@ class TestCreateValidateImageOnTest:
                 job_id=_uuid(),
                 request_body=ValidateImageOnTestRequest(image_key="test-image"),
                 token_data={"client_id": "test-client", "scopes": ["job:write"]},
+                use_case=use_case,
                 correlation_id=CorrelationId(corr_id),
                 _=None,
             )
@@ -183,6 +185,7 @@ class TestCreateValidateImageOnTest:
                 job_id=_uuid(),
                 request_body=ValidateImageOnTestRequest(image_key="test-image"),
                 token_data={"client_id": "test-client", "scopes": ["job:write"]},
+                use_case=use_case,
                 correlation_id=CorrelationId(corr_id),
                 _=None,
             )
@@ -203,6 +206,7 @@ class TestCreateValidateImageOnTest:
                 job_id=_uuid(),
                 request_body=ValidateImageOnTestRequest(image_key="test-image"),
                 token_data={"client_id": "test-client", "scopes": ["job:write"]},
+                use_case=use_case,
                 correlation_id=CorrelationId(corr_id),
                 _=None,
             )
@@ -221,6 +225,7 @@ class TestCreateValidateImageOnTest:
                 job_id=_uuid(),
                 request_body=ValidateImageOnTestRequest(image_key="test-image"),
                 token_data={"client_id": "test-client", "scopes": ["job:write"]},
+                use_case=use_case,
                 correlation_id=CorrelationId(corr_id),
                 _=None,
             )

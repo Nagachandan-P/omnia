@@ -69,6 +69,17 @@ class MockAuditRepo:
         return [e for e in self._events if str(e.job_id) == str(job_id)]
 
 
+class MockJobRepo:
+    def __init__(self):
+        self._jobs = {}
+
+    def find_by_id(self, job_id):
+        return self._jobs.get(str(job_id))
+
+    def save(self, job):
+        self._jobs[str(job.job_id)] = job
+
+
 class MockUUIDGenerator:
     def generate(self):
         return uuid.uuid4()
@@ -92,15 +103,21 @@ def mock_audit_repo():
 
 
 @pytest.fixture
+def mock_job_repo():
+    return MockJobRepo()
+
+
+@pytest.fixture
 def mock_uuid_gen():
     return MockUUIDGenerator()
 
 
 @pytest.fixture
-def result_poller(mock_result_service, mock_stage_repo, mock_audit_repo, mock_uuid_gen):
+def result_poller(mock_result_service, mock_job_repo, mock_stage_repo, mock_audit_repo, mock_uuid_gen):
     """Create ResultPoller instance with mocked dependencies."""
     return ResultPoller(
         result_service=mock_result_service,
+        job_repo=mock_job_repo,
         stage_repo=mock_stage_repo,
         audit_repo=mock_audit_repo,
         uuid_generator=mock_uuid_gen,

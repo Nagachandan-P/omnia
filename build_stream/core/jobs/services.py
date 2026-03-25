@@ -146,8 +146,8 @@ class JobStateHelper:
 
         except Exception as exc:
             logger.exception(
-                "Failed to update job state on stage failure: job_id=%s, stage=%s, error=%s",
-                job_id, stage_name, exc
+                "Failed to update job state on stage failure: job_id=%s, stage=%s",
+                job_id, stage_name
             )
 
     @staticmethod
@@ -208,7 +208,7 @@ class JobStateHelper:
             )
             audit_repo.save(event)
 
-            # Commit sessions if repositories have active sessions
+            # Commit sessions if repositories have active  sessions
             if hasattr(job_repo, 'session') and job_repo.session:
                 job_repo.session.commit()
             if hasattr(audit_repo, 'session') and audit_repo.session:
@@ -221,6 +221,6 @@ class JobStateHelper:
 
         except Exception as exc:
             logger.exception(
-                "Failed to update job state on completion: job_id=%s, error=%s",
-                job_id, exc
+                "Failed to update job state on completion: job_id=%s",
+                job_id
             )

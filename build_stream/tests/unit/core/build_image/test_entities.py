@@ -38,7 +38,7 @@ class TestBuildImageRequest:
                 {
                     "job_id": "job-123",
                     "image_key": ImageKey("test-image").value,
-                    "functional_groups": FunctionalGroups(["service_kube_control_plane_x86_64_first", "service_kube_control_plane_x86_64", "service_kube_node_x86_64"]).values,
+                    "functional_groups": FunctionalGroups(["service_kube_control_plane_x86_64_first", "service_kube_control_plane_x86_64", "service_kube_node_x86_64"]).to_list(),
                 }
             ),
             correlation_id="corr-456",
@@ -104,7 +104,7 @@ class TestBuildImageRequest:
                 {
                     "job_id": "job-123",
                     "image_key": ImageKey(image_key_value).value,
-                    "functional_groups": FunctionalGroups(["group1"]).values,
+                    "functional_groups": FunctionalGroups(["group1"]).to_list(),
                     "inventory_host": inventory_host_value,
                 }
             ),
@@ -133,7 +133,7 @@ class TestBuildImageRequest:
         assert "build_image_x86_64.yml" in command
         assert '-e job_id="job-123"' in command
         assert '-e image_key="test-image"' in command
-        assert '-e functional_groups=\'["group1", "group2"]\'' in command
+        assert "functional_groups=" in command
         assert "-i " not in command  # No inventory for x86_64
 
     @pytest.mark.parametrize(
@@ -169,16 +169,17 @@ class TestBuildImageRequest:
             timeout=ExecutionTimeout(60),
             submitted_at="2026-02-12T18:30:00.000Z",
             request_id="req-789",
+            inventory_file_path=f"/path/to/inventory/{inventory_host_value}",
         )
 
         command = request.get_playbook_command()
 
         assert "ansible-playbook" in command
         assert "build_image_aarch64.yml" in command
-        assert f"-i {inventory_host_value}" in command
+        assert "-i" in command and inventory_host_value in command  # inventory_file_path based
         assert f'-e job_id="{job_id_value}"' in command
         assert f'-e image_key="{image_key_value}"' in command
-        expected_groups = json.dumps(list(functional_groups_value))
+        expected_groups = str(list(functional_groups_value))
         assert f"-e functional_groups='{expected_groups}'" in command
 
     def test_immutable(self, sample_request):

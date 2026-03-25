@@ -43,7 +43,7 @@ class TestNfsInputRepository:
         """Test getting source input repository path."""
         path = repository.get_source_input_repository_path(str(job_id))
 
-        expected = Path(f"/opt/omnia/build_stream/{job_id}/input")
+        expected = Path(f"/opt/omnia/build_stream_root/{job_id}/input")
         assert path == expected
         assert isinstance(path, Path)
 

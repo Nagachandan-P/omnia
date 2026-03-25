@@ -22,11 +22,37 @@ import the app directly (it runs the server as a subprocess).
 # pylint: disable=redefined-outer-name,global-statement,import-outside-toplevel,protected-access
 
 import base64
+import os
 import sys
 from pathlib import Path
 from typing import Dict, Generator
 
 import pytest
+
+# Set DATABASE_URL early for test environment
+os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+
+# Patch JWT exceptions for compatibility with newer PyJWT versions
+# This must be done before any imports of jwt.exceptions
+import jwt.exceptions
+if not hasattr(jwt.exceptions, 'DecodeError'):
+    jwt.exceptions.DecodeError = jwt.exceptions.JWTDecodeError
+if not hasattr(jwt.exceptions, 'ExpiredSignatureError'):
+    class ExpiredSignatureError(jwt.exceptions.JWTDecodeError):
+        """Alias for expired signature errors."""
+    jwt.exceptions.ExpiredSignatureError = ExpiredSignatureError
+if not hasattr(jwt.exceptions, 'InvalidAudienceError'):
+    class InvalidAudienceError(jwt.exceptions.JWTDecodeError):
+        """Alias for invalid audience errors."""
+    jwt.exceptions.InvalidAudienceError = InvalidAudienceError
+if not hasattr(jwt.exceptions, 'InvalidIssuerError'):
+    class InvalidIssuerError(jwt.exceptions.JWTDecodeError):
+        """Alias for invalid issuer errors."""
+    jwt.exceptions.InvalidIssuerError = InvalidIssuerError
+if not hasattr(jwt.exceptions, 'InvalidSignatureError'):
+    class InvalidSignatureError(jwt.exceptions.JWTDecodeError):
+        """Alias for invalid signature errors."""
+    jwt.exceptions.InvalidSignatureError = InvalidSignatureError
 
 # Note: pythonpath is set in pytest.ini at project root
 
