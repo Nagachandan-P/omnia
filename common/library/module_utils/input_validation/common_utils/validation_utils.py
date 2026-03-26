@@ -615,11 +615,8 @@ def is_interface_up(interface: str) -> bool:
         bool: True if interface is up, False otherwise
     """
     try:
-        result = subprocess.run(
-            ["ip", "link", "show", interface], capture_output=True, text=True, check=True
-        )
-        # Look for "state UP" or flags containing UP
-        return " state UP " in result.stdout or "<" in result.stdout and "UP" in result.stdout.split("<",1)[1].split(">",1)[0].split(",")
+        with open(f"/sys/class/net/{interface}/operstate", "r", encoding="utf-8") as f:
+            return f.read().strip() == "up"
     except Exception:
         return False
 
