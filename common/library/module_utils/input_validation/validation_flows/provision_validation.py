@@ -1007,6 +1007,17 @@ def _validate_admin_network(network):
     oim_nic_name = admin_net.get("oim_nic_name", "")
     netmask_bits = admin_net.get("netmask_bits", "")
 
+    # Ensure admin NIC is up
+    if oim_nic_name:
+        if not validation_utils.is_interface_up(oim_nic_name):
+            errors.append(
+                create_error_msg(
+                    "admin_network.oim_nic_name",
+                    oim_nic_name,
+                    en_us_validation_msg.ADMIN_NIC_DOWN_MSG.format(nic=oim_nic_name),
+                )
+            )
+
     # Validate netmask_bits
     if "netmask_bits" in admin_net:
         netmask = admin_net["netmask_bits"]
