@@ -43,8 +43,9 @@ Migration strategy (create-copy-switch):
       - **RPM**: ``pulp rpm copy --config '<json>'`` (CLI has a copy command).
       - **File**: Pulp REST API ``POST <repo_href>modify/`` with
         ``add_content_units`` (File CLI has no copy/modify subcommand).
-      - **Python**: New repo is created empty; content re-populates on next
-        sync (pip_module repos are single-file uploads).
+      - **Python**: Pulp REST API ``POST <repo_href>modify/`` with
+        ``add_content_units`` (Python CLI has no copy/modify subcommand),
+        followed by ``pulp python publication create`` for the new repo.
 """
 
 import json
@@ -371,6 +372,32 @@ def _list_repo_content_via_api(version_href: str, logger) -> Optional[List[str]]
         return None
 
     uri = f"/pulp/api/v3/content/file/files/?repository_version={version_href}&limit=1000"
+    result = _pulp_api_get(creds["base_url"], creds["username"],
+                           creds["password"], uri, logger)
+
+    if not result["ok"]:
+        return None
+
+    body = result["body"]
+    results_list = body.get("results", [])
+    return [c.get("pulp_href", "") for c in results_list if c.get("pulp_href")]
+
+
+def _list_python_repo_content_via_api(version_href: str, logger) -> Optional[List[str]]:
+    """List content hrefs for a Python repository version via Pulp REST API.
+
+    The ``pulp python content list`` CLI does **not** support
+    ``--repository-version`` filtering, so we use the REST API directly:
+    ``GET /pulp/api/v3/content/python/packages/?repository_version=<href>&limit=1000``
+
+    Returns a list of content ``pulp_href`` strings, or ``None`` on failure.
+    """
+    creds = _load_pulp_credentials(logger)
+    if not creds:
+        logger.error("Cannot list Python repo content: no Pulp credentials")
+        return None
+
+    uri = f"/pulp/api/v3/content/python/packages/?repository_version={version_href}&limit=1000"
     result = _pulp_api_get(creds["base_url"], creds["username"],
                            creds["password"], uri, logger)
 
@@ -906,12 +933,14 @@ def migrate_python_repos(os_type: str, os_version: str, dry_run: bool,
 
     For each old-format Python repo:
       1. Create a new Python repository with the new name.
-      2. Create a new distribution with the new name and updated base_path.
-      3. Delete the old distribution and repository.
+      2. Copy content from old repo to new repo via REST API.
+      3. Create a new publication for the new repo.
+      4. Delete old distribution (base_path must be unique).
+      5. Create a new distribution with the new name and updated base_path.
+      6. Delete the old repository and other entities.
 
-    Note: Python repos in this codebase are single-file uploads (pip_module),
-    so content copy is handled by creating the repo and letting the next sync
-    populate it. The old repo is deleted after the new one is created.
+    Python repos contain pip wheel packages that were uploaded via the local
+    repo process. Content is preserved by copying via REST API.
     """
     results = []
 
@@ -969,7 +998,64 @@ def migrate_python_repos(os_type: str, os_version: str, dry_run: bool,
                             "message": f"Create failed: {create_res['stderr']}"})
             continue
 
-        # -- Step 2: Delete old distribution FIRST (base_path must be unique)
+        # Get the new repository href
+        new_repo_info = safe_json_parse(create_res.get("stdout", ""), default=None)
+        new_repo_href = new_repo_info.get("pulp_href", "") if new_repo_info else ""
+
+        # -- Step 2: Copy content from old repo to new repo ---------------
+        old_repo_info = safe_json_parse(
+            run_cmd(pulp_python_commands["show_repository"] % shlex.quote(old_name), logger
+                    ).get("stdout", ""), default=None
+        )
+        copy_ok = False
+        if old_repo_info:
+            version_href = old_repo_info.get("latest_version_href", "")
+            if version_href and not version_href.endswith("/versions/0/"):
+                # Use REST API to list Python content
+                hrefs = _list_python_repo_content_via_api(version_href, logger)
+                if hrefs is not None:
+                    if hrefs and new_repo_href:
+                        copy_ok = _modify_repo_content_via_api(
+                            new_repo_href, hrefs, logger
+                        )
+                        if copy_ok:
+                            logger.info("[Python %d/%d] Copied %d content units from '%s' to '%s'",
+                                        idx, len(old_repos), len(hrefs), old_name, new_name)
+                    elif not hrefs:
+                        copy_ok = True  # No content hrefs found but ok
+                        logger.info("[Python %d/%d] No content to copy for '%s'",
+                                    idx, len(old_repos), old_name)
+                    else:
+                        logger.error("Cannot determine new repo href for '%s'", new_name)
+                else:
+                    logger.warning("Failed to list content for '%s' via REST API",
+                                   old_name)
+                    copy_ok = True  # Proceed with empty new repo
+            else:
+                copy_ok = True  # Empty repo
+                logger.info("[Python %d/%d] Old repo '%s' is empty (no content)",
+                            idx, len(old_repos), old_name)
+        else:
+            copy_ok = True  # Cannot read old repo info
+
+        if not copy_ok:
+            run_cmd(pulp_python_commands["delete_repository"] % shlex.quote(new_name), logger)
+            results.append({"name": old_name, "new_name": new_name,
+                            "type": "python_repository", "status": "Failed",
+                            "message": "Content copy failed; rolled back"})
+            continue
+
+        # -- Step 3: Create new publication --------------------------------
+        pub_cmd = f"pulp python publication create --repository {shlex.quote(new_name)}"
+        pub_res = run_cmd(pub_cmd, logger)
+        if pub_res["rc"] != 0:
+            logger.warning("Publication creation for '%s' failed: %s",
+                           new_name, pub_res["stderr"])
+        else:
+            logger.info("[Python %d/%d] Created publication for '%s'",
+                        idx, len(old_repos), new_name)
+
+        # -- Step 4: Delete old distribution FIRST (base_path must be unique)
         #    Python repo base_paths use the package name, not the repo name,
         #    so old and new base_paths are identical.  Pulp enforces unique
         #    base_path, so the old distribution must be removed before
@@ -977,7 +1063,7 @@ def migrate_python_repos(os_type: str, os_version: str, dry_run: bool,
         if "delete_distribution" in pulp_python_commands:
             run_cmd(pulp_python_commands["delete_distribution"] % shlex.quote(old_name), logger)
 
-        # -- Step 3: Create new distribution with updated base_path -------
+        # -- Step 5: Create new distribution with updated base_path -------
         arch = None
         for a in ARCH_SUFFIXES:
             if old_name.startswith(f"{a}_"):
@@ -1000,7 +1086,7 @@ def migrate_python_repos(os_type: str, os_version: str, dry_run: bool,
                 logger.warning("Distribution creation for '%s' failed: %s",
                                new_name, dist_res["stderr"])
 
-        # -- Step 4: Delete remaining old entities (repo) -----------------
+        # -- Step 6: Delete remaining old entities (repo) -----------------
         #    Distribution already deleted above; _delete_old_repo_entities
         #    handles the rest (best-effort, skips if already gone).
         _delete_old_repo_entities("python", old_name, logger)
@@ -1285,19 +1371,30 @@ def regenerate_yum_repo_file(logger) -> Dict[str, Any]:
 # ============================================================================
 
 def format_migration_table(results: List[Dict[str, Any]]) -> str:
-    """Format migration results as a pretty table."""
+    """Format migration results as a pretty table.
+
+    Column width limits:
+    - Old Name / New Name: up to 80 chars to accommodate arch_os_version_package format
+    - Type: no limit (typically short)
+    - Status: no limit (typically short)
+    - Message: up to 50 chars
+    """
     if not results:
         return "No migration actions performed."
+
+    # Max width limits for each column to prevent excessively wide tables
+    max_name_width = 80
+    max_message_width = 50
 
     headers = ["Old Name", "New Name", "Type", "Status", "Message"]
     widths = [len(h) for h in headers]
 
     for r in results:
-        widths[0] = max(widths[0], min(len(str(r.get("name", ""))), 50))
-        widths[1] = max(widths[1], min(len(str(r.get("new_name", r.get("name", "")))), 50))
+        widths[0] = max(widths[0], min(len(str(r.get("name", ""))), max_name_width))
+        widths[1] = max(widths[1], min(len(str(r.get("new_name", r.get("name", "")))), max_name_width))
         widths[2] = max(widths[2], len(str(r.get("type", ""))))
         widths[3] = max(widths[3], len(str(r.get("status", ""))))
-        widths[4] = max(widths[4], min(len(str(r.get("message", ""))), 40))
+        widths[4] = max(widths[4], min(len(str(r.get("message", ""))), max_message_width))
 
     border = "+" + "+".join("-" * (w + 2) for w in widths) + "+"
     header_row = "|" + "|".join(
@@ -1306,11 +1403,11 @@ def format_migration_table(results: List[Dict[str, Any]]) -> str:
 
     lines = [border, header_row, border]
     for r in results:
-        old = str(r.get("name", ""))[:50]
-        new = str(r.get("new_name", r.get("name", "")))[:50]
+        old = str(r.get("name", ""))[:max_name_width]
+        new = str(r.get("new_name", r.get("name", "")))[:max_name_width]
         rtype = str(r.get("type", ""))
         status = str(r.get("status", ""))
-        msg = str(r.get("message", ""))[:40]
+        msg = str(r.get("message", ""))[:max_message_width]
         row = "|" + "|".join([
             f" {old.ljust(widths[0])} ",
             f" {new.ljust(widths[1])} ",
@@ -1412,8 +1509,7 @@ def run_module():
             module.exit_json(
                 changed=changed,
                 msg=(f"Migration completed: {success_count} renamed, "
-                     f"{skipped_count} skipped."
-                     f"See {log_dir}/{LOG_FILENAME} for details."),
+                     f"{skipped_count} skipped."),
                 results=all_results,
                 summary_table=table,
             )
