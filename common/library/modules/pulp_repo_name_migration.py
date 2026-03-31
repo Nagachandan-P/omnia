@@ -1509,7 +1509,8 @@ def run_module():
             module.exit_json(
                 changed=changed,
                 msg=(f"Migration completed: {success_count} renamed, "
-                     f"{skipped_count} skipped."),
+                     f"{skipped_count} skipped."
+                     f"See {log_dir}/{LOG_FILENAME} for details."),
                 results=all_results,
                 summary_table=table,
             )
