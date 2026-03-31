@@ -31,11 +31,6 @@
     log_dir: "{{ base_path }}/{{ cluster_os_type }}/{{ cluster_os_version }}"
   register: migration_result
 
-- name: Display migration summary
-  ansible.builtin.debug:
-    msg: "{{ migration_result.summary_table }}"
-  when: migration_result.summary_table is defined
-
 - name: Display migration result
   ansible.builtin.debug:
     msg: "{{ migration_result.msg }}"
