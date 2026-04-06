@@ -18,12 +18,13 @@
 # Telemetry Stack Cleanup Script
 # Removes Kafka, LDMS, iDRAC telemetry, and monitoring resources from the {{ telemetry_namespace }} namespace
 #
-# Usage: ./cleanup_telemetry.sh [kafka] [ldms] [idrac] [victoria] [all]
-#   kafka    - Delete Kafka cluster, users, and bridge
-#   ldms     - Delete LDMS aggregator and store
-#   idrac    - Delete iDRAC telemetry
-#   victoria - Delete VictoriaMetrics monitoring
-#   all      - Delete everything (default if no arguments)
+# Usage: ./cleanup_telemetry.sh [kafka] [ldms] [idrac] [victoria] [powerscale] [all]
+#   kafka      - Delete Kafka cluster, users, and bridge
+#   ldms       - Delete LDMS aggregator and store
+#   idrac      - Delete iDRAC telemetry
+#   victoria   - Delete VictoriaMetrics monitoring
+#   powerscale - Delete PowerScale telemetry (CSM Metrics, OTEL Collector, vmagent-powerscale)
+#   all        - Delete everything (default if no arguments)
 #
 
 set -e
@@ -35,6 +36,7 @@ CLEAN_KAFKA=false
 CLEAN_LDMS=false
 CLEAN_IDRAC=false
 CLEAN_VICTORIA=false
+CLEAN_POWERSCALE=false
 CLEAN_ALL=false
 
 if [ $# -eq 0 ]; then
@@ -53,6 +55,9 @@ else
                 ;;
             victoria)
                 CLEAN_VICTORIA=true
+                ;;
+            powerscale)
+                CLEAN_POWERSCALE=true
                 ;;
             all)
                 CLEAN_ALL=true
@@ -89,6 +94,7 @@ if [ "$CLEAN_ALL" = true ]; then
     CLEAN_LDMS=true
     CLEAN_IDRAC=true
     CLEAN_VICTORIA=true
+    CLEAN_POWERSCALE=true
 fi
 
 echo "=========================================="
@@ -101,6 +107,7 @@ echo "  Kafka Cluster:   $([ "$CLEAN_KAFKA" = true ] && echo "YES" || echo "NO")
 echo "  LDMS:            $([ "$CLEAN_LDMS" = true ] && echo "YES" || echo "NO")"
 echo "  iDRAC Telemetry: $([ "$CLEAN_IDRAC" = true ] && echo "YES" || echo "NO")"
 echo "  Victoria Metrics:$([ "$CLEAN_VICTORIA" = true ] && echo "YES" || echo "NO")"
+echo "  PowerScale Tel.: $([ "$CLEAN_POWERSCALE" = true ] && echo "YES" || echo "NO")"
 echo ""
 read -p "Continue? (y/N): " -n 1 -r
 echo
@@ -242,6 +249,10 @@ if [ "$CLEAN_KAFKA" = true ] || [ "$CLEAN_LDMS" = true ] || [ "$CLEAN_IDRAC" = t
             delete_resource pvc vmstorage-data-vmstorage-$i
         done
     fi
+    if [ "$CLEAN_POWERSCALE" = true ]; then
+        # Delete OTEL Collector PVCs
+        delete_all pvc "app=otel-collector-powerscale"
+    fi
     sleep 2
     echo ""
 fi
@@ -372,6 +383,39 @@ if [ "$CLEAN_VICTORIA" = true ]; then
     echo ""
 fi
 
+if [ "$CLEAN_POWERSCALE" = true ]; then
+    echo "Step: Delete PowerScale Telemetry"
+    echo "----------------------------------"
+
+    # Delete metrics pipeline components
+    echo "Deleting CSM Metrics PowerScale..."
+    delete_all deployment "app=csm-metrics-powerscale"
+    delete_all service "app=csm-metrics-powerscale"
+    delete_all configmap "app=csm-metrics-powerscale"
+    delete_all pod "app=csm-metrics-powerscale"
+
+    echo "Deleting OTEL Collector PowerScale..."
+    delete_all deployment "app=otel-collector-powerscale"
+    delete_all service "app=otel-collector-powerscale"
+    delete_all configmap "app=otel-collector-powerscale"
+    delete_all pod "app=otel-collector-powerscale"
+
+    # Note: vmagent is shared with iDRAC telemetry - not deleted here.
+    # PowerScale scrape targets are removed from vmagent config on next deployment.
+
+    # Delete Karavi-specific resources (if deployed)
+    echo "Deleting Karavi Authorization resources..."
+    delete_resource configmap karavi-authorization-config
+    delete_resource secret karavi-authorization-ca-cert
+
+    # Delete PowerScale credentials
+    echo "Deleting PowerScale credentials..."
+    delete_resource secret isilon-creds
+
+    sleep 2
+    echo ""
+fi
+
 echo ""
 echo "Step 13: Force Delete Any Remaining Component Pods"
 echo "---------------------------------------------------"
@@ -394,6 +438,10 @@ if [ "$CLEAN_VICTORIA" = true ]; then
     kubectl -n $NAMESPACE delete pod -l app=vmstorage --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
     kubectl -n $NAMESPACE delete pod -l app=vmagent --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
     kubectl -n $NAMESPACE delete pod -l app=victoria-tls-test --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
+fi
+if [ "$CLEAN_POWERSCALE" = true ]; then
+    kubectl -n $NAMESPACE delete pod -l app=csm-metrics-powerscale --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
+    kubectl -n $NAMESPACE delete pod -l app=otel-collector-powerscale --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
 fi
 sleep 5
 
@@ -427,6 +475,14 @@ if [ "$CLEAN_VICTORIA" = true ]; then
     kubectl -n $NAMESPACE get statefulset,pod -l app=vmstorage 2>/dev/null || echo "    None"
     echo "  vmagent:"
     kubectl -n $NAMESPACE get deployment,pod -l app=vmagent 2>/dev/null || echo "    None"
+    echo ""
+fi
+if [ "$CLEAN_POWERSCALE" = true ]; then
+    echo "Remaining PowerScale telemetry resources:"
+    echo "  CSM Metrics:"
+    kubectl -n $NAMESPACE get deployment,pod -l app=csm-metrics-powerscale 2>/dev/null || echo "    None"
+    echo "  OTEL Collector:"
+    kubectl -n $NAMESPACE get deployment,pod -l app=otel-collector-powerscale 2>/dev/null || echo "    None"
     echo ""
 fi
 echo "Remaining PVCs:"

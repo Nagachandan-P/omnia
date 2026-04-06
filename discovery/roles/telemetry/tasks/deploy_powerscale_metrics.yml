@@ -1,0 +1,104 @@
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+
+- name: Validate CSI driver PowerScale is configured
+  ansible.builtin.assert:
+    that:
+      - hostvars['localhost']['csi_driver_powerscale_support'] | default(false) | bool
+    fail_msg: >-
+      PowerScale telemetry requires csi_driver_powerscale to be configured in software_config.json.
+      Please add csi_driver_powerscale to software_config.json and re-run.
+
+- name: Load CSM Observability values.yaml
+  block:
+    - name: Read CSM Observability values.yaml
+      ansible.builtin.include_vars:
+        file: "{{ hostvars['localhost']['csm_observability_values_file_path'] }}"
+        name: csm_observability_values
+      no_log: true
+  rescue:
+    - name: Failed to read CSM Observability values.yaml
+      ansible.builtin.fail:
+        msg: >-
+          Failed to read CSM Observability values.yaml from
+          '{{ hostvars['localhost']['csm_observability_values_file_path'] }}'.
+          Please verify the file exists and contains valid YAML.
+
+- name: Detect authentication mode from CSM Observability values
+  ansible.builtin.set_fact:
+    karavi_enabled: >-
+      {{ csm_observability_values.karaviMetricsPowerscale.authorization.enabled | default(false) | bool }}
+    karavi_proxy_host: >-
+      {{ csm_observability_values.karaviMetricsPowerscale.authorization.proxyHost | default('') }}
+    karavi_skip_cert_validation: >-
+      {{ csm_observability_values.karaviMetricsPowerscale.authorization.skipCertificateValidation | default('true') }}
+
+- name: Display authentication mode
+  ansible.builtin.debug:
+    msg: >-
+      PowerScale telemetry authentication mode:
+      {% if karavi_enabled | bool %}Karavi Authorization (Mode B){% else %}Direct Authentication (Mode A){% endif %}
+
+- name: Extract container image versions from CSM Observability values
+  ansible.builtin.set_fact:
+    csm_metrics_powerscale_image: >-
+      {{ csm_observability_values.karaviMetricsPowerscale.image | default('quay.io/dell/container-storage-modules/csm-metrics-powerscale:v1.11.0') }}
+    otel_collector_image: >-
+      {{ csm_observability_values.otelCollector.image | default('ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector:0.146.1') }}
+    nginx_proxy_image: >-
+      {{ csm_observability_values.otelCollector.nginxProxy.image | default('nginxinc/nginx-unprivileged:1.29') }}
+    karavi_sidecar_image: >-
+      {{ csm_observability_values.karaviMetricsPowerscale.authorization.sidecarProxy.image
+      | default('quay.io/dell/container-storage-modules/csm-authorization-sidecar:v2.4.0') }}
+
+- name: Load CSI PowerScale credentials from vault
+  block:
+    - name: Read CSI driver secret.yaml
+      ansible.builtin.include_vars:
+        file: "{{ hostvars['localhost']['csi_powerscale_driver_secret_file_path'] }}"
+        name: csi_powerscale_secret
+      no_log: true
+
+    - name: Extract isilon clusters from secret
+      ansible.builtin.set_fact:
+        ps_clusters: "{{ csi_powerscale_secret.isilonClusters | default([]) }}"
+      no_log: true
+  rescue:
+    - name: Failed to load CSI PowerScale credentials
+      ansible.builtin.fail:
+        msg: >-
+          Failed to load CSI PowerScale driver secret from
+          '{{ hostvars['localhost']['csi_powerscale_driver_secret_file_path'] }}'.
+          Please verify the file exists and contains valid isilonClusters configuration.
+
+- name: Fail if no PowerScale clusters defined
+  ansible.builtin.fail:
+    msg: >-
+      No PowerScale clusters found in CSI driver secret.yaml.
+      Please define at least one cluster in isilonClusters.
+  when: ps_clusters | length == 0
+
+- name: Display PowerScale clusters found
+  ansible.builtin.debug:
+    msg: >-
+      Found {{ ps_clusters | length }} PowerScale cluster(s) for telemetry deployment.
+      PowerScale metrics will be scraped by the shared vmagent (no separate vmagent-powerscale).
+
+- name: Generate per-cluster manifests
+  ansible.builtin.include_tasks: deploy_powerscale_cluster.yml
+  loop: "{{ ps_clusters }}"
+  loop_control:
+    index_var: cluster_index
+    loop_var: ps_cluster

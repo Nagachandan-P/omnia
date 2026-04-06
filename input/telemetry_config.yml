@@ -258,3 +258,88 @@ ldms_sampler_configurations:
   - plugin_name: procnetdev2
     config_parameters: ""  # Monitor all interfaces
     activation_parameters: "interval=30000000 offset=0"  # interval=30000000 microseconds (30 seconds), offset=0
+
+# ============================================================================
+# POWERSCALE TELEMETRY CONFIGURATION
+# ============================================================================
+# PowerScale telemetry collects storage metrics from Dell PowerScale (OneFS)
+# clusters using the CSM (Container Storage Modules) Metrics PowerScale exporter.
+#
+# DATA PIPELINE:
+#   CSM Metrics PowerScale → OTEL Collector → vmagent-powerscale → VictoriaMetrics
+#
+# Metrics collected: capacity, performance, topology, and quota metrics via
+# OneFS REST API. Metrics are processed through an OpenTelemetry Collector
+# and ingested into the shared VictoriaMetrics cluster (same as iDRAC telemetry).
+#
+# AUTHENTICATION MODES (auto-detected from CSM Observability values.yaml):
+#   - Direct Authentication: CSM Metrics connects directly to PowerScale using
+#     credentials from the CSI driver secret.yaml (isilon-creds)
+#   - Karavi Authorization: CSM Metrics connects via Karavi Authorization Proxy
+#     sidecar with token-based authentication
+#
+# PREREQUISITES:
+#   - csi_driver_powerscale must be configured in software_config.json
+#   - Service cluster must be defined in functional_groups_config.yml
+#   - VictoriaMetrics must be enabled: 'victoria' must be included in
+#     idrac_telemetry_collection_type (e.g., "victoria" or "victoria,kafka")
+#   - CSI driver secret.yaml with valid isilonClusters credentials
+#   - CSM Observability values.yaml must be provided
+#
+# STORAGE REQUIREMENTS:
+# ┌─────────────────────┬──────────────┬──────────────┬──────────────────┐
+# │ Component           │ Per-Pod PVC  │ Pods         │ Total Storage    │
+# ├─────────────────────┼──────────────┼──────────────┼──────────────────┤
+# │ OTEL Collector      │ 5Gi          │ 1 per cluster│ 5Gi per cluster  │
+# ├─────────────────────┼──────────────┼──────────────┼──────────────────┤
+# │ vmagent-powerscale  │ 10Gi         │ 1 (shared)   │ 10Gi             │
+# ├─────────────────────┼──────────────┼──────────────┼──────────────────┤
+# │ TOTAL (1 cluster)   │              │              │ 15Gi             │
+# └─────────────────────┴──────────────┴──────────────┴──────────────────┘
+
+# Enable or disable PowerScale telemetry support
+# Accepted values: true or false
+# Default: false
+powerscale_telemetry_support: false
+
+# Enable or disable PowerScale log collection (syslog → VictoriaLogs)
+# Requires powerscale_telemetry_support: true
+# Accepted values: true or false
+# Default: false
+powerscale_log_enabled: false
+
+powerscale_configurations:
+  # PVC size for vmagent-powerscale buffer and WAL (Write-Ahead Log)
+  # vmagent buffers metrics locally before remote-writing to VictoriaMetrics.
+  # Larger PVC allows longer buffering during vminsert outages.
+  # Accepted values: in the form of "X[Ki|Mi|Gi|Ti|Pi|Ei]"
+  # Default: "10Gi"
+  vmagent_storage_size: "10Gi"
+
+  # PVC size for each OTEL Collector instance (one per PowerScale cluster)
+  # OTEL Collector uses this for metric batching and buffering.
+  # Accepted values: in the form of "X[Ki|Mi|Gi|Ti|Pi|Ei]"
+  # Default: "5Gi"
+  otel_collector_storage_size: "5Gi"
+
+  # Path to the CSM Observability (Karavi Observability) values.yaml file.
+  # This file provides:
+  #   - Container image versions for CSM Metrics, OTEL Collector, and Karavi sidecar
+  #   - Authentication settings (Direct vs. Karavi Authorization)
+  #   - Poll frequencies for each metric domain
+  #   - ISI client options for PowerScale OneFS API
+  # Required when powerscale_telemetry_support: true
+  # Reference: https://github.com/dell/helm-charts/blob/main/charts/karavi-observability/values.yaml
+  csm_observability_values_file_path: ""
+
+  # Additional VictoriaMetrics remote_write endpoints (optional)
+  # vmagent will write the same PowerScale metrics to ALL configured endpoints.
+  # Each endpoint receives an identical copy of all metrics.
+  # The primary Omnia VictoriaMetrics endpoint (vminsert) is always included automatically.
+  # Format: list of URL strings with optional TLS settings
+  # Default: [] (empty — only the primary Omnia VictoriaMetrics endpoint is used)
+  # Example:
+  #   additional_remote_write_endpoints:
+  #     - url: "https://external-victoria.example.com:8480/insert/0/prometheus/api/v1/write"
+  #       tls_insecure_skip_verify: true
+  additional_remote_write_endpoints: []

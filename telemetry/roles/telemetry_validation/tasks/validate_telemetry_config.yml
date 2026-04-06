@@ -43,6 +43,8 @@
 - name: Set support values
   ansible.builtin.set_fact:
     idrac_telemetry_support: "{{ idrac_telemetry_support | lower }}"
+    powerscale_telemetry_support: "{{ powerscale_telemetry_support | default(false) | lower }}"
+    csm_observability_values_file_path: "{{ powerscale_configurations.csm_observability_values_file_path | default('') }}"
 
 - name: Warning for idrac_telemetry_support is currently set to false
   ansible.builtin.pause:
@@ -55,3 +57,14 @@
     seconds: "{{ pause_time_15 }}"
     prompt: "{{ warning_idrac_telemetry_support_true }}"
   when: idrac_telemetry_support
+
+- name: Display PowerScale telemetry disabled warning
+  ansible.builtin.debug:
+    msg: "{{ warning_powerscale_telemetry_support_false }}"
+  when: not (powerscale_telemetry_support | default(false) | bool)
+
+- name: Warning for powerscale_telemetry_support is currently set to true
+  ansible.builtin.pause:
+    seconds: "{{ pause_time_15 }}"
+    prompt: "{{ warning_powerscale_telemetry_support_true }}"
+  when: powerscale_telemetry_support | default(false) | bool

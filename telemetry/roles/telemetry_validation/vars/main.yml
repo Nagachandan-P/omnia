@@ -39,6 +39,18 @@ warning_idrac_telemetry_support_true: |
   Make sure that Redfish is enabled and the iDRAC has a datacenter license.
   Also, ensure that the firmware version is greater than 4 for iDRAC9 or greater than 1 for iDRAC10."
 
+# Usage: validate_telemetry_config.yml - PowerScale telemetry
+warning_powerscale_telemetry_support_false: |
+  "[WARNING] PowerScale telemetry is disabled (powerscale_telemetry_support: false).
+  No PowerScale metrics or logs are being collected.
+  To enable, set powerscale_telemetry_support: true in telemetry_config.yml and re-run the playbook."
+warning_powerscale_telemetry_support_true: |
+  "[WARNING] PowerScale telemetry is enabled (powerscale_telemetry_support: true).
+  PowerScale telemetry pipeline will collect capacity, performance, topology, and quota metrics
+  from PowerScale OneFS cluster(s) via the CSM Metrics PowerScale exporter.
+  Data pipeline: CSM Metrics PowerScale -> OTEL Collector -> vmagent-powerscale -> VictoriaMetrics.
+  Authentication mode is auto-detected from CSM Observability values.yaml."
+
 # Usage: validate_idrac_inventory.yml
 service_cluster_md_not_found_msg: >
   Service cluster metadata file '{{ service_cluster_metadata_path }}' does not exist.

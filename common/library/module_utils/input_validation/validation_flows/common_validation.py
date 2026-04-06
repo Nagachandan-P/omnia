@@ -1597,7 +1597,160 @@ def validate_telemetry_config(
                         f"'{plugin_name}'",
                         "plugin_name cannot be empty. Must be one of: meminfo, procstat2, vmstat, loadavg, slurm_sampler, procnetdev2"
                     ))
-    
+
+    # Validate PowerScale telemetry configuration
+    powerscale_telemetry_support = data.get("powerscale_telemetry_support", False)
+
+    if powerscale_telemetry_support:
+        logger.info("PowerScale telemetry support is enabled, performing PowerScale validation")
+
+        # Check victoria is in idrac_telemetry_collection_type
+        # PowerScale telemetry pipeline requires VictoriaMetrics (writes to vminsert via shared vmagent)
+        collection_types = [t.strip() for t in idrac_telemetry_collection_type.split(',')]
+        if 'victoria' not in collection_types:
+            errors.append(create_error_msg(
+                "idrac_telemetry_collection_type",
+                idrac_telemetry_collection_type,
+                en_us_validation_msg.POWERSCALE_VICTORIA_REQUIRED_MSG
+            ))
+
+        # Check CSI driver PowerScale is in software_config.json
+        csi_powerscale_found = False
+        if os.path.exists(software_config_file_path):
+            try:
+                with open(software_config_file_path, 'r', encoding='utf-8') as f:
+                    software_config = json.load(f)
+                    softwares = software_config.get("softwares", [])
+                    csi_powerscale_found = any(
+                        software.get("name") == "csi_driver_powerscale" for software in softwares
+                    )
+            except (json.JSONDecodeError, IOError) as e:
+                logger.warn(f"Could not load software_config.json for PowerScale validation: {e}")
+
+        if not csi_powerscale_found:
+            errors.append(create_error_msg(
+                "powerscale_telemetry_support",
+                powerscale_telemetry_support,
+                en_us_validation_msg.POWERSCALE_CSI_DRIVER_MISSING_MSG
+            ))
+
+        # Check service cluster is defined
+        if not is_service_cluster_defined:
+            errors.append(create_error_msg(
+                "powerscale_telemetry_support",
+                powerscale_telemetry_support,
+                en_us_validation_msg.POWERSCALE_SERVICE_CLUSTER_MISSING_MSG
+            ))
+
+        # Validate powerscale_configurations section
+        powerscale_config = data.get("powerscale_configurations")
+        if not powerscale_config:
+            errors.append(create_error_msg(
+                "powerscale_configurations",
+                "not defined",
+                en_us_validation_msg.POWERSCALE_CONFIGURATIONS_MISSING_MSG
+            ))
+        else:
+            # Validate vmagent_storage_size
+            vmagent_storage = powerscale_config.get("vmagent_storage_size", "")
+            if not vmagent_storage or not isinstance(vmagent_storage, str):
+                errors.append(create_error_msg(
+                    "powerscale_configurations.vmagent_storage_size",
+                    vmagent_storage,
+                    en_us_validation_msg.POWERSCALE_VMAGENT_STORAGE_SIZE_INVALID_MSG
+                ))
+
+            # Validate otel_collector_storage_size
+            otel_storage = powerscale_config.get("otel_collector_storage_size", "")
+            if not otel_storage or not isinstance(otel_storage, str):
+                errors.append(create_error_msg(
+                    "powerscale_configurations.otel_collector_storage_size",
+                    otel_storage,
+                    en_us_validation_msg.POWERSCALE_OTEL_STORAGE_SIZE_INVALID_MSG
+                ))
+
+            # Validate csm_observability_values_file_path
+            csm_values_path = powerscale_config.get("csm_observability_values_file_path", "")
+            if not csm_values_path or not isinstance(csm_values_path, str) or csm_values_path.strip() == "":
+                errors.append(create_error_msg(
+                    "powerscale_configurations.csm_observability_values_file_path",
+                    csm_values_path,
+                    en_us_validation_msg.POWERSCALE_CSM_VALUES_PATH_REQUIRED_MSG
+                ))
+            elif not os.path.exists(csm_values_path):
+                errors.append(create_error_msg(
+                    "powerscale_configurations.csm_observability_values_file_path",
+                    csm_values_path,
+                    en_us_validation_msg.powerscale_csm_values_not_found_msg(csm_values_path)
+                ))
+            else:
+                # Validate the CSM Observability values.yaml content
+                try:
+                    with open(csm_values_path, 'r', encoding='utf-8') as f:
+                        csm_values = yaml.safe_load(f)
+                    if not isinstance(csm_values, dict):
+                        errors.append(create_error_msg(
+                            "powerscale_configurations.csm_observability_values_file_path",
+                            csm_values_path,
+                            en_us_validation_msg.POWERSCALE_CSM_VALUES_INVALID_YAML_MSG
+                        ))
+                    else:
+                        # Validate required keys
+                        karavi_metrics = csm_values.get("karaviMetricsPowerscale", {})
+                        if not karavi_metrics:
+                            errors.append(create_error_msg(
+                                "csm_observability_values_file_path",
+                                csm_values_path,
+                                en_us_validation_msg.POWERSCALE_CSM_VALUES_MISSING_KARAVI_SECTION_MSG
+                            ))
+                        else:
+                            # Validate image reference exists
+                            if not karavi_metrics.get("image"):
+                                errors.append(create_error_msg(
+                                    "karaviMetricsPowerscale.image",
+                                    "not defined",
+                                    en_us_validation_msg.POWERSCALE_CSM_METRICS_IMAGE_MISSING_MSG
+                                ))
+
+                        otel_config = csm_values.get("otelCollector", {})
+                        if not otel_config or not otel_config.get("image"):
+                            errors.append(create_error_msg(
+                                "otelCollector.image",
+                                "not defined",
+                                en_us_validation_msg.POWERSCALE_OTEL_COLLECTOR_IMAGE_MISSING_MSG
+                            ))
+
+                        logger.info("CSM Observability values.yaml validation passed")
+                except (yaml.YAMLError, IOError) as e:
+                    errors.append(create_error_msg(
+                        "powerscale_configurations.csm_observability_values_file_path",
+                        csm_values_path,
+                        en_us_validation_msg.powerscale_csm_values_parse_error_msg(str(e))
+                    ))
+
+            # Validate additional_remote_write_endpoints
+            additional_endpoints = powerscale_config.get("additional_remote_write_endpoints", [])
+            if additional_endpoints and isinstance(additional_endpoints, list):
+                if len(additional_endpoints) > 5:
+                    logger.warn(f"More than 5 additional_remote_write_endpoints configured ({len(additional_endpoints)}). "
+                                "This may impact performance.")
+                for idx, endpoint in enumerate(additional_endpoints):
+                    if not isinstance(endpoint, dict):
+                        continue
+                    url = endpoint.get("url", "")
+                    if not url or not isinstance(url, str):
+                        errors.append(create_error_msg(
+                            f"powerscale_configurations.additional_remote_write_endpoints[{idx}].url",
+                            url,
+                            en_us_validation_msg.POWERSCALE_ADDITIONAL_ENDPOINTS_URL_EMPTY_MSG
+                        ))
+                    elif not url.startswith("http://") and not url.startswith("https://"):
+                        errors.append(create_error_msg(
+                            f"powerscale_configurations.additional_remote_write_endpoints[{idx}].url",
+                            url,
+                            en_us_validation_msg.POWERSCALE_ADDITIONAL_ENDPOINTS_URL_INVALID_MSG
+                        ))
+
     return errors
 
 def validate_additional_software(

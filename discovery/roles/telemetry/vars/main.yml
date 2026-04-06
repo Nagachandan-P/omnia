@@ -278,3 +278,12 @@ ldms_pod_not_ready_msg: "WARNING: LDMS aggregator pod did not become ready withi
 ldms_store_pod_ready_msg: "LDMS store daemon pod restarted successfully and is ready"
 ldms_store_pod_not_ready_msg: "LDMS store daemon pod restart failed or not ready within timeout"
 ldms_store_restart_wait_seconds: 10
+
+# ============================================================================
+# PowerScale Telemetry Configuration
+# ============================================================================
+# Usage: deploy_powerscale_metrics.yml
+# PowerScale manifests go into the shared telemetry/deployments/ directory
+# alongside iDRAC, Victoria, Kafka manifests - all managed by the common kustomization.yaml.j2
+# PowerScale metrics are scraped by the existing shared vmagent (no separate vmagent-powerscale)
+powerscale_deployments_dir: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/deployments"

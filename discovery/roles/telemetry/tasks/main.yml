@@ -70,3 +70,8 @@
   ansible.builtin.include_tasks: apply_telemetry_on_upgrade.yml
   when:
     - hostvars['localhost']['upgrade_enabled'] | default(false) | bool
+
+- name: Deploy PowerScale telemetry metrics
+  ansible.builtin.include_tasks: deploy_powerscale_metrics.yml
+  when:
+    - hostvars['localhost']['powerscale_telemetry_support'] | default(false) | bool

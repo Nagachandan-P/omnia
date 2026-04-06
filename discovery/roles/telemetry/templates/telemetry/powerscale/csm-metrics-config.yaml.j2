@@ -1,0 +1,31 @@
+#  Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: csm-metrics-powerscale-config-cluster{{ cluster_index }}
+  namespace: {{ telemetry_namespace }}
+data:
+  LOG_LEVEL: "{{ csm_observability_values.karaviMetricsPowerscale.logLevel | default('INFO') }}"
+  COLLECTOR_ADDR: "otel-collector-powerscale-cluster{{ cluster_index }}.{{ telemetry_namespace }}.svc.cluster.local:4317"
+  POWERSCALE_CAPACITY_METRICS_ENABLED: "{{ csm_observability_values.karaviMetricsPowerscale.capacityMetricsEnabled | default('true') }}"
+  POWERSCALE_PERFORMANCE_METRICS_ENABLED: "{{ csm_observability_values.karaviMetricsPowerscale.performanceMetricsEnabled | default('true') }}"
+  POWERSCALE_CLUSTER_CAPACITY_POLL_FREQUENCY: "{{ csm_observability_values.karaviMetricsPowerscale.clusterCapacityPollFrequencySeconds | default('30') }}"
+  POWERSCALE_CLUSTER_PERFORMANCE_POLL_FREQUENCY: "{{ csm_observability_values.karaviMetricsPowerscale.clusterPerformancePollFrequencySeconds | default('20') }}"
+  POWERSCALE_CLUSTER_TOPOLOGY_POLL_FREQUENCY: "{{ csm_observability_values.karaviMetricsPowerscale.topologyMetricsPollFrequencySeconds | default('30') }}"
+  POWERSCALE_CLUSTER_QUOTA_POLL_FREQUENCY: "{{ csm_observability_values.karaviMetricsPowerscale.quotaCapacityPollFrequencySeconds | default('30') }}"
+  POWERSCALE_MAX_CONCURRENT_QUERIES: "{{ csm_observability_values.karaviMetricsPowerscale.concurrentPowerscaleQueries | default('10') }}"
+  POWERSCALE_ISICLIENT_INSECURE: "{{ csm_observability_values.karaviMetricsPowerscale.isiClientOptions.isiSkipCertificateValidation | default('true') }}"
+  POWERSCALE_ISICLIENT_AUTH_TYPE: "{{ csm_observability_values.karaviMetricsPowerscale.isiClientOptions.isiAuthType | default('1') }}"
+  POWERSCALE_ISICLIENT_VERBOSE: "{{ csm_observability_values.karaviMetricsPowerscale.isiClientOptions.isiLogVerbose | default('0') }}"
