@@ -315,6 +315,19 @@ POWERSCALE_ADDITIONAL_ENDPOINTS_URL_EMPTY_MSG = (
 POWERSCALE_ADDITIONAL_ENDPOINTS_URL_INVALID_MSG = (
     "URL must start with 'http://' or 'https://'."
 )
+def powerscale_image_version_mismatch_msg(image_name, values_image, service_k8s_image):
+    """Returns error message when CSM values.yaml image version doesn't match service_k8s.json."""
+    return (
+        f"Image version mismatch for '{image_name}': "
+        f"CSM Observability values.yaml has '{values_image}' but "
+        f"service_k8s.json has '{service_k8s_image}'. "
+        f"Please update service_k8s.json to match the values.yaml version "
+        f"and re-run local_repo.yml to mirror the correct image to Pulp."
+    )
+POWERSCALE_SERVICE_K8S_JSON_NOT_FOUND_MSG = (
+    "service_k8s.json not found. Cannot validate PowerScale telemetry image versions. "
+    "Please ensure local_repo.yml has been executed."
+)
 
 def boolean_fail_msg(value):
     """Returns a formatted message indicating boolean_fail_msg."""

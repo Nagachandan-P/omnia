@@ -1711,6 +1711,108 @@ def validate_telemetry_config(
                                 en_us_validation_msg.POWERSCALE_OTEL_COLLECTOR_IMAGE_MISSING_MSG
                             ))
 
+                        # Cross-validate image versions between values.yaml and service_k8s.json
+                        service_k8s_json_path = os.path.join(
+                            input_dir, "config", "x86_64",
+                            data.get("cluster_os_type", "rhel") if "cluster_os_type" in data else "rhel",
+                            data.get("cluster_os_version", "10.0") if "cluster_os_version" in data else "10.0",
+                            "service_k8s.json"
+                        )
+                        # Try reading cluster_os_type/version from software_config.json
+                        if os.path.exists(software_config_file_path):
+                            try:
+                                with open(software_config_file_path, 'r', encoding='utf-8') as scf:
+                                    sc_data = json.load(scf)
+                                    sc_os_type = sc_data.get("cluster_os_type", "rhel")
+                                    sc_os_version = sc_data.get("cluster_os_version", "10.0")
+                                    service_k8s_json_path = os.path.join(
+                                        input_dir, "config", "x86_64",
+                                        sc_os_type, sc_os_version, "service_k8s.json"
+                                    )
+                            except (json.JSONDecodeError, IOError):
+                                pass
+
+                        if os.path.exists(service_k8s_json_path):
+                            try:
+                                with open(service_k8s_json_path, 'r', encoding='utf-8') as sk8s_f:
+                                    service_k8s_data = json.load(sk8s_f)
+
+                                # Build lookup: package -> tag from service_k8s.json
+                                sk8s_images = {}
+                                for entry in service_k8s_data.get("service_k8s", {}).get("cluster", []):
+                                    if entry.get("type") == "image" and "tag" in entry:
+                                        sk8s_images[entry["package"]] = entry["tag"]
+
+                                # Images to cross-validate: (description, values.yaml image, service_k8s package key)
+                                images_to_check = []
+
+                                if karavi_metrics and karavi_metrics.get("image"):
+                                    images_to_check.append((
+                                        "csm-metrics-powerscale",
+                                        karavi_metrics["image"],
+                                        "quay.io/dell/container-storage-modules/csm-metrics-powerscale"
+                                    ))
+                                if otel_config and otel_config.get("image"):
+                                    images_to_check.append((
+                                        "opentelemetry-collector",
+                                        otel_config["image"],
+                                        "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector"
+                                    ))
+                                karavi_auth = karavi_metrics.get("authorization", {}) if karavi_metrics else {}
+                                sidecar_proxy = karavi_auth.get("sidecarProxy", {})
+                                if sidecar_proxy and sidecar_proxy.get("image"):
+                                    # csm-authorization-sidecar is in csi_driver_powerscale.json, not service_k8s.json
+                                    csi_ps_json_path = os.path.join(
+                                        os.path.dirname(service_k8s_json_path), "csi_driver_powerscale.json"
+                                    )
+                                    if os.path.exists(csi_ps_json_path):
+                                        try:
+                                            with open(csi_ps_json_path, 'r', encoding='utf-8') as csi_f:
+                                                csi_ps_data = json.load(csi_f)
+                                            for entry in csi_ps_data.get("csi_driver_powerscale", {}).get("cluster", []):
+                                                if (entry.get("type") == "image" and
+                                                        entry.get("package") == "quay.io/dell/container-storage-modules/csm-authorization-sidecar"):
+                                                    sidecar_values_tag = sidecar_proxy["image"].split(":")[-1] if ":" in sidecar_proxy["image"] else ""
+                                                    if sidecar_values_tag and sidecar_values_tag != entry["tag"]:
+                                                        errors.append(create_error_msg(
+                                                            "powerscale image: csm-authorization-sidecar",
+                                                            sidecar_proxy["image"],
+                                                            en_us_validation_msg.powerscale_image_version_mismatch_msg(
+                                                                "csm-authorization-sidecar",
+                                                                sidecar_proxy["image"],
+                                                                f"{entry['package']}:{entry['tag']}"
+                                                            )
+                                                        ))
+                                                    else:
+                                                        logger.info(f"Image version match for csm-authorization-sidecar: {sidecar_values_tag}")
+                                                    break
+                                        except (json.JSONDecodeError, IOError) as csi_err:
+                                            logger.warn(f"Could not read csi_driver_powerscale.json: {csi_err}")
+
+                                for img_name, values_image, sk8s_key in images_to_check:
+                                    if sk8s_key in sk8s_images:
+                                        # Extract tag from values.yaml image (format: registry/repo:tag)
+                                        values_tag = values_image.split(":")[-1] if ":" in values_image else ""
+                                        sk8s_tag = sk8s_images[sk8s_key]
+                                        if values_tag and values_tag != sk8s_tag:
+                                            sk8s_full = f"{sk8s_key}:{sk8s_tag}"
+                                            errors.append(create_error_msg(
+                                                f"powerscale image: {img_name}",
+                                                values_image,
+                                                en_us_validation_msg.powerscale_image_version_mismatch_msg(
+                                                    img_name, values_image, sk8s_full
+                                                )
+                                            ))
+                                        else:
+                                            logger.info(f"Image version match for {img_name}: {values_tag}")
+                                    else:
+                                        logger.warn(f"Image {sk8s_key} not found in service_k8s.json, skipping version check")
+
+                            except (json.JSONDecodeError, IOError) as sk8s_err:
+                                logger.warn(f"Could not read service_k8s.json for image version validation: {sk8s_err}")
+                        else:
+                            logger.warn(f"service_k8s.json not found at {service_k8s_json_path}, skipping image version validation")
+
                         logger.info("CSM Observability values.yaml validation passed")
                 except (yaml.YAMLError, IOError) as e:
                     errors.append(create_error_msg(

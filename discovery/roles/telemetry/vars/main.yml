@@ -287,3 +287,26 @@ ldms_store_restart_wait_seconds: 10
 # alongside iDRAC, Victoria, Kafka manifests - all managed by the common kustomization.yaml.j2
 # PowerScale metrics are scraped by the existing shared vmagent (no separate vmagent-powerscale)
 powerscale_deployments_dir: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/deployments"
+
+# Usage: deploy_powerscale_metrics.yml - messages
+ps_csi_driver_not_configured_msg: >-
+  PowerScale telemetry requires csi_driver_powerscale to be configured in software_config.json.
+  Please add csi_driver_powerscale to software_config.json and re-run.
+ps_csm_values_read_fail_msg: >-
+  Failed to read CSM Observability values.yaml from '{{ ps_csm_values_path }}'.
+  Please verify the file exists and contains valid YAML.
+ps_auth_mode_direct_msg: "PowerScale telemetry authentication mode: Direct Authentication (Mode A)"
+ps_auth_mode_karavi_msg: "PowerScale telemetry authentication mode: Karavi Authorization (Mode B)"
+ps_csi_secret_read_fail_msg: >-
+  Failed to load CSI PowerScale driver secret from '{{ ps_csi_secret_path }}'.
+  Please verify the file exists and contains valid isilonClusters configuration.
+ps_no_clusters_found_msg: >-
+  No PowerScale clusters found in CSI driver secret.yaml.
+  Please define at least one cluster in isilonClusters.
+ps_clusters_found_msg: >-
+  Found {{ ps_clusters | default([]) | length }} PowerScale cluster(s) for telemetry deployment.
+  PowerScale metrics will be scraped by the shared vmagent.
+
+# Usage: deploy_powerscale_cluster.yml - messages
+ps_cluster_manifest_msg: >-
+  Generating manifests for PowerScale cluster '{{ ps_cluster_name }}' (index: {{ cluster_index }})

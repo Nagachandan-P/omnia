@@ -23,7 +23,7 @@
 
 - name: Display cluster{{ cluster_index }} info
   ansible.builtin.debug:
-    msg: "Generating manifests for PowerScale cluster '{{ ps_cluster_name }}' (index: {{ cluster_index }})"
+    msg: "{{ ps_cluster_manifest_msg }}"
 
 - name: Generate OTEL Collector manifests for cluster{{ cluster_index }}
   ansible.builtin.template:
