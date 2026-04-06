@@ -52,12 +52,6 @@
     "powerscale_configurations": {
       "type": "object",
       "properties": {
-        "vmagent_storage_size": {
-          "type": "string",
-          "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)$",
-          "default": "10Gi",
-          "description": "PVC size for vmagent-powerscale buffer and WAL storage."
-        },
         "otel_collector_storage_size": {
           "type": "string",
           "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)$",
@@ -90,7 +84,7 @@
           "description": "Additional VictoriaMetrics remote_write endpoints. vmagent writes to all configured endpoints."
         }
       },
-      "required": ["vmagent_storage_size", "otel_collector_storage_size", "csm_observability_values_file_path"]
+      "required": ["otel_collector_storage_size", "csm_observability_values_file_path"]
     },
     "ldms_sampler_configurations": {
       "anyOf": [

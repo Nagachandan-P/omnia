@@ -291,10 +291,6 @@ ldms_sampler_configurations:
 # │ Component           │ Per-Pod PVC  │ Pods         │ Total Storage    │
 # ├─────────────────────┼──────────────┼──────────────┼──────────────────┤
 # │ OTEL Collector      │ 5Gi          │ 1 per cluster│ 5Gi per cluster  │
-# ├─────────────────────┼──────────────┼──────────────┼──────────────────┤
-# │ vmagent-powerscale  │ 10Gi         │ 1 (shared)   │ 10Gi             │
-# ├─────────────────────┼──────────────┼──────────────┼──────────────────┤
-# │ TOTAL (1 cluster)   │              │              │ 15Gi             │
 # └─────────────────────┴──────────────┴──────────────┴──────────────────┘
 
 # Enable or disable PowerScale telemetry support
@@ -309,13 +305,6 @@ powerscale_telemetry_support: false
 powerscale_log_enabled: false
 
 powerscale_configurations:
-  # PVC size for vmagent-powerscale buffer and WAL (Write-Ahead Log)
-  # vmagent buffers metrics locally before remote-writing to VictoriaMetrics.
-  # Larger PVC allows longer buffering during vminsert outages.
-  # Accepted values: in the form of "X[Ki|Mi|Gi|Ti|Pi|Ei]"
-  # Default: "10Gi"
-  vmagent_storage_size: "10Gi"
-
   # PVC size for each OTEL Collector instance (one per PowerScale cluster)
   # OTEL Collector uses this for metric batching and buffering.
   # Accepted values: in the form of "X[Ki|Mi|Gi|Ti|Pi|Ei]"

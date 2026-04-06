@@ -281,9 +281,6 @@ POWERSCALE_SERVICE_CLUSTER_MISSING_MSG = (
 POWERSCALE_CONFIGURATIONS_MISSING_MSG = (
     "powerscale_configurations section is required when powerscale_telemetry_support is true."
 )
-POWERSCALE_VMAGENT_STORAGE_SIZE_INVALID_MSG = (
-    "must be a non-empty string in format 'XGi' (e.g., '10Gi')"
-)
 POWERSCALE_OTEL_STORAGE_SIZE_INVALID_MSG = (
     "must be a non-empty string in format 'XGi' (e.g., '5Gi')"
 )

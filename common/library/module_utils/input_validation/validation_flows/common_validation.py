@@ -1651,15 +1651,6 @@ def validate_telemetry_config(
                 en_us_validation_msg.POWERSCALE_CONFIGURATIONS_MISSING_MSG
             ))
         else:
-            # Validate vmagent_storage_size
-            vmagent_storage = powerscale_config.get("vmagent_storage_size", "")
-            if not vmagent_storage or not isinstance(vmagent_storage, str):
-                errors.append(create_error_msg(
-                    "powerscale_configurations.vmagent_storage_size",
-                    vmagent_storage,
-                    en_us_validation_msg.POWERSCALE_VMAGENT_STORAGE_SIZE_INVALID_MSG
-                ))
-
             # Validate otel_collector_storage_size
             otel_storage = powerscale_config.get("otel_collector_storage_size", "")
             if not otel_storage or not isinstance(otel_storage, str):
