@@ -21,46 +21,57 @@
 
 - name: Set PowerScale configuration facts
   ansible.builtin.set_fact:
-    ps_csm_values_path: "{{ telemetry_config.powerscale_configurations.csm_observability_values_file_path }}"
     ps_csi_secret_path: "{{ hostvars['localhost']['service_cluster_info'].csi_powerscale_driver_secret_file_path | default('') }}"
     powerscale_configurations: "{{ telemetry_config.powerscale_configurations }}"
+    ps_helm_values_file: "{{ telemetry_config.powerscale_configurations.csm_observability_values_file_path }}"
 
-- name: Load CSM Observability values.yaml
+- name: Validate user-provided Helm values file path
+  ansible.builtin.assert:
+    that:
+      - ps_helm_values_file | length > 0
+    fail_msg: >-
+      csm_observability_values_file_path is required in telemetry_config.yml when powerscale_telemetry_support is true.
+      Provide the path to your customized karavi-observability Helm values file.
+
+- name: Verify user-provided Helm values file exists
+  ansible.builtin.stat:
+    path: "{{ ps_helm_values_file }}"
+  register: helm_values_stat
+
+- name: Fail if user-provided Helm values file does not exist
+  ansible.builtin.fail:
+    msg: >-
+      Helm values file not found at '{{ ps_helm_values_file }}'.
+      Please create a values file following the Dell CSM Observability documentation
+      and set the path in telemetry_config.yml (csm_observability_values_file_path).
+  when: not helm_values_stat.stat.exists
+
+# --- Read user values file to detect auth mode for secret copying ---
+
+- name: Load user-provided Helm values to detect auth mode
   block:
-    - name: Read CSM Observability values.yaml
+    - name: Read user Helm values file
       ansible.builtin.include_vars:
-        file: "{{ ps_csm_values_path }}"
-        name: csm_observability_values
+        file: "{{ ps_helm_values_file }}"
+        name: user_helm_values
       no_log: true
   rescue:
-    - name: Failed to read CSM Observability values.yaml
+    - name: Failed to read user Helm values file
       ansible.builtin.fail:
-        msg: "{{ ps_csm_values_read_fail_msg }}"
+        msg: >-
+          Failed to parse Helm values file at '{{ ps_helm_values_file }}'.
+          Please verify the file contains valid YAML.
 
 - name: Detect authentication mode from CSM Observability values
   ansible.builtin.set_fact:
     karavi_enabled: >-
-      {{ csm_observability_values.karaviMetricsPowerscale.authorization.enabled | default(false) | bool }}
-    karavi_proxy_host: >-
-      {{ csm_observability_values.karaviMetricsPowerscale.authorization.proxyHost | default('') }}
-    karavi_skip_cert_validation: >-
-      {{ csm_observability_values.karaviMetricsPowerscale.authorization.skipCertificateValidation | default('true') }}
+      {{ user_helm_values.karaviMetricsPowerscale.authorization.enabled | default(false) | bool }}
 
 - name: Display authentication mode
   ansible.builtin.debug:
     msg: "{% if karavi_enabled | bool %}{{ ps_auth_mode_karavi_msg }}{% else %}{{ ps_auth_mode_direct_msg }}{% endif %}"
 
-- name: Extract container image versions from CSM Observability values
-  ansible.builtin.set_fact:
-    csm_metrics_powerscale_image: >-
-      {{ csm_observability_values.karaviMetricsPowerscale.image | default('quay.io/dell/container-storage-modules/csm-metrics-powerscale:v1.11.0') }}
-    otel_collector_image: >-
-      {{ csm_observability_values.otelCollector.image | default('ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector:0.146.1') }}
-    nginx_proxy_image: >-
-      {{ csm_observability_values.otelCollector.nginxProxy.image | default('nginxinc/nginx-unprivileged:1.29') }}
-    karavi_sidecar_image: >-
-      {{ csm_observability_values.karaviMetricsPowerscale.authorization.sidecarProxy.image
-      | default('quay.io/dell/container-storage-modules/csm-authorization-sidecar:v2.4.0') }}
+# --- Load CSI PowerScale credentials from vault ---
 
 - name: Load CSI PowerScale credentials from vault
   block:
@@ -88,9 +99,14 @@
   ansible.builtin.debug:
     msg: "{{ ps_clusters_found_msg }}"
 
-- name: Generate per-cluster manifests
-  ansible.builtin.include_tasks: deploy_powerscale_cluster.yml
-  loop: "{{ ps_clusters }}"
-  loop_control:
-    index_var: cluster_index
-    loop_var: ps_cluster
+# --- Air-gapped: Download and extract karavi-observability dependencies from Pulp to NFS ---
+
+- name: Get PowerScale telemetry offline dependencies
+  ansible.builtin.include_tasks: get_powerscale_telemetry_dependencies.yml
+
+# --- Deploy CSM Observability via Helm (air-gapped, user-provided values) ---
+# The Helm chart deploys: CSM Metrics PowerScale, OTEL Collector, Services, ConfigMaps, RBAC.
+# The CSM Metrics container reads all clusters from the isilon-creds secret.
+
+- name: Deploy CSM Observability via Helm chart
+  ansible.builtin.include_tasks: deploy_powerscale_helm.yml

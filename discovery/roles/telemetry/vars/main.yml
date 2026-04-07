@@ -282,19 +282,27 @@ ldms_store_restart_wait_seconds: 10
 # ============================================================================
 # PowerScale Telemetry Configuration
 # ============================================================================
-# Usage: deploy_powerscale_metrics.yml
-# PowerScale manifests go into the shared telemetry/deployments/ directory
-# alongside iDRAC, Victoria, Kafka manifests - all managed by the common kustomization.yaml.j2
-# PowerScale metrics are scraped by the existing shared vmagent (no separate vmagent-powerscale)
-powerscale_deployments_dir: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/deployments"
+# Usage: deploy_powerscale_metrics.yml, deploy_powerscale_helm.yml
+# PowerScale telemetry is deployed via Helm chart (karavi-observability).
+# The Helm chart deploys CSM Metrics PowerScale, OTEL Collector, and all
+# associated Kubernetes resources. No per-cluster Kustomize manifests needed.
+# PowerScale metrics are scraped by the existing shared vmagent.
+
+# Karavi Observability offline installer variables
+# All files are on the NFS share at {{ k8s_client_mount_path }}/karavi-observability/
+karavi_observability_git: "karavi-observability.tar.gz"
+karavi_helm_charts_git: "helm-charts.tar.gz"
+karavi_helm_chart_path: "{{ k8s_client_mount_path }}/karavi-observability/helm-charts/charts/karavi-observability"
+permission_644: "0644"
+
+# Internal namespace constants (not user-configurable)
+csm_namespace: "karavi"
+csi_driver_namespace: "isilon"
 
 # Usage: deploy_powerscale_metrics.yml - messages
 ps_csi_driver_not_configured_msg: >-
   PowerScale telemetry requires csi_driver_powerscale to be configured in software_config.json.
   Please add csi_driver_powerscale to software_config.json and re-run.
-ps_csm_values_read_fail_msg: >-
-  Failed to read CSM Observability values.yaml from '{{ ps_csm_values_path }}'.
-  Please verify the file exists and contains valid YAML.
 ps_auth_mode_direct_msg: "PowerScale telemetry authentication mode: Direct Authentication (Mode A)"
 ps_auth_mode_karavi_msg: "PowerScale telemetry authentication mode: Karavi Authorization (Mode B)"
 ps_csi_secret_read_fail_msg: >-
@@ -305,8 +313,3 @@ ps_no_clusters_found_msg: >-
   Please define at least one cluster in isilonClusters.
 ps_clusters_found_msg: >-
   Found {{ ps_clusters | default([]) | length }} PowerScale cluster(s) for telemetry deployment.
-  PowerScale metrics will be scraped by the shared vmagent.
-
-# Usage: deploy_powerscale_cluster.yml - messages
-ps_cluster_manifest_msg: >-
-  Generating manifests for PowerScale cluster '{{ ps_cluster_name }}' (index: {{ cluster_index }})

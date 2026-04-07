@@ -1,0 +1,52 @@
+# get_powerscale_telemetry_dependencies.yml
+# Downloads and extracts karavi-observability git repository and Helm chart
+# from Pulp local mirror for air-gapped deployment.
+# Follows the same pattern as get_powerscale_dependencies.yml for CSI driver.
+# All files are downloaded to the NFS share at {{ k8s_client_mount_path }}/karavi-observability/
+#
+# cert-manager CRDs are included inside the karavi-observability repo
+# (installer/cert-manager.crds.yaml) -- no separate download needed.
+
+- name: Get karavi-observability offline dependencies from Pulp to NFS share
+  block:
+    - name: Create karavi-observability directory on NFS share
+      ansible.builtin.file:
+        path: "{{ k8s_client_mount_path }}/karavi-observability"
+        state: directory
+        mode: '0755'
+
+    - name: Get karavi-observability git tar from Pulp
+      ansible.builtin.get_url:
+        url: "{{ offline_git_path }}/karavi-observability/{{ karavi_observability_git }}"
+        dest: "{{ k8s_client_mount_path }}/karavi-observability/{{ karavi_observability_git }}"
+        mode: "{{ permission_644 }}"
+
+    - name: Extract karavi-observability tar file on NFS share
+      ansible.builtin.unarchive:
+        src: "{{ k8s_client_mount_path }}/karavi-observability/{{ karavi_observability_git }}"
+        dest: "{{ k8s_client_mount_path }}/karavi-observability/"
+        remote_src: true
+
+    - name: Get dell/helm-charts git tar from Pulp
+      ansible.builtin.get_url:
+        url: "{{ offline_git_path }}/helm-charts/{{ karavi_helm_charts_git }}"
+        dest: "{{ k8s_client_mount_path }}/karavi-observability/{{ karavi_helm_charts_git }}"
+        mode: "{{ permission_644 }}"
+
+    - name: Extract dell/helm-charts tar file on NFS share
+      ansible.builtin.unarchive:
+        src: "{{ k8s_client_mount_path }}/karavi-observability/{{ karavi_helm_charts_git }}"
+        dest: "{{ k8s_client_mount_path }}/karavi-observability/"
+        remote_src: true
+
+    - name: Set karavi-observability paths on NFS share
+      ansible.builtin.set_fact:
+        karavi_helm_chart_path: "{{ k8s_client_mount_path }}/karavi-observability/helm-charts/charts/karavi-observability"
+        karavi_cert_manager_crds_path: "{{ k8s_client_mount_path }}/karavi-observability/karavi-observability/installer/cert-manager.crds.yaml"
+
+  rescue:
+    - name: Handle dependency download failure
+      ansible.builtin.fail:
+        msg: >-
+          Failed to get karavi-observability dependencies from Pulp.
+          Make sure to verify entries in service_k8s.json and run local_repo.yml first.

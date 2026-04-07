@@ -305,8 +305,8 @@ powerscale_telemetry_support: false
 powerscale_log_enabled: false
 
 powerscale_configurations:
-  # PVC size for each OTEL Collector instance (one per PowerScale cluster)
-  # OTEL Collector uses this for metric batching and buffering.
+  # PVC size for OTEL Collector metric batching and buffering.
+  # Adjust based on cluster scale and metric volume.
   # Accepted values: in the form of "X[Ki|Mi|Gi|Ti|Pi|Ei]"
   # Default: "5Gi"
   otel_collector_storage_size: "5Gi"
@@ -317,6 +317,16 @@ powerscale_configurations:
   #   - Authentication settings (Direct vs. Karavi Authorization)
   #   - Poll frequencies for each metric domain
   #   - ISI client options for PowerScale OneFS API
+  #
+  # At minimum, configure true only for karaviMetricsPowerscale section, make false for others:
+  #   karaviMetricsPowerscale:
+  #     enabled: true
+  #     ...
+  #
+  # If CSM Authorization is enabled, configure:
+  #   karaviMetricsPowerscale.authorization.enabled: true
+  #   karaviMetricsPowerscale.authorization.proxyHost: "<host>"
+  #
   # Required when powerscale_telemetry_support: true
   # Reference: https://github.com/dell/helm-charts/blob/main/charts/karavi-observability/values.yaml
   csm_observability_values_file_path: ""
@@ -325,7 +335,6 @@ powerscale_configurations:
   # vmagent will write the same PowerScale metrics to ALL configured endpoints.
   # Each endpoint receives an identical copy of all metrics.
   # The primary Omnia VictoriaMetrics endpoint (vminsert) is always included automatically.
-  # Format: list of URL strings with optional TLS settings
   # Default: [] (empty — only the primary Omnia VictoriaMetrics endpoint is used)
   # Example:
   #   additional_remote_write_endpoints:

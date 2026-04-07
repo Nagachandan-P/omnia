@@ -56,11 +56,11 @@
           "type": "string",
           "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)$",
           "default": "5Gi",
-          "description": "PVC size for each OTEL Collector instance (one per PowerScale cluster)."
+          "description": "PVC size for OTEL Collector metric batching and buffering."
         },
         "csm_observability_values_file_path": {
           "type": "string",
-          "description": "Path to the CSM Observability (Karavi Observability) values.yaml file. Required when powerscale_telemetry_support is true."
+          "description": "Path to the user-provided Helm values file for karavi-observability chart. Required when powerscale_telemetry_support is true."
         },
         "additional_remote_write_endpoints": {
           "type": "array",
