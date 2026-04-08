@@ -37,6 +37,7 @@
   ansible.builtin.stat:
     path: "{{ ps_helm_values_file }}"
   register: helm_values_stat
+  delegate_to: localhost
 
 - name: Fail if user-provided Helm values file does not exist
   ansible.builtin.fail:
@@ -104,9 +105,19 @@
 - name: Get PowerScale telemetry offline dependencies
   ansible.builtin.include_tasks: get_powerscale_telemetry_dependencies.yml
 
-# --- Deploy CSM Observability via Helm (air-gapped, user-provided values) ---
-# The Helm chart deploys: CSM Metrics PowerScale, OTEL Collector, Services, ConfigMaps, RBAC.
-# The CSM Metrics container reads all clusters from the isilon-creds secret.
+# --- Copy user-provided values file to NFS share ---
+# Actual helm install happens in cloud-init during PXE boot.
 
-- name: Deploy CSM Observability via Helm chart
-  ansible.builtin.include_tasks: deploy_powerscale_helm.yml
+- name: Copy user-provided Helm values file to NFS share
+  ansible.builtin.copy:
+    src: "{{ ps_helm_values_file }}"
+    dest: "{{ k8s_client_mount_path }}/karavi-observability/myvalues.yaml"
+    mode: '0600'
+
+- name: Display PowerScale telemetry preparation status
+  ansible.builtin.debug:
+    msg: >-
+      PowerScale telemetry files prepared on NFS share.
+      Helm chart: {{ karavi_helm_chart_path }}
+      Values file: {{ k8s_client_mount_path }}/karavi-observability/myvalues.yaml
+      Deployment will occur during cloud-init (PXE boot) on the control plane node.

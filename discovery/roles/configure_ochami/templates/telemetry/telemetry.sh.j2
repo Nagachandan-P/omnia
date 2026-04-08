@@ -8,8 +8,3 @@ kubectl create secret generic nersc-ldms-ovis-auth   --from-file=ldmsauth.conf={
 kubectl create secret generic nersc-munge-key   --from-file=munge.key={{ k8s_client_mount_path }}/telemetry/ldms/munge.key   --dry-run=client -o yaml | kubectl apply -f - -n telemetry
 cd {{ k8s_client_mount_path }}/telemetry/ldms/nersc-ldms-aggr && helm install -n telemetry nersc-ldms-aggr nersc-ldms-aggr --values values.yaml
 {% endif %}
-{% if hostvars['localhost']['powerscale_telemetry_support'] | default(false) | bool %}
-# PowerScale telemetry pipeline (CSM Metrics + OTEL Collector + vmagent-powerscale)
-# is deployed as part of the common kustomization above (kubectl apply -k)
-echo "PowerScale telemetry pipeline resources included in kustomize deployment."
-{% endif %}

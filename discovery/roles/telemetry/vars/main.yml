@@ -282,7 +282,7 @@ ldms_store_restart_wait_seconds: 10
 # ============================================================================
 # PowerScale Telemetry Configuration
 # ============================================================================
-# Usage: deploy_powerscale_metrics.yml, deploy_powerscale_helm.yml
+# Usage: deploy_powerscale_metrics.yml
 # PowerScale telemetry is deployed via Helm chart (karavi-observability).
 # The Helm chart deploys CSM Metrics PowerScale, OTEL Collector, and all
 # associated Kubernetes resources. No per-cluster Kustomize manifests needed.

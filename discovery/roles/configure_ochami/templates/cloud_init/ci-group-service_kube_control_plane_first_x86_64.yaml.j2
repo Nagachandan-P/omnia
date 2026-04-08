@@ -1041,6 +1041,100 @@
             systemctl restart nfs-client.target
             systemctl restart rpcbind
 
+{% if hostvars['localhost']['powerscale_telemetry_support'] | default(false) | bool %}
+            # ===== PowerScale Telemetry - CSM Observability Helm Deployment =====
+            echo "===== Starting PowerScale Telemetry (CSM Observability) deployment ====="
+            PS_TEL_FAILED=0
+
+            # Step 1: Create karavi namespace
+            echo "Creating CSM Observability namespace (karavi)..."
+            kubectl create namespace karavi --dry-run=client -o yaml | kubectl apply -f - || {
+              echo "ERROR: Failed to create karavi namespace."
+              PS_TEL_FAILED=1
+            }
+
+            # Step 2: Apply cert-manager CRDs from cloned karavi-observability repo
+            if [ "$PS_TEL_FAILED" -eq 0 ]; then
+              echo "Applying cert-manager CRDs..."
+              CERT_MANAGER_CRDS="/opt/omnia/karavi-observability/karavi-observability/installer/cert-manager.crds.yaml"
+              if [ -f "$CERT_MANAGER_CRDS" ]; then
+                kubectl apply --validate=false -f "$CERT_MANAGER_CRDS" || {
+                  echo "WARNING: Failed to apply cert-manager CRDs."
+                }
+              else
+                echo "WARNING: cert-manager CRDs file not found at $CERT_MANAGER_CRDS"
+              fi
+            fi
+
+            # Step 3: Copy isilon-creds secret from CSI driver namespace to karavi namespace
+            if [ "$PS_TEL_FAILED" -eq 0 ]; then
+              echo "Copying isilon-creds secret to karavi namespace..."
+              kubectl get secret isilon-creds -n isilon -o yaml \
+                | sed 's/namespace: isilon/namespace: karavi/' \
+                | kubectl apply -f - || {
+                echo "ERROR: Failed to copy isilon-creds secret to karavi namespace."
+                PS_TEL_FAILED=1
+              }
+            fi
+
+{% if hostvars['localhost']['telemetry_config']['powerscale_configurations']['authorization_enabled'] | default(false) | bool %}
+            # Step 3b: Copy Karavi Authorization resources (authorization enabled)
+            if [ "$PS_TEL_FAILED" -eq 0 ]; then
+              echo "Copying Karavi Authorization resources to karavi namespace..."
+              kubectl get configmap isilon-config-params -n isilon -o yaml \
+                | sed 's/namespace: isilon/namespace: karavi/' \
+                | kubectl apply -f - || echo "WARNING: Failed to copy isilon-config-params."
+
+              kubectl get secret proxy-server-root-certificate proxy-authz-tokens -n isilon -o yaml \
+                | sed 's/namespace: isilon/namespace: karavi/' \
+                | sed 's/name: proxy-server-root-certificate/name: isilon-proxy-server-root-certificate/' \
+                | sed 's/name: proxy-authz-tokens/name: isilon-proxy-authz-tokens/' \
+                | kubectl apply -f - || echo "WARNING: Failed to copy proxy secrets."
+            fi
+{% endif %}
+
+            # Step 4: Install karavi-observability Helm chart from local NFS share
+            if [ "$PS_TEL_FAILED" -eq 0 ]; then
+              HELM_CHART_PATH="/opt/omnia/karavi-observability/helm-charts/charts/karavi-observability"
+              HELM_VALUES_FILE="/opt/omnia/karavi-observability/myvalues.yaml"
+
+              if [ -d "$HELM_CHART_PATH" ] && [ -f "$HELM_VALUES_FILE" ]; then
+                echo "Installing karavi-observability Helm chart..."
+                # Check if release already exists
+                if helm list -n karavi --filter karavi-observability -q 2>/dev/null | grep -q karavi-observability; then
+                  echo "Upgrading existing karavi-observability release..."
+                  helm upgrade karavi-observability "$HELM_CHART_PATH" \
+                    -n karavi \
+                    -f "$HELM_VALUES_FILE" \
+                    --wait --timeout 10m || {
+                    echo "ERROR: Helm upgrade failed."
+                    PS_TEL_FAILED=1
+                  }
+                else
+                  echo "Fresh install of karavi-observability..."
+                  helm install karavi-observability "$HELM_CHART_PATH" \
+                    -n karavi \
+                    -f "$HELM_VALUES_FILE" \
+                    --wait --timeout 10m || {
+                    echo "ERROR: Helm install failed."
+                    PS_TEL_FAILED=1
+                  }
+                fi
+              else
+                echo "ERROR: Helm chart or values file not found."
+                echo "  Chart path: $HELM_CHART_PATH (exists: $([ -d '$HELM_CHART_PATH' ] && echo yes || echo no))"
+                echo "  Values file: $HELM_VALUES_FILE (exists: $([ -f '$HELM_VALUES_FILE' ] && echo yes || echo no))"
+                PS_TEL_FAILED=1
+              fi
+            fi
+
+            if [ "$PS_TEL_FAILED" -eq 0 ]; then
+              echo "===== PowerScale Telemetry (CSM Observability) deployed successfully ====="
+            else
+              echo "===== PowerScale Telemetry deployment had errors (see above) ====="
+            fi
+{% endif %}
+
 {% if hostvars['localhost']['idrac_telemetry_support'] or hostvars['localhost']['ldms_support'] %}
             echo "Applying Telemetry Kubernetes deployments"
             /root/telemetry.sh

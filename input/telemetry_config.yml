@@ -318,10 +318,12 @@ powerscale_configurations:
   #   - Poll frequencies for each metric domain
   #   - ISI client options for PowerScale OneFS API
   #
-  # At minimum, configure true only for karaviMetricsPowerscale section, make false for others:
+  # At minimum, configure the karaviMetricsPowerscale section (set enabled: true,
+  # disable other storage backends like powerflex/powerstore/powermax):
   #   karaviMetricsPowerscale:
   #     enabled: true
   #     ...
+  #
   #
   # If CSM Authorization is enabled, configure:
   #   karaviMetricsPowerscale.authorization.enabled: true
