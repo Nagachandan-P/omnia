@@ -1,11 +1,33 @@
 # get_powerscale_telemetry_dependencies.yml
-# Downloads and extracts karavi-observability git repository and Helm chart
-# from Pulp local mirror for air-gapped deployment.
+# Downloads and extracts karavi-observability git repository, Helm chart,
+# and cert-manager Helm chart dependency from Pulp local mirror for
+# air-gapped deployment.
 # Follows the same pattern as get_powerscale_dependencies.yml for CSI driver.
 # All files are downloaded to the NFS share at {{ k8s_client_mount_path }}/karavi-observability/
 #
 # cert-manager CRDs are included inside the karavi-observability repo
 # (installer/cert-manager.crds.yaml) -- no separate download needed.
+#
+# cert-manager Helm chart (from Jetstack) is pre-downloaded to Pulp via
+# service_k8s.json tarball entry. The package name and version are read
+# dynamically from service_k8s.json -- not hardcoded.
+
+- name: Extract cert-manager package name from service_k8s.json
+  ansible.builtin.set_fact:
+    cert_manager_package: >-
+      {{ telemetry_packages['service_k8s']['cluster']
+        | selectattr('type', 'equalto', 'tarball')
+        | selectattr('package', 'search', 'cert-manager')
+        | map(attribute='package')
+        | first }}
+
+- name: Set cert-manager chart tgz filename
+  ansible.builtin.set_fact:
+    cert_manager_chart_tgz: "{{ cert_manager_package }}.tgz"
+
+- name: Display cert-manager package read from service_k8s.json
+  ansible.builtin.debug:
+    msg: "cert-manager package from service_k8s.json: {{ cert_manager_package }} ({{ cert_manager_chart_tgz }})"
 
 - name: Get karavi-observability offline dependencies from Pulp to NFS share
   block:
@@ -39,14 +61,49 @@
         dest: "{{ k8s_client_mount_path }}/karavi-observability/"
         remote_src: true
 
-    - name: Set karavi-observability paths on NFS share
+    - name: Set karavi-observability Helm chart path on NFS share
       ansible.builtin.set_fact:
         karavi_helm_chart_path: "{{ k8s_client_mount_path }}/karavi-observability/helm-charts/charts/karavi-observability"
-        karavi_cert_manager_crds_path: "{{ k8s_client_mount_path }}/karavi-observability/karavi-observability/installer/cert-manager.crds.yaml"
+
+    - name: Create charts/ directory for Helm dependencies
+      ansible.builtin.file:
+        path: "{{ karavi_helm_chart_path }}/charts"
+        state: directory
+        mode: '0755'
+
+    - name: Download cert-manager Helm chart from Pulp (Jetstack repo pre-staged offline)
+      ansible.builtin.get_url:
+        url: "{{ offline_tarball_path }}/{{ cert_manager_package }}/{{ cert_manager_chart_tgz }}"
+        dest: "{{ karavi_helm_chart_path }}/charts/{{ cert_manager_chart_tgz }}"
+        mode: "{{ permission_644 }}"
+
+    - name: Verify cert-manager chart was staged in charts/ directory
+      ansible.builtin.stat:
+        path: "{{ karavi_helm_chart_path }}/charts/{{ cert_manager_chart_tgz }}"
+      register: cert_manager_chart_stat
+
+    - name: Fail if cert-manager chart is missing
+      ansible.builtin.fail:
+        msg: >-
+          cert-manager Helm chart ({{ cert_manager_chart_tgz }}) was not found in
+          {{ karavi_helm_chart_path }}/charts/. This chart is required for TLS certificate
+          management. Ensure the Jetstack cert-manager entry exists in service_k8s.json
+          and run local_repo.yml to download it to Pulp.
+      when: not cert_manager_chart_stat.stat.exists
+
+    - name: Display cert-manager dependency staged successfully
+      ansible.builtin.debug:
+        msg: >-
+          cert-manager ({{ cert_manager_package }}) staged in
+          {{ karavi_helm_chart_path }}/charts/{{ cert_manager_chart_tgz }}.
+          Helm will resolve this dependency during install on the control plane node.
 
   rescue:
     - name: Handle dependency download failure
       ansible.builtin.fail:
         msg: >-
           Failed to get karavi-observability dependencies from Pulp.
-          Make sure to verify entries in service_k8s.json and run local_repo.yml first.
+          Ensure the following entries exist in service_k8s.json and run local_repo.yml:
+            - karavi-observability (git)
+            - helm-charts (git)
+            - {{ cert_manager_package }} (tarball from Jetstack Helm repo)

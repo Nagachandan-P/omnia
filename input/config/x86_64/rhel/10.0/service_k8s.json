@@ -35,6 +35,7 @@
       { "package": "docker.io/nginxinc/nginx-unprivileged", "tag": "1.29", "type": "image" },
       { "package": "karavi-observability", "type": "git", "url": "https://github.com/dell/karavi-observability.git", "version": "v1.12.0" },
       { "package": "helm-charts", "type": "git", "url": "https://github.com/dell/helm-charts.git", "version": "container-storage-modules-1.9.2" },
+      { "package": "cert-manager-v1.10.0", "type": "tarball", "url": "https://charts.jetstack.io/packages/cert-manager-v1.10.0.tgz" },
       { "package": "strimzi-kafka-operator-helm-3-chart-0.48.0", "type": "tarball", "url": "https://github.com/strimzi/strimzi-kafka-operator/releases/download/0.48.0/strimzi-kafka-operator-helm-3-chart-0.48.0.tgz" },
       { "package": "quay.io/strimzi/kafka-bridge", "tag": "0.33.1", "type": "image" },
       { "package": "apptainer", "type": "rpm", "repo_name": "epel" },

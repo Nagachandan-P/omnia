@@ -324,7 +324,6 @@ powerscale_configurations:
   #     enabled: true
   #     ...
   #
-  #
   # If CSM Authorization is enabled, configure:
   #   karaviMetricsPowerscale.authorization.enabled: true
   #   karaviMetricsPowerscale.authorization.proxyHost: "<host>"

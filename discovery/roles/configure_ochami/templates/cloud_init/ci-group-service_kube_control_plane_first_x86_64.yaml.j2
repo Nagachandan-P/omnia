@@ -1053,32 +1053,24 @@
               PS_TEL_FAILED=1
             }
 
-            # Step 2: Apply cert-manager CRDs from cloned karavi-observability repo
-            if [ "$PS_TEL_FAILED" -eq 0 ]; then
-              echo "Applying cert-manager CRDs..."
-              CERT_MANAGER_CRDS="/opt/omnia/karavi-observability/karavi-observability/installer/cert-manager.crds.yaml"
-              if [ -f "$CERT_MANAGER_CRDS" ]; then
-                kubectl apply --validate=false -f "$CERT_MANAGER_CRDS" || {
-                  echo "WARNING: Failed to apply cert-manager CRDs."
-                }
-              else
-                echo "WARNING: cert-manager CRDs file not found at $CERT_MANAGER_CRDS"
-              fi
-            fi
+            # Note: cert-manager CRDs are in helm-charts/charts/karavi-observability/crds/
+            # and are applied automatically by Helm during install.
 
-            # Step 3: Copy isilon-creds secret from CSI driver namespace to karavi namespace
+            # Step 2: Copy isilon-creds secret from CSI driver namespace to karavi namespace
             if [ "$PS_TEL_FAILED" -eq 0 ]; then
               echo "Copying isilon-creds secret to karavi namespace..."
-              kubectl get secret isilon-creds -n isilon -o yaml \
-                | sed 's/namespace: isilon/namespace: karavi/' \
-                | kubectl apply -f - || {
+              kubectl delete secret isilon-creds -n karavi --ignore-not-found=true 2>/dev/null
+              kubectl get secret isilon-creds -n isilon -o json \
+                | jq 'del(.metadata.resourceVersion,.metadata.uid,.metadata.creationTimestamp,.metadata.annotations,.metadata.managedFields)' \
+                | jq '.metadata.namespace = "karavi"' \
+                | kubectl create -f - || {
                 echo "ERROR: Failed to copy isilon-creds secret to karavi namespace."
                 PS_TEL_FAILED=1
               }
             fi
 
 {% if hostvars['localhost']['telemetry_config']['powerscale_configurations']['authorization_enabled'] | default(false) | bool %}
-            # Step 3b: Copy Karavi Authorization resources (authorization enabled)
+            # Step 3: Copy Karavi Authorization resources (authorization enabled)
             if [ "$PS_TEL_FAILED" -eq 0 ]; then
               echo "Copying Karavi Authorization resources to karavi namespace..."
               kubectl get configmap isilon-config-params -n isilon -o yaml \
@@ -1093,14 +1085,15 @@
             fi
 {% endif %}
 
-            # Step 4: Install karavi-observability Helm chart from local NFS share
+            # Step 4: Install karavi-observability Helm chart directly from NFS share
             if [ "$PS_TEL_FAILED" -eq 0 ]; then
-              HELM_CHART_PATH="/opt/omnia/karavi-observability/helm-charts/charts/karavi-observability"
-              HELM_VALUES_FILE="/opt/omnia/karavi-observability/myvalues.yaml"
+              HELM_CHART_PATH="{{ k8s_client_mount_path }}/karavi-observability/helm-charts/charts/karavi-observability"
+              HELM_VALUES_FILE="{{ k8s_client_mount_path }}/karavi-observability/myvalues.yaml"
 
               if [ -d "$HELM_CHART_PATH" ] && [ -f "$HELM_VALUES_FILE" ]; then
-                echo "Installing karavi-observability Helm chart..."
-                # Check if release already exists
+                # cert-manager dependency chart is pre-staged in charts/ directory by Ansible
+                # CRDs are in crds/ directory and applied automatically by Helm
+                echo "Installing karavi-observability Helm chart from NFS share..."
                 if helm list -n karavi --filter karavi-observability -q 2>/dev/null | grep -q karavi-observability; then
                   echo "Upgrading existing karavi-observability release..."
                   helm upgrade karavi-observability "$HELM_CHART_PATH" \
@@ -1121,9 +1114,9 @@
                   }
                 fi
               else
-                echo "ERROR: Helm chart or values file not found."
-                echo "  Chart path: $HELM_CHART_PATH (exists: $([ -d '$HELM_CHART_PATH' ] && echo yes || echo no))"
-                echo "  Values file: $HELM_VALUES_FILE (exists: $([ -f '$HELM_VALUES_FILE' ] && echo yes || echo no))"
+                echo "ERROR: Helm chart or values file not found on NFS share."
+                echo "  Chart path: $HELM_CHART_PATH"
+                echo "  Values file: $HELM_VALUES_FILE"
                 PS_TEL_FAILED=1
               fi
             fi

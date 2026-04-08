@@ -72,6 +72,14 @@
   ansible.builtin.debug:
     msg: "{% if karavi_enabled | bool %}{{ ps_auth_mode_karavi_msg }}{% else %}{{ ps_auth_mode_direct_msg }}{% endif %}"
 
+# --- Validate cert-manager is enabled (required for TLS) ---
+
+- name: Validate cert-manager is enabled in Helm values
+  ansible.builtin.assert:
+    that:
+      - user_helm_values['cert-manager']['enabled'] | default(false) | bool
+    fail_msg: "{{ ps_cert_manager_disabled_msg }}"
+
 # --- Load CSI PowerScale credentials from vault ---
 
 - name: Load CSI PowerScale credentials from vault
