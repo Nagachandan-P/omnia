@@ -1053,10 +1053,21 @@
               PS_TEL_FAILED=1
             }
 
-            # Note: cert-manager CRDs are in helm-charts/charts/karavi-observability/crds/
-            # and are applied automatically by Helm during install.
+            # Step 2: Apply cert-manager CRDs (required before Helm install per official guide)
+            if [ "$PS_TEL_FAILED" -eq 0 ]; then
+              HELM_CHART_PATH="{{ k8s_client_mount_path }}/karavi-observability/helm-charts/charts/karavi-observability"
+              CRDS_FILE="${HELM_CHART_PATH}/crds/cert-manager.crds.yaml"
+              if [ -f "$CRDS_FILE" ]; then
+                echo "Applying cert-manager CRDs from chart crds/ directory..."
+                kubectl apply --validate=false -f "$CRDS_FILE" || {
+                  echo "WARNING: Failed to apply cert-manager CRDs from crds/ directory."
+                }
+              else
+                echo "No cert-manager CRDs file found at ${CRDS_FILE}, Helm will handle CRDs."
+              fi
+            fi
 
-            # Step 2: Copy isilon-creds secret from CSI driver namespace to karavi namespace
+            # Step 3: Copy isilon-creds secret from CSI driver namespace to karavi namespace
             if [ "$PS_TEL_FAILED" -eq 0 ]; then
               echo "Copying isilon-creds secret to karavi namespace..."
               kubectl delete secret isilon-creds -n karavi --ignore-not-found=true 2>/dev/null
@@ -1070,7 +1081,7 @@
             fi
 
 {% if hostvars['localhost']['telemetry_config']['powerscale_configurations']['authorization_enabled'] | default(false) | bool %}
-            # Step 3: Copy Karavi Authorization resources (authorization enabled)
+            # Step 4: Copy Karavi Authorization resources (authorization enabled)
             if [ "$PS_TEL_FAILED" -eq 0 ]; then
               echo "Copying Karavi Authorization resources to karavi namespace..."
               kubectl get configmap isilon-config-params -n isilon -o yaml \
@@ -1085,14 +1096,22 @@
             fi
 {% endif %}
 
-            # Step 4: Install karavi-observability Helm chart directly from NFS share
+            # Step 5: Install karavi-observability Helm chart directly from NFS share
             if [ "$PS_TEL_FAILED" -eq 0 ]; then
               HELM_CHART_PATH="{{ k8s_client_mount_path }}/karavi-observability/helm-charts/charts/karavi-observability"
               HELM_VALUES_FILE="{{ k8s_client_mount_path }}/karavi-observability/myvalues.yaml"
 
+              # Verify cert-manager subchart is available (directory or archive)
+              if [ -d "${HELM_CHART_PATH}/charts/cert-manager" ]; then
+                echo "cert-manager subchart found as directory in charts/."
+              elif ls "${HELM_CHART_PATH}/charts/cert-manager"*.tgz 1>/dev/null 2>&1 || \
+                   ls "${HELM_CHART_PATH}/charts/cert-manager"*.tar.gz 1>/dev/null 2>&1; then
+                echo "cert-manager subchart found as archive in charts/."
+              else
+                echo "WARNING: cert-manager subchart not found in ${HELM_CHART_PATH}/charts/."
+              fi
+
               if [ -d "$HELM_CHART_PATH" ] && [ -f "$HELM_VALUES_FILE" ]; then
-                # cert-manager dependency chart is pre-staged in charts/ directory by Ansible
-                # CRDs are in crds/ directory and applied automatically by Helm
                 echo "Installing karavi-observability Helm chart from NFS share..."
                 if helm list -n karavi --filter karavi-observability -q 2>/dev/null | grep -q karavi-observability; then
                   echo "Upgrading existing karavi-observability release..."

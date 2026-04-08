@@ -97,13 +97,13 @@
         mode: "{{ permission_644 }}"
       when: not cert_manager_disabled
 
-    - name: Verify cert-manager chart was staged in charts/ directory
+    - name: Verify cert-manager chart archive was downloaded
       ansible.builtin.stat:
         path: "{{ karavi_helm_chart_path }}/charts/{{ cert_manager_chart_tgz }}"
       register: cert_manager_chart_stat
       when: not cert_manager_disabled
 
-    - name: Fail if cert-manager chart is missing
+    - name: Fail if cert-manager chart archive is missing
       ansible.builtin.fail:
         msg: >-
           cert-manager Helm chart ({{ cert_manager_chart_tgz }}) was not found in
@@ -112,13 +112,40 @@
           and run local_repo.yml to download it to Pulp.
       when: not cert_manager_disabled and not cert_manager_chart_stat.stat.exists
 
+    - name: Extract cert-manager chart as directory for Helm compatibility
+      ansible.builtin.unarchive:
+        src: "{{ karavi_helm_chart_path }}/charts/{{ cert_manager_chart_tgz }}"
+        dest: "{{ karavi_helm_chart_path }}/charts/"
+        remote_src: true
+      when: not cert_manager_disabled and cert_manager_chart_stat.stat.exists
+
+    - name: Remove cert-manager archive after extraction
+      ansible.builtin.file:
+        path: "{{ karavi_helm_chart_path }}/charts/{{ cert_manager_chart_tgz }}"
+        state: absent
+      when: not cert_manager_disabled and cert_manager_chart_stat.stat.exists
+
+    - name: Verify cert-manager chart directory was extracted
+      ansible.builtin.stat:
+        path: "{{ karavi_helm_chart_path }}/charts/cert-manager/Chart.yaml"
+      register: cert_manager_dir_stat
+      when: not cert_manager_disabled
+
+    - name: Fail if cert-manager chart directory extraction failed
+      ansible.builtin.fail:
+        msg: >-
+          cert-manager chart was not extracted correctly to
+          {{ karavi_helm_chart_path }}/charts/cert-manager/.
+          The archive {{ cert_manager_chart_tgz }} may be corrupt.
+      when: not cert_manager_disabled and not cert_manager_dir_stat.stat.exists
+
     - name: Display cert-manager dependency staged successfully
       ansible.builtin.debug:
         msg: >-
-          cert-manager ({{ cert_manager_package }}) staged in
-          {{ karavi_helm_chart_path }}/charts/{{ cert_manager_chart_tgz }}.
+          cert-manager ({{ cert_manager_package }}) extracted to
+          {{ karavi_helm_chart_path }}/charts/cert-manager/.
           Helm will resolve this dependency during install on the control plane node.
-      when: not cert_manager_disabled and cert_manager_chart_stat.stat.exists
+      when: not cert_manager_disabled and cert_manager_dir_stat.stat.exists
 
     - name: Display cert-manager dependency skipped
       ansible.builtin.debug:
