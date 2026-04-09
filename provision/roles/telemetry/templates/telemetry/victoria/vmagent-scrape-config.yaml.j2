@@ -68,7 +68,7 @@ data:
         honor_labels: true
         scrape_interval: 30s
         static_configs:
-          - targets: ['otel-collector-powerscale-cluster{{ loop.index0 }}.{{ telemetry_namespace }}.svc.cluster.local:8889']
+          - targets: ['otel-collector.{{ telemetry_namespace }}.svc.cluster.local:8889']
             labels:
               source: powerscale
               cluster: "{{ cluster.clusterName }}"
