@@ -17,14 +17,26 @@
 This module provides a shared ResultPoller that can be used by all stage APIs
 (local_repo, build_image, validate_image_on_test, etc.) to poll the NFS result
 queue and update stage states accordingly.
+
+Enhanced (S1-4 Part B): On build-image success, creates ImageGroup (BUILT)
+and Image records from catalog metadata persisted during parse-catalog.
 """
 
+import json
 import asyncio
 import logging
+import uuid
 from datetime import datetime, timezone
+
+from sqlalchemy.exc import IntegrityError
 
 from api.logging_utils import log_secure_info
 
+from core.image_group.entities import Image, ImageGroup
+from core.image_group.repositories import ImageGroupRepository, ImageRepository
+from core.image_group.value_objects import ImageGroupId, ImageGroupStatus
+from core.artifacts.interfaces import ArtifactMetadataRepository, ArtifactStore
+from core.artifacts.value_objects import ArtifactKind
 from core.jobs.entities import AuditEvent
 from core.jobs.entities.stage import StageState
 from core.jobs.repositories import (
@@ -67,6 +79,10 @@ class ResultPoller:
         audit_repo: AuditEventRepository,
         uuid_generator: UUIDGenerator,
         poll_interval: int = 5,
+        image_group_repo: ImageGroupRepository = None,
+        image_repo: ImageRepository = None,
+        artifact_store: ArtifactStore = None,
+        artifact_metadata_repo: ArtifactMetadataRepository = None,
     ) -> None:  # pylint: disable=too-many-arguments,too-many-positional-arguments
         """Initialize result poller.
 
@@ -77,6 +93,10 @@ class ResultPoller:
             audit_repo: Audit event repository implementation.
             uuid_generator: UUID generator for identifiers.
             poll_interval: Interval in seconds between polls (default: 5).
+            image_group_repo: ImageGroup repository for build-image completion.
+            image_repo: Image repository for build-image completion.
+            artifact_store: Artifact store for retrieving catalog metadata.
+            artifact_metadata_repo: Artifact metadata repo for finding artifacts.
         """
         self._result_service = result_service
         self._job_repo = job_repo
@@ -84,6 +104,10 @@ class ResultPoller:
         self._audit_repo = audit_repo
         self._uuid_generator = uuid_generator
         self._poll_interval = poll_interval
+        self._image_group_repo = image_group_repo
+        self._image_repo = image_repo
+        self._artifact_store = artifact_store
+        self._artifact_metadata_repo = artifact_metadata_repo
         self._running = False
         self._task = None
 
@@ -155,7 +179,7 @@ class ResultPoller:
                 )
                 # Return early - service will archive the result file automatically
                 return
-            
+
             if result.status == "success":
                 stage.complete()
                 logger.info(
@@ -163,7 +187,11 @@ class ResultPoller:
                     result.job_id,
                     result.stage_name,
                 )
-                
+
+                # S1-4 Part B: On build-image success, create ImageGroup + Images
+                if self._is_build_image_stage(result.stage_name):
+                    self._on_build_image_success(result)
+
                 # Check if this is the final stage (validate-image-on-test)
                 # If so, mark the job as completed
                 if result.stage_name == "validate-image-on-test":
@@ -185,7 +213,7 @@ class ResultPoller:
                     result.stage_name,
                     error_code,
                 )
-                
+
                 # Update job state to FAILED when stage fails
                 JobStateHelper.handle_stage_failure(
                     job_repo=self._job_repo,
@@ -227,13 +255,13 @@ class ResultPoller:
                 },
             )
             self._audit_repo.save(event)
-            
+
             # Commit both repositories if using SQL
             # Note: Each repository may have its own session, so commit both
             if hasattr(self._stage_repo, 'session'):
                 self._stage_repo.session.commit()
             if hasattr(self._audit_repo, 'session'):
-                    self._audit_repo.session.commit()
+                self._audit_repo.session.commit()
 
             log_secure_info(
                 "info",
@@ -247,3 +275,145 @@ class ResultPoller:
                 result.job_id,
                 exc,
             )
+
+    # ------------------------------------------------------------------
+    # S1-4 Part B: Build-image completion — ImageGroup/Image creation
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _is_build_image_stage(stage_name: str) -> bool:
+        """Check if the stage is a build-image stage."""
+        return stage_name in (
+            "build-image-x86_64",
+            "build-image-aarch64",
+            "build-image",
+        )
+
+    def _on_build_image_success(self, result: PlaybookResult) -> None:
+        """Create ImageGroup (BUILT) and Image records on build-image success.
+
+        Loads catalog metadata persisted by parse-catalog, creates the
+        ImageGroup with status BUILT, and inserts Image records for each
+        constituent role.
+
+        Args:
+            result: Playbook execution result from NFS queue.
+        """
+        if self._image_group_repo is None or self._image_repo is None:
+            logger.warning(
+                "ImageGroup/Image repos not available; skipping "
+                "ImageGroup creation for job=%s",
+                result.job_id,
+            )
+            return
+
+        try:
+            catalog_metadata = self._load_catalog_metadata(result.job_id)
+            if catalog_metadata is None:
+                logger.warning(
+                    "No catalog metadata found for job=%s; "
+                    "skipping ImageGroup creation",
+                    result.job_id,
+                )
+                return
+
+            image_group_id = catalog_metadata["image_group_id"]
+            role_images = catalog_metadata.get("role_images", {})
+
+            # Create ImageGroup entity
+            now = datetime.now(timezone.utc)
+            image_group = ImageGroup(
+                id=ImageGroupId(image_group_id),
+                job_id=JobId(str(result.job_id)),
+                status=ImageGroupStatus.BUILT,
+                images=[],
+                created_at=now,
+                updated_at=now,
+            )
+
+            # Create Image entities for each role
+            images = []
+            for role_name, image_name in role_images.items():
+                image = Image(
+                    id=str(uuid.uuid4()),
+                    image_group_id=image_group_id,
+                    role=role_name,
+                    image_name=image_name,
+                    created_at=now,
+                )
+                images.append(image)
+            image_group.images = images
+
+            # Persist atomically
+            try:
+                self._image_group_repo.save(image_group)
+                self._image_repo.save_batch(images)
+            except IntegrityError:
+                # Race condition: another completion already created this
+                # ImageGroup (primary key collision). Log and skip.
+                logger.warning(
+                    "ImageGroup '%s' already exists (race condition). "
+                    "Skipping duplicate creation for job=%s.",
+                    image_group_id,
+                    result.job_id,
+                )
+                if hasattr(self._image_group_repo, 'session'):
+                    self._image_group_repo.session.rollback()
+                return
+
+            # Commit ImageGroup/Image records
+            if hasattr(self._image_group_repo, 'session'):
+                self._image_group_repo.session.commit()
+
+            logger.info(
+                "Build-image SUCCESS for job=%s. Created ImageGroup '%s' "
+                "with %d images (status=BUILT).",
+                result.job_id,
+                image_group_id,
+                len(images),
+            )
+
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception(
+                "Failed to create ImageGroup/Images for job=%s: %s",
+                result.job_id,
+                exc,
+            )
+
+    def _load_catalog_metadata(self, job_id) -> dict:
+        """Load catalog metadata artifact persisted by parse-catalog.
+
+        Retrieves the catalog-metadata artifact from the artifact store
+        to get image_group_id and role-to-image mappings.
+
+        Args:
+            job_id: Job identifier.
+
+        Returns:
+            Dict with image_group_id, roles, role_images, or None if not found.
+        """
+        if self._artifact_metadata_repo is None or self._artifact_store is None:
+            return None
+
+        try:
+            record = self._artifact_metadata_repo.find_by_job_stage_and_label(
+                job_id=job_id,
+                stage_name=StageName("parse-catalog"),
+                label="catalog-metadata",
+            )
+            if record is None:
+                return None
+
+            raw = self._artifact_store.retrieve(
+                record.artifact_ref.key,
+                ArtifactKind.FILE,
+            )
+            return json.loads(raw.decode("utf-8"))
+
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning(
+                "Failed to load catalog metadata for job=%s: %s",
+                job_id,
+                exc,
+            )
+            return None
