@@ -27,7 +27,8 @@
 
 - name: Display cert-manager package read from service_k8s.json
   ansible.builtin.debug:
-    msg: "cert-manager package from service_k8s.json: {{ cert_manager_package }} ({{ cert_manager_chart_tgz }})"
+    msg: "{{ ps_cert_manager_pkg_msg }}"
+    verbosity: 2
 
 - name: Get karavi-observability offline dependencies from Pulp to NFS share
   block:
@@ -87,8 +88,8 @@
 
     - name: Display cert-manager dependency status
       ansible.builtin.debug:
-        msg: >-
-          cert-manager dependency download: {% if cert_manager_disabled %}SKIPPED (disabled in values file){% else %}REQUIRED{% endif %}
+        msg: "{% if cert_manager_disabled %}{{ ps_cert_manager_skipped_msg }}{% else %}{{ ps_cert_manager_required_msg }}{% endif %}"
+        verbosity: 2
 
     - name: Download cert-manager Helm chart from Pulp (Jetstack repo pre-staged offline)
       ansible.builtin.get_url:
@@ -105,11 +106,7 @@
 
     - name: Fail if cert-manager chart archive is missing
       ansible.builtin.fail:
-        msg: >-
-          cert-manager Helm chart ({{ cert_manager_chart_tgz }}) was not found in
-          {{ karavi_helm_chart_path }}/charts/. This chart is required for TLS certificate
-          management. Ensure the Jetstack cert-manager entry exists in service_k8s.json
-          and run local_repo.yml to download it to Pulp.
+        msg: "{{ ps_cert_manager_missing_msg }}"
       when: not cert_manager_disabled and not cert_manager_chart_stat.stat.exists
 
     - name: Extract cert-manager chart as directory for Helm compatibility
@@ -133,33 +130,22 @@
 
     - name: Fail if cert-manager chart directory extraction failed
       ansible.builtin.fail:
-        msg: >-
-          cert-manager chart was not extracted correctly to
-          {{ karavi_helm_chart_path }}/charts/cert-manager/.
-          The archive {{ cert_manager_chart_tgz }} may be corrupt.
+        msg: "{{ ps_cert_manager_extract_fail_msg }}"
       when: not cert_manager_disabled and not cert_manager_dir_stat.stat.exists
 
     - name: Display cert-manager dependency staged successfully
       ansible.builtin.debug:
-        msg: >-
-          cert-manager ({{ cert_manager_package }}) extracted to
-          {{ karavi_helm_chart_path }}/charts/cert-manager/.
-          Helm will resolve this dependency during install on the control plane node.
+        msg: "{{ ps_cert_manager_staged_msg }}"
+        verbosity: 2
       when: not cert_manager_disabled and cert_manager_dir_stat.stat.exists
 
     - name: Display cert-manager dependency skipped
       ansible.builtin.debug:
-        msg: >-
-          cert-manager dependency skipped (disabled in values file).
-          CRDs are bundled in karavi-observability chart and will be applied automatically.
+        msg: "{{ ps_cert_manager_skipped_detail_msg }}"
+        verbosity: 2
       when: cert_manager_disabled
 
   rescue:
     - name: Handle dependency download failure
       ansible.builtin.fail:
-        msg: >-
-          Failed to get karavi-observability dependencies from Pulp.
-          Ensure the following entries exist in service_k8s.json and run local_repo.yml:
-            - karavi-observability (git)
-            - helm-charts (git)
-            - {{ cert_manager_package }} (tarball from Jetstack Helm repo)
+        msg: "{{ ps_dependency_fail_msg }}"

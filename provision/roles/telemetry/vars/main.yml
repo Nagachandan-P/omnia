@@ -299,6 +299,15 @@ permission_644: "0644"
 csm_namespace: "telemetry"
 csi_driver_namespace: "isilon"
 
+# CSM Metrics PowerScale resource limits
+csm_metrics_powerscale_resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
 # Usage: deploy_powerscale_metrics.yml - messages
 ps_csi_driver_not_configured_msg: >-
   PowerScale telemetry requires csi_driver_powerscale to be configured in software_config.json.
@@ -317,3 +326,29 @@ ps_no_clusters_found_msg: >-
   Please define at least one cluster in isilonClusters.
 ps_clusters_found_msg: >-
   Found {{ ps_clusters | default([]) | length }} PowerScale cluster(s) for telemetry deployment.
+ps_cert_manager_pkg_msg: >-
+  cert-manager package from service_k8s.json: {{ cert_manager_package | default('') }} ({{ cert_manager_chart_tgz | default('') }})
+ps_cert_manager_required_msg: "cert-manager dependency download: REQUIRED"
+ps_cert_manager_skipped_msg: "cert-manager dependency download: SKIPPED (disabled in values file)"
+ps_cert_manager_staged_msg: >-
+  cert-manager ({{ cert_manager_package | default('') }}) extracted to
+  {{ karavi_helm_chart_path }}/charts/cert-manager/.
+  Helm will resolve this dependency during install on the control plane node.
+ps_cert_manager_skipped_detail_msg: >-
+  cert-manager dependency skipped (disabled in values file).
+  CRDs are bundled in karavi-observability chart and will be applied automatically.
+ps_cert_manager_extract_fail_msg: >-
+  cert-manager chart was not extracted correctly to
+  {{ karavi_helm_chart_path }}/charts/cert-manager/.
+  The archive {{ cert_manager_chart_tgz | default('') }} may be corrupt.
+ps_cert_manager_missing_msg: >-
+  cert-manager Helm chart ({{ cert_manager_chart_tgz | default('') }}) was not found in
+  {{ karavi_helm_chart_path }}/charts/. This chart is required for TLS certificate
+  management. Ensure the Jetstack cert-manager entry exists in service_k8s.json
+  and run local_repo.yml to download it to Pulp.
+ps_dependency_fail_msg: >-
+  Failed to get karavi-observability dependencies from Pulp.
+  Ensure the following entries exist in service_k8s.json and run local_repo.yml:
+    - karavi-observability (git)
+    - helm-charts (git)
+    - {{ cert_manager_package | default('cert-manager') }} (tarball from Jetstack Helm repo)
