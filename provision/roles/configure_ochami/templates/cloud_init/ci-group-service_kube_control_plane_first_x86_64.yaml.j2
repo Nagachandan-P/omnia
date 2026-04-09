@@ -1105,7 +1105,7 @@
             # Step 5: Install karavi-observability Helm chart directly from NFS share
             if [ "$PS_TEL_FAILED" -eq 0 ]; then
               HELM_CHART_PATH="{{ k8s_client_mount_path }}/karavi-observability/helm-charts/charts/karavi-observability"
-              HELM_VALUES_FILE="{{ k8s_client_mount_path }}/karavi-observability/myvalues.yaml"
+              HELM_VALUES_FILE="{{ k8s_client_mount_path }}/karavi-observability/csm_metrics_values.yaml"
 
               # Verify cert-manager subchart is available (directory or archive)
               if [ -d "${HELM_CHART_PATH}/charts/cert-manager" ]; then

@@ -297,7 +297,6 @@ permission_644: "0644"
 
 # Internal namespace constants (not user-configurable)
 csm_namespace: "telemetry"
-csi_driver_namespace: "isilon"
 
 # CSM Metrics PowerScale resource limits
 csm_metrics_powerscale_resources:
@@ -312,20 +311,35 @@ csm_metrics_powerscale_resources:
 ps_csi_driver_not_configured_msg: >-
   PowerScale telemetry requires csi_driver_powerscale to be configured in software_config.json.
   Please add csi_driver_powerscale to software_config.json and re-run.
+ps_helm_values_path_missing_msg: >-
+  csm_observability_values_file_path is required in telemetry_config.yml when powerscale_telemetry_support is true.
+  Provide the path to your customized karavi-observability Helm values file.
+ps_helm_values_file_not_found_msg: >-
+  Helm values file not found at '{{ ps_helm_values_file | default('') }}'.
+  Please create a values file following the Dell CSM Observability documentation
+  and set the path in telemetry_config.yml (csm_observability_values_file_path).
+ps_helm_values_parse_fail_msg: >-
+  Failed to parse Helm values file at '{{ ps_helm_values_file | default('') }}'.
+  Please verify the file contains valid YAML.
 ps_cert_manager_disabled_msg: >-
   cert-manager must be enabled in the CSM Observability Helm values file.
-  Set 'cert-manager.enabled: true' in {{ ps_helm_values_file }}.
+  Set 'cert-manager.enabled: true' in {{ ps_helm_values_file | default('') }}.
   cert-manager is required for automatic TLS certificate management (otel-collector-tls secret).
 ps_auth_mode_direct_msg: "PowerScale telemetry authentication mode: Direct Authentication (Mode A)"
 ps_auth_mode_karavi_msg: "PowerScale telemetry authentication mode: Karavi Authorization (Mode B)"
 ps_csi_secret_read_fail_msg: >-
-  Failed to load CSI PowerScale driver secret from '{{ ps_csi_secret_path }}'.
+  Failed to load CSI PowerScale driver secret from '{{ ps_csi_secret_path | default('') }}'.
   Please verify the file exists and contains valid isilonClusters configuration.
 ps_no_clusters_found_msg: >-
   No PowerScale clusters found in CSI driver secret.yaml.
   Please define at least one cluster in isilonClusters.
 ps_clusters_found_msg: >-
   Found {{ ps_clusters | default([]) | length }} PowerScale cluster(s) for telemetry deployment.
+ps_telemetry_prepared_msg: >-
+  PowerScale telemetry files prepared on NFS share.
+  Helm chart: {{ karavi_helm_chart_path }}
+  Values file: {{ k8s_client_mount_path }}/karavi-observability/csm_metrics_values.yaml
+  Deployment will occur during cloud-init (PXE boot) on the control plane node.
 ps_cert_manager_pkg_msg: >-
   cert-manager package from service_k8s.json: {{ cert_manager_package | default('') }} ({{ cert_manager_chart_tgz | default('') }})
 ps_cert_manager_required_msg: "cert-manager dependency download: REQUIRED"

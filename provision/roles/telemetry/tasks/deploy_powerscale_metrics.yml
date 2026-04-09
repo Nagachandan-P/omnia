@@ -30,9 +30,7 @@
   ansible.builtin.assert:
     that:
       - ps_helm_values_file | length > 0
-    fail_msg: >-
-      csm_observability_values_file_path is required in telemetry_config.yml when powerscale_telemetry_support is true.
-      Provide the path to your customized karavi-observability Helm values file.
+    fail_msg: "{{ ps_helm_values_path_missing_msg }}"
 
 - name: Verify user-provided Helm values file exists
   ansible.builtin.stat:
@@ -42,10 +40,7 @@
 
 - name: Fail if user-provided Helm values file does not exist
   ansible.builtin.fail:
-    msg: >-
-      Helm values file not found at '{{ ps_helm_values_file }}'.
-      Please create a values file following the Dell CSM Observability documentation
-      and set the path in telemetry_config.yml (csm_observability_values_file_path).
+    msg: "{{ ps_helm_values_file_not_found_msg }}"
   when: not helm_values_stat.stat.exists
 
 # --- Read user values file to detect auth mode for secret copying ---
@@ -60,9 +55,7 @@
   rescue:
     - name: Failed to read user Helm values file
       ansible.builtin.fail:
-        msg: >-
-          Failed to parse Helm values file at '{{ ps_helm_values_file }}'.
-          Please verify the file contains valid YAML.
+        msg: "{{ ps_helm_values_parse_fail_msg }}"
 
 - name: Detect authentication mode from CSM Observability values
   ansible.builtin.set_fact:
@@ -72,6 +65,7 @@
 - name: Display authentication mode
   ansible.builtin.debug:
     msg: "{% if karavi_enabled | bool %}{{ ps_auth_mode_karavi_msg }}{% else %}{{ ps_auth_mode_direct_msg }}{% endif %}"
+    verbosity: 2
 
 # --- Validate cert-manager is enabled (required for TLS) ---
 
@@ -108,6 +102,7 @@
 - name: Display PowerScale clusters found
   ansible.builtin.debug:
     msg: "{{ ps_clusters_found_msg }}"
+    verbosity: 2
 
 # --- Air-gapped: Download and extract karavi-observability dependencies from Pulp to NFS ---
 
@@ -120,13 +115,10 @@
 - name: Copy user-provided Helm values file to NFS share
   ansible.builtin.copy:
     src: "{{ ps_helm_values_file }}"
-    dest: "{{ k8s_client_mount_path }}/karavi-observability/myvalues.yaml"
+    dest: "{{ k8s_client_mount_path }}/karavi-observability/csm_metrics_values.yaml"
     mode: '0600'
 
 - name: Display PowerScale telemetry preparation status
   ansible.builtin.debug:
-    msg: >-
-      PowerScale telemetry files prepared on NFS share.
-      Helm chart: {{ karavi_helm_chart_path }}
-      Values file: {{ k8s_client_mount_path }}/karavi-observability/myvalues.yaml
-      Deployment will occur during cloud-init (PXE boot) on the control plane node.
+    msg: "{{ ps_telemetry_prepared_msg }}"
+    verbosity: 2
