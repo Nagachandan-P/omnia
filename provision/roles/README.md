@@ -1,6 +1,6 @@
-# Discovery Roles Overview
+# Provision Roles Overview
 
-This directory contains Ansible roles for the Omnia node discovery and provisioning process. Each role handles a specific aspect of cluster node discovery, configuration, and service deployment.
+This directory contains Ansible roles for the Omnia node provisioning process. Each role handles a specific aspect of cluster node provisioning, configuration, and service deployment.
 
 ## Active Roles
 
@@ -17,17 +17,17 @@ Configures OpenCHAMI (Open Composable HPC Architecture Management Interface) for
 
 ---
 
-### 2. **discovery_validations**
-Validates all node discovery-related configuration files and inputs before the discovery process begins. Acts as a gatekeeper to prevent misconfigured deployments.
+### 2. **provision_validations**
+Validates all node provision-related configuration files and inputs before the provision process begins. Acts as a gatekeeper to prevent misconfigured deployments.
 
 **Key Functions**:
-- Discovery input file validation
+- Provision input file validation
 - Software configuration consistency checks
 - Mapping file validation
 - Telemetry configuration validation
 - Hosts file updates
 
-[View Detailed README](./discovery_validations/README.md)
+[View Detailed README](./provision_validations/README.md)
 
 ---
 
@@ -102,9 +102,9 @@ Configures Slurm workload manager settings and creates necessary directory struc
 
 ## Role Execution Order
 
-Typical discovery workflow role sequence:
+Typical provision workflow role sequence:
 
-1. **discovery_validations** - Validate all inputs
+1. **provision_validations** - Validate all inputs
 2. **nfs_client** - Mount NFS shares (if needed early)
 3. **openldap** - Setup LDAP connection parameters
 4. **k8s_config** - Generate Kubernetes configurations
