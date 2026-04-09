@@ -296,7 +296,7 @@ karavi_helm_chart_path: "{{ k8s_client_mount_path }}/karavi-observability/helm-c
 permission_644: "0644"
 
 # Internal namespace constants (not user-configurable)
-csm_namespace: "karavi"
+csm_namespace: "telemetry"
 csi_driver_namespace: "isilon"
 
 # Usage: deploy_powerscale_metrics.yml - messages
