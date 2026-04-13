@@ -203,6 +203,10 @@ class ResultPoller:
                         correlation_id=result.request_id.value if hasattr(result.request_id, 'value') else str(result.request_id),
                         client_id=str(result.job_id),
                     )
+
+                # S1-6: On deploy success, transition ImageGroup DEPLOYING -> DEPLOYED
+                if result.stage_name == "deploy":
+                    self._on_deploy_success(result)
             else:
                 error_code = result.error_code or "PLAYBOOK_FAILED"
                 error_summary = result.error_summary or "Playbook execution failed"
@@ -417,3 +421,89 @@ class ResultPoller:
                 exc,
             )
             return None
+
+    # ------------------------------------------------------------------
+    # S1-6: Deploy completion — ImageGroup status transitions
+    # ------------------------------------------------------------------
+
+    def _on_deploy_success(self, result: PlaybookResult) -> None:
+        """Transition ImageGroup from DEPLOYING to DEPLOYED on deploy success."""
+        if self._image_group_repo is None:
+            logger.warning(
+                "ImageGroup repo not available; skipping deploy status "
+                "update for job=%s",
+                result.job_id,
+            )
+            return
+
+        try:
+            image_group = self._image_group_repo.find_by_job_id(
+                JobId(str(result.job_id))
+            )
+            if image_group is None:
+                logger.error(
+                    "Deploy callback: No ImageGroup found for job=%s.",
+                    result.job_id,
+                )
+                return
+
+            self._image_group_repo.update_status(
+                image_group_id=image_group.id,
+                new_status=ImageGroupStatus.DEPLOYED,
+            )
+
+            if hasattr(self._image_group_repo, 'session'):
+                self._image_group_repo.session.commit()
+
+            logger.info(
+                "Deploy SUCCESS for job=%s. ImageGroup '%s' -> DEPLOYED.",
+                result.job_id,
+                image_group.id,
+            )
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception(
+                "Failed to update ImageGroup status on deploy success for job=%s: %s",
+                result.job_id,
+                exc,
+            )
+
+    def _on_deploy_failure(self, result: PlaybookResult) -> None:
+        """Transition ImageGroup from DEPLOYING to FAILED on deploy failure."""
+        if self._image_group_repo is None:
+            logger.warning(
+                "ImageGroup repo not available; skipping deploy failure "
+                "update for job=%s",
+                result.job_id,
+            )
+            return
+
+        try:
+            image_group = self._image_group_repo.find_by_job_id(
+                JobId(str(result.job_id))
+            )
+            if image_group is None:
+                logger.error(
+                    "Deploy failure callback: No ImageGroup found for job=%s.",
+                    result.job_id,
+                )
+                return
+
+            self._image_group_repo.update_status(
+                image_group_id=image_group.id,
+                new_status=ImageGroupStatus.FAILED,
+            )
+
+            if hasattr(self._image_group_repo, 'session'):
+                self._image_group_repo.session.commit()
+
+            logger.warning(
+                "Deploy FAILED for job=%s. ImageGroup '%s' -> FAILED.",
+                result.job_id,
+                image_group.id,
+            )
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception(
+                "Failed to update ImageGroup status on deploy failure for job=%s: %s",
+                result.job_id,
+                exc,
+            )
