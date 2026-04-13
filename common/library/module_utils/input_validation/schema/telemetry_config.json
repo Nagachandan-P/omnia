@@ -6,7 +6,7 @@
     "idrac_telemetry_support": {
       "type": "boolean"
     },
-    "idrac_telemetry_collection_type": {
+    "telemetry_collection_type": {
       "anyOf": [
         {
           "type": "string",
@@ -169,7 +169,7 @@
       ]
     }
   },
-  "required": ["idrac_telemetry_support", "idrac_telemetry_collection_type", "ldms_sampler_configurations", "ldms_agg_port", "ldms_store_port", "ldms_sampler_port", "powerscale_configurations" ],
+  "required": ["idrac_telemetry_support", "telemetry_collection_type", "ldms_sampler_configurations", "ldms_agg_port", "ldms_store_port", "ldms_sampler_port", "powerscale_configurations" ],
   "$defs": {
     "kafka_configurations": {
       "type": "object",
@@ -220,7 +220,7 @@
             }
           },
           "uniqueItems": true,
-          "description": "IMPORTANT: At least one Kafka topic must be defined. Topic names 'idrac' and 'ldms' are CONSTANTS. 'idrac' is required if idrac_telemetry_support is true and kafka is in idrac_telemetry_collection_type. 'ldms' is required if LDMS software is configured in software_config.json (automatic detection). Only partition counts can be changed.",
+          "description": "IMPORTANT: At least one Kafka topic must be defined. Topic names 'idrac' and 'ldms' are CONSTANTS. 'idrac' is required if idrac_telemetry_support is true and kafka is in telemetry_collection_type. 'ldms' is required if LDMS software is configured in software_config.json (automatic detection). Only partition counts can be changed.",
           "errorMessage": {
             "minItems": "At least 1 Kafka topic must be defined. Configure based on enabled features.",
             "maxItems": "Maximum 2 topics allowed: 'idrac' and 'ldms'",
@@ -271,7 +271,7 @@
       "if": {
         "properties": {
             "idrac_telemetry_support": { "const": true },
-            "idrac_telemetry_collection_type": { "pattern": "(?i)^kafka$" }
+            "telemetry_collection_type": { "pattern": "(?i)^kafka$" }
         }
       },
       "then": {
@@ -285,7 +285,7 @@
       "if": {
         "properties": {
           "idrac_telemetry_support": { "const": true },
-          "idrac_telemetry_collection_type": { "pattern": "(?i)^victoria$" }
+          "telemetry_collection_type": { "pattern": "(?i)^victoria$" }
         }
       },
       "then": {
@@ -299,7 +299,7 @@
       "if": {
         "properties": {
           "idrac_telemetry_support": { "const": true },
-          "idrac_telemetry_collection_type": {
+          "telemetry_collection_type": {
             "pattern": "(?i)^(victoria,kafka|kafka,victoria)$"
           }
         }

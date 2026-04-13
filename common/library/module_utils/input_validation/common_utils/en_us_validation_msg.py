@@ -268,7 +268,7 @@ TELEMETRY_SERVICE_CLUSTER_ENTRY_FOR_LDMS_MISSING_ROLES_CONFIG_MSG= ("requires se
 POWERSCALE_VICTORIA_REQUIRED_MSG = (
     "PowerScale telemetry requires VictoriaMetrics to be deployed. "
     "When powerscale_configurations.powerscale_telemetry_support is true, 'victoria' must be included in "
-    "idrac_telemetry_collection_type (e.g., 'victoria' or 'victoria,kafka')."
+    "telemetry_collection_type (e.g., 'victoria' or 'victoria,kafka')."
 )
 POWERSCALE_CSI_DRIVER_MISSING_MSG = (
     "csi_driver_powerscale is not configured in software_config.json. "

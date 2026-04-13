@@ -82,13 +82,13 @@ idrac_telemetry_support: true
 #   - "kafka"           : Store in Kafka only
 #   - "victoria,kafka"  : Store in both (recommended)
 # Default: "victoria,kafka"
-idrac_telemetry_collection_type: "victoria,kafka"
+telemetry_collection_type: "victoria,kafka"
 
 # ============================================================================
 # VICTORIAMETRICS CONFIGURATION
 # ============================================================================
 # VictoriaMetrics is a time-series database for storing telemetry metrics.
-# Used for iDRAC telemetry when 'victoria' is enabled in idrac_telemetry_collection_type.
+# Used for iDRAC telemetry when 'victoria' is enabled in telemetry_collection_type.
 #
 # DEPLOYMENT MODES:
 #   - single-node: Simple deployment with one pod (suitable for small deployments)
@@ -130,7 +130,7 @@ victoria_configurations:
 # KAFKA CONFIGURATION
 # ============================================================================
 # Apache Kafka is a distributed streaming platform for storing telemetry data.
-# Used for iDRAC telemetry when 'kafka' is enabled in idrac_telemetry_collection_type.
+# Used for iDRAC telemetry when 'kafka' is enabled in telemetry_collection_type.
 # Also used for LDMS telemetry when LDMS software is configured.
 #
 # NOTE: Kafka topics are auto-generated based on enabled features:
@@ -282,7 +282,7 @@ ldms_sampler_configurations:
 #   - csi_driver_powerscale must be configured in software_config.json
 #   - Service cluster must be defined in functional_groups_config.yml
 #   - VictoriaMetrics must be enabled: 'victoria' must be included in
-#     idrac_telemetry_collection_type (e.g., "victoria" or "victoria,kafka")
+#     telemetry_collection_type (e.g., "victoria" or "victoria,kafka")
 #   - CSI driver secret.yaml with valid isilonClusters credentials
 #   - CSM Observability values.yaml must be provided
 #
