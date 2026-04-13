@@ -264,6 +264,25 @@
         "retention_period"
       ],
       "additionalProperties": false
+    },
+    "victoria_logs_configurations": {
+      "type": "object",
+      "description": "VictoriaLogs cluster mode configuration. Deployed alongside VictoriaMetrics when 'victoria' is in collection type.",
+      "properties": {
+        "storage_size": {
+          "type": "string",
+          "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)$",
+          "default": "8Gi",
+          "description": "Storage size per vlstorage replica PVC. Total = storage_size x 2 replicas.",
+          "errorMessage": "storage_size must be a valid Kubernetes PVC size (e.g., '8Gi', '50Gi', '1Ti')"
+        },
+        "retention_period": {
+          "type": "integer",
+          "minimum": 24
+        }
+      },
+      "required": ["storage_size", "retention_period"],
+      "additionalProperties": false
     }
   },
   "allOf": [
@@ -289,9 +308,10 @@
         }
       },
       "then": {
-        "required": ["victoria_configurations"],
+        "required": ["victoria_configurations", "victoria_logs_configurations"],
         "properties": {
-          "victoria_configurations": { "$ref": "#/$defs/victoria_configurations" }
+          "victoria_configurations": { "$ref": "#/$defs/victoria_configurations" },
+          "victoria_logs_configurations": { "$ref": "#/$defs/victoria_logs_configurations" }
         }
       }
     },
@@ -305,10 +325,11 @@
         }
       },
       "then": {
-        "required": ["kafka_configurations", "victoria_configurations"],
+        "required": ["kafka_configurations", "victoria_configurations", "victoria_logs_configurations"],
         "properties": {
           "kafka_configurations": { "$ref": "#/$defs/kafka_configurations" },
-          "victoria_configurations": { "$ref": "#/$defs/victoria_configurations" }
+          "victoria_configurations": { "$ref": "#/$defs/victoria_configurations" },
+          "victoria_logs_configurations": { "$ref": "#/$defs/victoria_logs_configurations" }
         }
       }
     }

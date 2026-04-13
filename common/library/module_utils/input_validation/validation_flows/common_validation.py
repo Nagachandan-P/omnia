@@ -21,6 +21,7 @@ import csv
 import ipaddress
 import json
 import os
+import re
 from collections import Counter
 
 import yaml
