@@ -293,18 +293,18 @@ ldms_sampler_configurations:
 # │ OTEL Collector      │ 5Gi          │ 1 per cluster│ 5Gi per cluster  │
 # └─────────────────────┴──────────────┴──────────────┴──────────────────┘
 
-# Enable or disable PowerScale telemetry support
-# Accepted values: true or false
-# Default: false
-powerscale_telemetry_support: false
-
-# Enable or disable PowerScale log collection (syslog → VictoriaLogs)
-# Requires powerscale_telemetry_support: true
-# Accepted values: true or false
-# Default: false
-powerscale_log_enabled: false
-
 powerscale_configurations:
+  # Enable or disable PowerScale telemetry support
+  # Accepted values: true or false
+  # Default: true
+  powerscale_telemetry_support: true
+
+  # Enable or disable PowerScale log collection (syslog → VictoriaLogs)
+  # Requires powerscale_telemetry_support: true
+  # Accepted values: true or false
+  # Default: false
+  powerscale_log_enabled: false
+
   # PVC size for OTEL Collector metric batching and buffering.
   # Adjust based on cluster scale and metric volume.
   # Accepted values: in the form of "X[Ki|Mi|Gi|Ti|Pi|Ei]"
@@ -324,11 +324,21 @@ powerscale_configurations:
   #     enabled: true
   #     ...
   #
-  # If CSM Authorization is enabled, configure:
-  #   karaviMetricsPowerscale.authorization.enabled: true
-  #   karaviMetricsPowerscale.authorization.proxyHost: "<host>"
+  # AUTHENTICATION MODE (configured in the Helm values file):
+  #   Mode A - Direct Authentication (default):
+  #     karaviMetricsPowerscale.authorization.enabled: false (or omit)
+  #     Only isilon-creds secret is copied to the telemetry namespace.
   #
-  # Required when powerscale_telemetry_support: true
+  #   Mode B - Karavi Authorization:
+  #     karaviMetricsPowerscale.authorization.enabled: true
+  #     karaviMetricsPowerscale.authorization.proxyHost: "<csm-auth-proxy-host>"
+  #     Requires CSI driver deployed with CSM Authorization enabled.
+  #     Additional resources are automatically copied to the telemetry namespace:
+  #       - isilon-config-params ConfigMap
+  #       - isilon-proxy-server-root-certificate Secret
+  #       - isilon-proxy-authz-tokens Secret
+  #
+  # Required when powerscale_configurations.powerscale_telemetry_support: true
   # Reference: https://github.com/dell/helm-charts/blob/main/charts/karavi-observability/values.yaml
   csm_observability_values_file_path: ""
 

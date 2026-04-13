@@ -312,7 +312,7 @@ ps_csi_driver_not_configured_msg: >-
   PowerScale telemetry requires csi_driver_powerscale to be configured in software_config.json.
   Please add csi_driver_powerscale to software_config.json and re-run.
 ps_helm_values_path_missing_msg: >-
-  csm_observability_values_file_path is required in telemetry_config.yml when powerscale_telemetry_support is true.
+  csm_observability_values_file_path is required in telemetry_config.yml when powerscale_configurations.powerscale_telemetry_support is true.
   Provide the path to your customized karavi-observability Helm values file.
 ps_helm_values_file_not_found_msg: >-
   Helm values file not found at '{{ ps_helm_values_file | default('') }}'.

@@ -39,19 +39,19 @@
       "default": 10001,
       "description": "LDMS sampler port on compute nodes. Valid range: 10001-10100. Default: 10001"
     },
-    "powerscale_telemetry_support": {
-      "type": "boolean",
-      "default": false,
-      "description": "Enable or disable PowerScale telemetry support. Requires csi_driver_powerscale in software_config.json."
-    },
-    "powerscale_log_enabled": {
-      "type": "boolean",
-      "default": false,
-      "description": "Enable or disable PowerScale log collection (syslog to VictoriaLogs). Requires powerscale_telemetry_support: true."
-    },
     "powerscale_configurations": {
       "type": "object",
       "properties": {
+        "powerscale_telemetry_support": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable PowerScale telemetry support. Requires csi_driver_powerscale in software_config.json."
+        },
+        "powerscale_log_enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable or disable PowerScale log collection (syslog to VictoriaLogs). Requires powerscale_telemetry_support: true."
+        },
         "otel_collector_storage_size": {
           "type": "string",
           "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)$",
@@ -84,7 +84,7 @@
           "description": "Additional VictoriaMetrics remote_write endpoints. vmagent writes to all configured endpoints."
         }
       },
-      "required": ["otel_collector_storage_size", "csm_observability_values_file_path"]
+      "required": ["powerscale_telemetry_support", "otel_collector_storage_size", "csm_observability_values_file_path"]
     },
     "ldms_sampler_configurations": {
       "anyOf": [
@@ -169,7 +169,7 @@
       ]
     }
   },
-  "required": ["idrac_telemetry_support", "idrac_telemetry_collection_type", "ldms_sampler_configurations", "ldms_agg_port", "ldms_store_port", "ldms_sampler_port", "powerscale_telemetry_support" ],
+  "required": ["idrac_telemetry_support", "idrac_telemetry_collection_type", "ldms_sampler_configurations", "ldms_agg_port", "ldms_store_port", "ldms_sampler_port", "powerscale_configurations" ],
   "$defs": {
     "kafka_configurations": {
       "type": "object",
