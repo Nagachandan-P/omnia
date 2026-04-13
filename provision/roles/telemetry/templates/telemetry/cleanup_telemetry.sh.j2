@@ -23,8 +23,9 @@
 #   ldms       - Delete LDMS aggregator and store
 #   idrac      - Delete iDRAC telemetry
 #   victoria   - Delete VictoriaMetrics monitoring
-#   powerscale - Delete PowerScale telemetry (CSM Metrics, OTEL Collector, vmagent-powerscale)
+#   powerscale - Delete PowerScale telemetry (karavi-observability Helm release, CSM Metrics, OTEL Collector)
 #   all        - Delete everything (default if no arguments)
+#
 
 set -e
 
@@ -63,20 +64,22 @@ else
                 CLEAN_ALL=true
                 ;;
             -h|--help)
-                echo "Usage: $0 [kafka] [ldms] [idrac] [victoria] [all]"
+                echo "Usage: $0 [kafka] [ldms] [idrac] [victoria] [powerscale] [all]"
                 echo ""
                 echo "Options:"
-                echo "  kafka    - Delete Kafka cluster, users, and bridge"
-                echo "  ldms     - Delete LDMS aggregator and store"
-                echo "  idrac    - Delete iDRAC telemetry"
-                echo "  victoria - Delete VictoriaMetrics monitoring"
-                echo "  all      - Delete everything (default if no arguments)"
+                echo "  kafka      - Delete Kafka cluster, users, and bridge"
+                echo "  ldms       - Delete LDMS aggregator and store"
+                echo "  idrac      - Delete iDRAC telemetry"
+                echo "  victoria   - Delete VictoriaMetrics monitoring"
+                echo "  powerscale - Delete PowerScale telemetry (karavi-observability Helm release)"
+                echo "  all        - Delete everything (default if no arguments)"
                 echo ""
                 echo "Examples:"
                 echo "  $0                    # Delete everything"
                 echo "  $0 all                # Delete everything"
                 echo "  $0 kafka ldms         # Delete only Kafka and LDMS"
                 echo "  $0 idrac victoria     # Delete only iDRAC and Victoria"
+                echo "  $0 powerscale         # Delete only PowerScale telemetry"
                 exit 0
                 ;;
             *)
@@ -227,7 +230,7 @@ if [ "$CLEAN_KAFKA" = true ]; then
     echo ""
 fi
 
-if [ "$CLEAN_KAFKA" = true ] || [ "$CLEAN_LDMS" = true ] || [ "$CLEAN_IDRAC" = true ] || [ "$CLEAN_VICTORIA" = true ]; then
+if [ "$CLEAN_KAFKA" = true ] || [ "$CLEAN_LDMS" = true ] || [ "$CLEAN_IDRAC" = true ] || [ "$CLEAN_VICTORIA" = true ] || [ "$CLEAN_POWERSCALE" = true ]; then
     echo "Step 7: Delete Persistent Volume Claims"
     echo "----------------------------------------"
     if [ "$CLEAN_KAFKA" = true ]; then
@@ -250,8 +253,9 @@ if [ "$CLEAN_KAFKA" = true ] || [ "$CLEAN_LDMS" = true ] || [ "$CLEAN_IDRAC" = t
         done
     fi
     if [ "$CLEAN_POWERSCALE" = true ]; then
-        # Delete OTEL Collector PVCs
-        delete_all pvc "app=otel-collector-powerscale"
+        # Delete OTEL Collector PVC (created by cloud-init post-Helm-install)
+        delete_resource pvc otel-collector-data
+        delete_all pvc "app.kubernetes.io/name=otel-collector"
     fi
     sleep 2
     echo ""
@@ -395,18 +399,33 @@ if [ "$CLEAN_POWERSCALE" = true ]; then
     echo "Step: Delete PowerScale Telemetry"
     echo "----------------------------------"
 
-    # Delete metrics pipeline components
-    echo "Deleting CSM Metrics PowerScale..."
-    delete_all deployment "app=csm-metrics-powerscale"
-    delete_all service "app=csm-metrics-powerscale"
-    delete_all configmap "app=csm-metrics-powerscale"
-    delete_all pod "app=csm-metrics-powerscale"
+    # Uninstall karavi-observability Helm release (primary deployment method)
+    echo "Uninstalling karavi-observability Helm release..."
+    if helm list -n $NAMESPACE --filter karavi-observability -q 2>/dev/null | grep -q karavi-observability; then
+        helm uninstall karavi-observability -n $NAMESPACE --wait --timeout 5m 2>/dev/null || true
+        echo "Helm release karavi-observability uninstalled."
+        sleep 5
+    else
+        echo "No karavi-observability Helm release found."
+    fi
 
-    echo "Deleting OTEL Collector PowerScale..."
-    delete_all deployment "app=otel-collector-powerscale"
-    delete_all service "app=otel-collector-powerscale"
-    delete_all configmap "app=otel-collector-powerscale"
-    delete_all pod "app=otel-collector-powerscale"
+    # Delete Helm-managed resources by label (karavi-observability Helm chart)
+    echo "Deleting CSM Metrics PowerScale (Helm-managed)..."
+    delete_all deployment "app.kubernetes.io/name=karavi-metrics-powerscale"
+    delete_all service "app.kubernetes.io/name=karavi-metrics-powerscale"
+    delete_all configmap "app.kubernetes.io/name=karavi-metrics-powerscale"
+    delete_all pod "app.kubernetes.io/name=karavi-metrics-powerscale"
+
+    echo "Deleting OTEL Collector (Helm-managed)..."
+    delete_all deployment "app.kubernetes.io/name=otel-collector"
+    delete_all service "app.kubernetes.io/name=otel-collector"
+    delete_all configmap "app.kubernetes.io/name=otel-collector"
+    delete_all pod "app.kubernetes.io/name=otel-collector"
+
+    # Delete cert-manager resources deployed by karavi-observability sub-chart
+    echo "Deleting cert-manager resources (Helm sub-chart)..."
+    delete_all deployment "app.kubernetes.io/instance=karavi-observability,app.kubernetes.io/name=cert-manager"
+    delete_all pod "app.kubernetes.io/instance=karavi-observability,app.kubernetes.io/name=cert-manager"
 
     # Note: vmagent is shared with iDRAC telemetry - not deleted here.
     # PowerScale scrape targets are removed from vmagent config on next deployment.
@@ -447,8 +466,9 @@ if [ "$CLEAN_VICTORIA" = true ]; then
     kubectl -n $NAMESPACE delete pod -l app=victoria-tls-test --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
 fi
 if [ "$CLEAN_POWERSCALE" = true ]; then
-    kubectl -n $NAMESPACE delete pod -l app=csm-metrics-powerscale --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
-    kubectl -n $NAMESPACE delete pod -l app=otel-collector-powerscale --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
+    kubectl -n $NAMESPACE delete pod -l app.kubernetes.io/name=karavi-metrics-powerscale --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
+    kubectl -n $NAMESPACE delete pod -l app.kubernetes.io/name=otel-collector --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
+    kubectl -n $NAMESPACE delete pod -l app.kubernetes.io/instance=karavi-observability,app.kubernetes.io/name=cert-manager --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
 fi
 sleep 5
 
@@ -484,17 +504,11 @@ fi
 if [ "$CLEAN_POWERSCALE" = true ]; then
     echo "Remaining PowerScale telemetry resources:"
     echo "  CSM Metrics:"
-    kubectl -n $NAMESPACE get deployment,pod -l app=csm-metrics-powerscale 2>/dev/null || echo "    None"
+    kubectl -n $NAMESPACE get deployment,pod -l app.kubernetes.io/name=karavi-metrics-powerscale 2>/dev/null || echo "    None"
     echo "  OTEL Collector:"
-    kubectl -n $NAMESPACE get deployment,pod -l app=otel-collector-powerscale 2>/dev/null || echo "    None"
-    echo ""
-fi
-if [ "$CLEAN_POWERSCALE" = true ]; then
-    echo "Remaining PowerScale telemetry resources:"
-    echo "  CSM Metrics:"
-    kubectl -n $NAMESPACE get deployment,pod -l app=csm-metrics-powerscale 2>/dev/null || echo "    None"
-    echo "  OTEL Collector:"
-    kubectl -n $NAMESPACE get deployment,pod -l app=otel-collector-powerscale 2>/dev/null || echo "    None"
+    kubectl -n $NAMESPACE get deployment,pod -l app.kubernetes.io/name=otel-collector 2>/dev/null || echo "    None"
+    echo "  Helm release:"
+    helm list -n $NAMESPACE --filter karavi-observability 2>/dev/null || echo "    None"
     echo ""
 fi
 echo "Remaining PVCs:"
