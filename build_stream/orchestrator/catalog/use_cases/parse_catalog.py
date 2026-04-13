@@ -14,14 +14,21 @@
 
 # pylint: disable=too-many-arguments,too-many-positional-arguments
 
-"""ParseCatalog use case implementation."""
+"""ParseCatalog use case implementation.
+
+Enhanced (S1-4 Part A):
+- Extracts image_group_id from catalog JSON top-level key
+- Validates image_group_id uniqueness against image_groups table
+- Persists catalog metadata (image_group_id, roles, role-to-image mapping)
+  as an NFS artifact for downstream build-image consumption
+"""
 
 import json
 import logging
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 import hashlib
 
@@ -33,10 +40,14 @@ from core.artifacts.interfaces import ArtifactMetadataRepository, ArtifactStore
 from core.artifacts.value_objects import ArtifactDigest, ArtifactKind, ArtifactRef, StoreHint
 from core.catalog.exceptions import (
     CatalogSchemaValidationError,
+    InvalidCatalogFormatError,
     InvalidFileFormatError,
     InvalidJSONError,
 )
 from core.catalog.generator import generate_root_json_from_catalog
+from core.image_group.exceptions import DuplicateImageGroupError
+from core.image_group.repositories import ImageGroupRepository
+from core.image_group.value_objects import ImageGroupId
 from core.jobs.entities import AuditEvent, Job, Stage
 from core.jobs.exceptions import (
     InvalidStateTransitionError,
@@ -71,10 +82,11 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
     Orchestrates:
     1. Stage guard validation (job exists, stage PENDING)
     2. Catalog validation (format, JSON, schema)
-    3. Root JSON generation via existing generator
-    4. Artifact storage (catalog file + root JSONs archive)
-    5. Artifact metadata persistence
-    6. Stage state transitions and audit events
+    3. ImageGroup ID extraction and uniqueness check (S1-4 Part A)
+    4. Root JSON generation via existing generator
+    5. Artifact storage (catalog file + root JSONs archive + catalog metadata)
+    6. Artifact metadata persistence
+    7. Stage state transitions and audit events
     """
 
     def __init__(
@@ -85,6 +97,7 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
         artifact_store: ArtifactStore,
         artifact_metadata_repo: ArtifactMetadataRepository,
         uuid_generator: UUIDGenerator,
+        image_group_repo: ImageGroupRepository = None,
     ) -> None:
         self._job_repo = job_repo
         self._stage_repo = stage_repo
@@ -92,16 +105,21 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
         self._artifact_store = artifact_store
         self._artifact_metadata_repo = artifact_metadata_repo
         self._uuid_generator = uuid_generator
+        self._image_group_repo = image_group_repo
         self._current_job: Job | None = None
 
     def execute(self, command: ParseCatalogCommand) -> ParseCatalogResult:
         """Execute the parse-catalog stage.
 
+        Enhanced (S1-4 Part A): Now extracts image_group_id from the catalog
+        top-level key, validates uniqueness against image_groups table, and
+        persists catalog metadata for downstream build-image consumption.
+
         Args:
             command: ParseCatalogCommand with job_id, filename, content.
 
         Returns:
-            ParseCatalogResult with stage outcome and artifact references.
+            ParseCatalogResult with stage outcome, artifact refs, and image_group_id.
 
         Raises:
             JobNotFoundError: If job does not exist.
@@ -109,6 +127,8 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
             StageAlreadyCompletedError: If stage already completed.
             InvalidFileFormatError: If file is not JSON.
             InvalidJSONError: If content is not valid JSON dict.
+            InvalidCatalogFormatError: If catalog structure is invalid.
+            DuplicateImageGroupError: If ImageGroup already exists (409).
             CatalogSchemaValidationError: If catalog fails schema validation.
             ArtifactStoreError: If artifact storage fails.
         """
@@ -124,13 +144,26 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
             self._mark_stage_started(job, stage, command)
             self._validate_file_format(command.filename)
             catalog_data = self._parse_and_validate_json(command.content)
+
+            # S1-4 Part A: Extract image_group_id, check uniqueness,
+            # extract catalog metadata
+            image_group_id = self._extract_image_group_id(catalog_data)
+            self._check_image_group_uniqueness(image_group_id)
+            catalog_metadata = self._extract_catalog_metadata(
+                catalog_data, image_group_id
+            )
+
             catalog_ref = self._store_catalog_artifact(command)
             root_jsons_ref = self._generate_and_store_root_jsons(
                 command, catalog_data
             )
+
+            # S1-4 Part A: Store catalog metadata for build-image
+            self._store_catalog_metadata_artifact(command, catalog_metadata)
+
             self._mark_stage_completed(stage, command)
             return self._build_success_result(
-                command, catalog_ref, root_jsons_ref
+                command, catalog_ref, root_jsons_ref, catalog_metadata
             )
         except Exception as e:
             self._mark_stage_failed(stage, command, e)
@@ -219,6 +252,171 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
                 "Invalid JSON data. The data must be a dictionary."
             )
         return data
+
+    # ------------------------------------------------------------------
+    # S1-4 Part A: ImageGroup ID extraction and uniqueness
+    # ------------------------------------------------------------------
+
+    def _extract_image_group_id(self, catalog_data: dict) -> str:
+        """Extract ImageGroupID from the catalog JSON top-level key.
+
+        The catalog JSON has exactly one top-level key that serves as the
+        ImageGroupID (e.g., 'omnia-cluster-v1.2').
+
+        Args:
+            catalog_data: Parsed catalog JSON as a dict.
+
+        Returns:
+            The ImageGroupID string (1-128 characters).
+
+        Raises:
+            InvalidCatalogFormatError: If catalog has zero or multiple
+                top-level keys, or if the key is empty/too long.
+        """
+        top_level_keys = list(catalog_data.keys())
+
+        if len(top_level_keys) == 0:
+            raise InvalidCatalogFormatError(
+                "Catalog JSON is empty - no top-level key found"
+            )
+
+        if len(top_level_keys) > 1:
+            raise InvalidCatalogFormatError(
+                f"Catalog JSON has {len(top_level_keys)} top-level keys; "
+                f"expected exactly 1. Keys found: {top_level_keys}"
+            )
+
+        image_group_id = top_level_keys[0]
+
+        if not image_group_id or not image_group_id.strip():
+            raise InvalidCatalogFormatError(
+                "Catalog top-level key is empty or whitespace"
+            )
+
+        if len(image_group_id) > ImageGroupId.MAX_LENGTH:
+            raise InvalidCatalogFormatError(
+                f"Catalog top-level key exceeds {ImageGroupId.MAX_LENGTH} "
+                f"characters (length: {len(image_group_id)})"
+            )
+
+        return image_group_id
+
+    def _check_image_group_uniqueness(self, image_group_id: str) -> None:
+        """Check that no ImageGroup with this ID already exists.
+
+        Args:
+            image_group_id: The extracted ImageGroupID from the catalog.
+
+        Raises:
+            DuplicateImageGroupError: If an ImageGroup with this ID
+                already exists in the database. Maps to HTTP 409 Conflict.
+        """
+        if self._image_group_repo is None:
+            logger.debug(
+                "ImageGroup repo not available; skipping uniqueness check"
+            )
+            return
+
+        exists = self._image_group_repo.exists(ImageGroupId(image_group_id))
+        if exists:
+            raise DuplicateImageGroupError(image_group_id)
+
+    def _extract_catalog_metadata(
+        self, catalog_data: dict, image_group_id: str
+    ) -> dict:
+        """Extract role/image mappings from catalog for build-image.
+
+        Args:
+            catalog_data: Parsed catalog JSON as a dict.
+            image_group_id: The top-level key (ImageGroupID).
+
+        Returns:
+            Dict with image_group_id, roles, role_images, and catalog info.
+        """
+        catalog_content = catalog_data.get(image_group_id, {})
+        roles_section = catalog_content.get("roles", {})
+
+        roles = sorted(roles_section.keys())
+        role_images: Dict[str, str] = {}
+        for role_name, role_config in roles_section.items():
+            image_name = (
+                role_config.get("image_name")
+                if isinstance(role_config, dict) else None
+            )
+            if not image_name:
+                image_name = f"{role_name}.img"
+            role_images[role_name] = image_name
+
+        return {
+            "image_group_id": image_group_id,
+            "roles": roles,
+            "role_images": role_images,
+            "os": catalog_content.get("os", ""),
+            "version": catalog_content.get("version", ""),
+            "arch": catalog_content.get("arch", "x86_64"),
+        }
+
+    def _store_catalog_metadata_artifact(
+        self, command: ParseCatalogCommand, catalog_metadata: dict
+    ) -> ArtifactRef:
+        """Store catalog metadata as a FILE artifact for build-image.
+
+        The metadata includes image_group_id, roles, and role-to-image
+        mappings extracted from the catalog. This is consumed by the
+        build-image completion callback to create ImageGroup and Image
+        records in the database.
+        """
+        metadata_with_timestamp = {
+            **catalog_metadata,
+            "parsed_at": datetime.now(timezone.utc).isoformat(),
+        }
+        content = json.dumps(
+            metadata_with_timestamp, indent=2
+        ).encode("utf-8")
+
+        hint = StoreHint(
+            namespace="catalog",
+            label="catalog-metadata",
+            tags={"job_id": str(command.job_id)},
+        )
+
+        try:
+            metadata_ref = self._artifact_store.store(
+                hint=hint,
+                kind=ArtifactKind.FILE,
+                content=content,
+                content_type="application/json",
+            )
+        except ArtifactAlreadyExistsError:
+            key = self._artifact_store.generate_key(hint, ArtifactKind.FILE)
+            raw = self._artifact_store.retrieve(key, ArtifactKind.FILE)
+            digest = ArtifactDigest(hashlib.sha256(raw).hexdigest())
+            metadata_ref = ArtifactRef(
+                key=key, digest=digest, size_bytes=len(raw),
+                uri=f"memory://{key.value}",
+            )
+
+        record = ArtifactRecord(
+            id=str(self._uuid_generator.generate()),
+            job_id=command.job_id,
+            stage_name=StageName(StageType.PARSE_CATALOG.value),
+            label="catalog-metadata",
+            artifact_ref=metadata_ref,
+            kind=ArtifactKind.FILE,
+            content_type="application/json",
+            tags={"job_id": str(command.job_id)},
+        )
+        self._artifact_metadata_repo.save(record)
+
+        logger.info(
+            "Stored catalog metadata artifact: job_id=%s, "
+            "image_group_id=%s, roles=%s",
+            command.job_id,
+            catalog_metadata.get("image_group_id"),
+            catalog_metadata.get("roles"),
+        )
+
+        return metadata_ref
 
     # ------------------------------------------------------------------
     # Artifact storage
@@ -394,7 +592,11 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
             error_code=error_code,
             error_summary=error_summary,
             correlation_id=str(command.correlation_id),
-            client_id=str(command.client_id),
+            client_id=str(
+                self._current_job.client_id
+                if self._current_job is not None
+                else "unknown"
+            ),
         )
 
     # ------------------------------------------------------------------
@@ -433,8 +635,10 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
         command: ParseCatalogCommand,
         catalog_ref: ArtifactRef,
         root_jsons_ref: ArtifactRef,
+        catalog_metadata: dict = None,
     ) -> ParseCatalogResult:
         """Build the success result DTO."""
+        metadata = catalog_metadata or {}
         return ParseCatalogResult(
             job_id=str(command.job_id),
             stage_state="COMPLETED",
@@ -444,4 +648,7 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
             root_json_count=0,  # No longer tracking file count
             arch_os_combinations=[],  # No longer tracking combinations
             completed_at=datetime.now(timezone.utc).isoformat(),
+            image_group_id=metadata.get("image_group_id", ""),
+            roles=metadata.get("roles", []),
+            role_images=metadata.get("role_images", {}),
         )

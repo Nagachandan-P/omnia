@@ -208,6 +208,8 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         audit_repo=audit_repository,
         uuid_generator=uuid_generator,
         poll_interval=int(os.getenv("RESULT_POLL_INTERVAL", "5")),
+        image_group_repo=image_group_repository,
+        image_repo=image_repository,
     )
 
     # --- Use cases ---
@@ -245,6 +247,7 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         artifact_store=artifact_store,
         artifact_metadata_repo=artifact_metadata_repository,
         uuid_generator=uuid_generator,
+        image_group_repo=image_group_repository,
     )
 
     generate_input_files_use_case = providers.Factory(
@@ -384,6 +387,8 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         audit_repo=audit_repository,
         uuid_generator=uuid_generator,
         poll_interval=int(os.getenv("RESULT_POLL_INTERVAL", "5")),
+        image_group_repo=image_group_repository,
+        image_repo=image_repository,
     )
 
     # --- Use cases ---
@@ -422,6 +427,7 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         artifact_store=artifact_store,
         artifact_metadata_repo=artifact_metadata_repository,
         uuid_generator=uuid_generator,
+        image_group_repo=image_group_repository,
     )
     create_build_image_use_case = providers.Factory(
         CreateBuildImageUseCase,
