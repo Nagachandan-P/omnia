@@ -39,6 +39,7 @@ CLEAN_VICTORIA=false
 CLEAN_POWERSCALE=false
 CLEAN_ALL=false
 
+
 if [ $# -eq 0 ]; then
     CLEAN_ALL=true
 else
@@ -245,10 +246,10 @@ if [ "$CLEAN_KAFKA" = true ] || [ "$CLEAN_LDMS" = true ] || [ "$CLEAN_IDRAC" = t
         # Delete single-node PVCs
         delete_all pvc "app=victoria-metric"
         delete_resource pvc victoria-metrics-pvc-victoria-metric-0
-        # Delete cluster mode PVCs (vmstorage StatefulSet PVCs)
-        delete_all pvc "app=vmstorage"
+        # Delete cluster mode PVCs (operator-managed vmstorage StatefulSet PVCs)
+        delete_all pvc "app.kubernetes.io/instance=victoria-cluster"
         for i in {0..9}; do
-            delete_resource pvc vmstorage-data-vmstorage-$i
+            delete_resource pvc vmstorage-data-vmstorage-victoria-cluster-$i
         done
     fi
     if [ "$CLEAN_POWERSCALE" = true ]; then
@@ -334,10 +335,11 @@ if [ "$CLEAN_KAFKA" = true ] || [ "$CLEAN_VICTORIA" = true ]; then
     fi
     if [ "$CLEAN_VICTORIA" = true ]; then
         delete_resource service victoria-metric
-        delete_resource service vmselect
-        delete_resource service vminsert
-        delete_resource service vmstorage
-        delete_resource service vmagent
+        # Operator-managed cluster services
+        delete_resource service vmselect-victoria-cluster
+        delete_resource service vminsert-victoria-cluster
+        delete_resource service vmstorage-victoria-cluster
+        delete_resource service vmagent-victoria-cluster
     fi
     sleep 2
     echo ""
@@ -347,17 +349,23 @@ if [ "$CLEAN_VICTORIA" = true ]; then
     echo "Step 12: Delete Monitoring Resources"
     echo "-------------------------------------"
     
-    # Delete VictoriaMetrics cluster components (if cluster mode is deployed)
+    # Delete VictoriaMetrics operator CRD resources (operator cascades deletion)
+    echo "Deleting VictoriaMetrics operator CRD resources..."
+    kubectl -n $NAMESPACE delete vmcluster victoria-cluster --ignore-not-found=true 2>/dev/null || true
+    kubectl -n $NAMESPACE delete vmagent --all --ignore-not-found=true 2>/dev/null || true
+    kubectl -n $NAMESPACE delete vmpodscrape --all --ignore-not-found=true 2>/dev/null || true
+    kubectl -n $NAMESPACE delete vmsingle --all --ignore-not-found=true 2>/dev/null || true
+    sleep 5
+
+    # Delete any remaining operator-managed cluster components
     echo "Deleting VictoriaMetrics cluster components..."
-    delete_resource deployment vmselect
-    delete_resource deployment vminsert
-    delete_resource statefulset vmstorage
-    delete_resource service vmselect
-    delete_resource service vminsert
-    delete_resource service vmstorage
-    delete_all pod "app=vmselect"
-    delete_all pod "app=vminsert"
-    delete_all pod "app=vmstorage"
+    delete_resource deployment vmselect-victoria-cluster
+    delete_resource deployment vminsert-victoria-cluster
+    delete_resource statefulset vmstorage-victoria-cluster
+    delete_resource service vmselect-victoria-cluster
+    delete_resource service vminsert-victoria-cluster
+    delete_resource service vmstorage-victoria-cluster
+    delete_all pod "app.kubernetes.io/instance=victoria-cluster"
     
     # Delete VictoriaMetrics single-node components (if single-node mode is deployed)
     echo "Deleting VictoriaMetrics single-node components..."
@@ -371,6 +379,7 @@ if [ "$CLEAN_VICTORIA" = true ]; then
     delete_resource deployment vmagent
     delete_resource service vmagent
     delete_all pod "app=vmagent"
+    delete_all pod "app.kubernetes.io/name=vmagent"
     
     # Delete shared resources
     echo "Deleting VictoriaMetrics shared resources..."
@@ -451,9 +460,8 @@ if [ "$CLEAN_IDRAC" = true ]; then
 fi
 if [ "$CLEAN_VICTORIA" = true ]; then
     kubectl -n $NAMESPACE delete pod -l app=victoria-metric --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
-    kubectl -n $NAMESPACE delete pod -l app=vmselect --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
-    kubectl -n $NAMESPACE delete pod -l app=vminsert --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
-    kubectl -n $NAMESPACE delete pod -l app=vmstorage --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
+    kubectl -n $NAMESPACE delete pod -l app.kubernetes.io/instance=victoria-cluster --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
+    kubectl -n $NAMESPACE delete pod -l app.kubernetes.io/name=vmagent --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
     kubectl -n $NAMESPACE delete pod -l app=vmagent --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
     kubectl -n $NAMESPACE delete pod -l app=victoria-tls-test --grace-period=0 --force --ignore-not-found=true 2>/dev/null || true
 fi
@@ -486,13 +494,10 @@ if [ "$CLEAN_VICTORIA" = true ]; then
     echo "Remaining Victoria Metrics resources:"
     echo "  Single-node:"
     kubectl -n $NAMESPACE get statefulset,deployment,pod,configmap -l app=victoria-metric 2>/dev/null || echo "    None"
-    echo "  Cluster (vmselect):"
-    kubectl -n $NAMESPACE get deployment,pod -l app=vmselect 2>/dev/null || echo "    None"
-    echo "  Cluster (vminsert):"
-    kubectl -n $NAMESPACE get deployment,pod -l app=vminsert 2>/dev/null || echo "    None"
-    echo "  Cluster (vmstorage):"
-    kubectl -n $NAMESPACE get statefulset,pod -l app=vmstorage 2>/dev/null || echo "    None"
+    echo "  Operator-managed cluster:"
+    kubectl -n $NAMESPACE get vmcluster,deployment,statefulset,pod -l app.kubernetes.io/instance=victoria-cluster 2>/dev/null || echo "    None"
     echo "  vmagent:"
+    kubectl -n $NAMESPACE get deployment,pod -l app.kubernetes.io/name=vmagent 2>/dev/null || echo "    None"
     kubectl -n $NAMESPACE get deployment,pod -l app=vmagent 2>/dev/null || echo "    None"
     echo ""
 fi
