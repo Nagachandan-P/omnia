@@ -1567,64 +1567,6 @@ def validate_telemetry_config(
                 "Each topic must be defined only once"
             ))
 
-
-    # ======================================================================
-    # VictoriaLogs Configuration Validation
-    # ======================================================================
-    # VictoriaLogs is co-deployed with VictoriaMetrics when 'victoria' is
-    # in idrac_telemetry_collection_type. Validate only when applicable.
-    if 'victoria' in idrac_telemetry_collection_type.split(','):
-        victoria_logs_config = data.get("victoria_logs_configurations", {})
-
-        if not victoria_logs_config:
-            errors.append(create_error_msg(
-                "victoria_logs_configurations",
-                "not defined",
-                en_us_validation_msg.VICTORIALOGS_CONFIG_MISSING_MSG
-            ))
-        else:
-            # Validate retention_period is a positive integer (e.g., 7, 30, 90, 365)
-            vl_retention = victoria_logs_config.get("retention_period", "")
-            if vl_retention is not None and vl_retention != "":
-                try:
-                    vl_retention_int = int(vl_retention)
-                    if vl_retention_int < 1:
-                        errors.append(create_error_msg(
-                            "victoria_logs_configurations.retention_period",
-                            vl_retention,
-                            en_us_validation_msg.VICTORIALOGS_RETENTION_PERIOD_INVALID_MSG
-                        ))
-                except (ValueError, TypeError):
-                    errors.append(create_error_msg(
-                        "victoria_logs_configurations.retention_period",
-                        vl_retention,
-                        en_us_validation_msg.VICTORIALOGS_RETENTION_PERIOD_INVALID_MSG
-                    ))
-            else:
-                errors.append(create_error_msg(
-                    "victoria_logs_configurations.retention_period",
-                    "empty or missing",
-                    "retention_period is required. Example: 30"
-                ))
-
-            # Validate storage_size format (e.g., "8Gi", "50Gi")
-            vl_storage = victoria_logs_config.get("storage_size", "")
-            if vl_storage:
-                if not re.match(r'^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)$', str(vl_storage)):
-                    errors.append(create_error_msg(
-                        "victoria_logs_configurations.storage_size",
-                        vl_storage,
-                        en_us_validation_msg.VICTORIALOGS_STORAGE_SIZE_INVALID_MSG
-                    ))
-            else:
-                errors.append(create_error_msg(
-                    "victoria_logs_configurations.storage_size",
-                    "empty or missing",
-                    "storage_size is required. Example: '8Gi'"
-                ))
-
-        logger.info(f"VictoriaLogs validation completed - errors so far: {len(errors)}")
-
     # Validate ldms_sampler_configurations - fail if it's None or empty array
     ldms_sampler_configurations = data.get("ldms_sampler_configurations")
 
