@@ -127,6 +127,38 @@ victoria_configurations:
   retention_period: 168
 
 # ============================================================================
+# VICTORIALOGS CONFIGURATION
+# ============================================================================
+# VictoriaLogs provides centralized log storage and querying (cluster mode only).
+# Deployed alongside VictoriaMetrics when 'victoria' is in idrac_telemetry_collection_type.
+#
+# DEPLOYMENT:
+#   - Always cluster mode (vlstorage, vlinsert, vlselect, VLAgent)
+#   - Co-deployed with VictoriaMetrics — same deployment gate
+#   - Shares TLS infrastructure with VictoriaMetrics
+#
+# STORAGE REQUIREMENTS:
+# ┌─────────────────┬──────────────────┬─────────────────┬──────────────────┐
+# │ Component       │ Per-Pod Storage  │ Number of Pods  │ Total Storage    │
+# ├─────────────────┼──────────────────┼─────────────────┼──────────────────┤
+# │ vlstorage       │ storage_size     │ 2 pods          │ 2× storage       │
+# ├─────────────────┼──────────────────┼─────────────────┼──────────────────┤
+# │ VLAgent buffer  │ 5Gi (fixed)      │ 1 pod           │ 5Gi              │
+# └─────────────────┴──────────────────┴─────────────────┴──────────────────┘
+# Example: 8Gi × 2 vlstorage = 16Gi + 5Gi VLAgent = 21Gi total
+victoria_logs_configurations:
+  # Storage size per vlstorage replica PVC
+  # IMPORTANT: Total VictoriaLogs storage = storage_size × 2 vlstorage pods
+  # Accepted values: in the form of "X[Ki|Mi|Gi|Ti|Pi|Ei]"
+  # Default: 8Gi (results in 16Gi total storage)
+  storage_size: "8Gi"
+
+  # Log retention period (duration format)
+  # Logs older than this period are automatically purged by vlstorage.
+  # Default: 168 (7 days)
+  retention_period: 168
+
+# ============================================================================
 # KAFKA CONFIGURATION
 # ============================================================================
 # Apache Kafka is a distributed streaming platform for storing telemetry data.

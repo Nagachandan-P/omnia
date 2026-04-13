@@ -328,6 +328,19 @@ POWERSCALE_SERVICE_K8S_JSON_NOT_FOUND_MSG = (
     "service_k8s.json not found. Cannot validate PowerScale telemetry image versions. "
     "Please ensure local_repo.yml has been executed."
 )
+# VictoriaLogs Cluster Mode validation messages
+VICTORIALOGS_RETENTION_PERIOD_INVALID_MSG = (
+    "victoria_logs_configurations.retention_period must be a positive integer "
+    "(e.g., 24, 168, 720, 8760) representing the retention period in hours."
+)
+VICTORIALOGS_STORAGE_SIZE_INVALID_MSG = (
+    "victoria_logs_configurations.storage_size must be a valid Kubernetes PVC size "
+    "(e.g., '8Gi', '50Gi', '1Ti'). Format: <number><Ki|Mi|Gi|Ti|Pi|Ei>"
+)
+VICTORIALOGS_CONFIG_MISSING_MSG = (
+    "victoria_logs_configurations section is required when 'victoria' is in "
+    "idrac_telemetry_collection_type. Please define storage_size and retention_period."
+)
 
 def boolean_fail_msg(value):
     """Returns a formatted message indicating boolean_fail_msg."""
