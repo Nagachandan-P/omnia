@@ -16,11 +16,52 @@
 
 import logging
 
-from core.validate.services import ValidateQueueService
+from core.jobs.value_objects import CorrelationId
+from core.deploy.entities import DeployPlaybookRequest
 
 logger = logging.getLogger(__name__)
 
-# Deploy reuses the same ValidateQueueService for queue operations
-# since the NFS queue pattern is identical. The service simply writes
-# the request JSON to the NFS queue directory.
-DeployQueueService = ValidateQueueService
+
+class DeployQueueService:
+    """Service for deploy queue operations.
+
+    Submits deploy playbook requests to the NFS queue for the
+    OIM Playbook Watcher to pick up and execute.
+    """
+
+    def __init__(self, queue_repo) -> None:
+        """Initialize service with PlaybookQueueRequestRepository.
+
+        Args:
+            queue_repo: Playbook queue request repository implementation.
+        """
+        self._queue_repo = queue_repo
+
+    def submit_request(
+        self,
+        request: DeployPlaybookRequest,
+        correlation_id: CorrelationId,
+    ) -> None:
+        """Submit deploy request to queue.
+
+        Args:
+            request: DeployPlaybookRequest to submit.
+            correlation_id: Correlation ID for tracing.
+
+        Raises:
+            QueueUnavailableError: If queue is not accessible.
+        """
+        logger.info(
+            "Submitting deploy request to queue: "
+            "job_id=%s, correlation_id=%s",
+            request.job_id,
+            correlation_id,
+        )
+        self._queue_repo.write_request(request)
+        logger.info(
+            "Deploy request submitted successfully: "
+            "job_id=%s, request_id=%s, correlation_id=%s",
+            request.job_id,
+            request.request_id,
+            correlation_id,
+        )

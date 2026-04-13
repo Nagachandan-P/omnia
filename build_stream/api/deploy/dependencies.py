@@ -14,7 +14,9 @@
 
 """FastAPI dependency providers for Deploy API."""
 
-from fastapi import Depends
+from typing import Optional
+
+from fastapi import Depends, Header
 from sqlalchemy.orm import Session
 
 from api.dependencies import (
@@ -25,6 +27,7 @@ from api.dependencies import (
     _create_sql_image_group_repo,
     _ENV,
 )
+from core.jobs.value_objects import CorrelationId
 from orchestrator.deploy.use_cases.deploy_use_case import DeployUseCase
 
 
@@ -49,3 +52,22 @@ def get_deploy_use_case(
             uuid_generator=container.uuid_generator(),
         )
     return _get_container().deploy_use_case()
+
+
+def get_deploy_correlation_id(
+    x_correlation_id: Optional[str] = Header(
+        default=None,
+        alias="X-Correlation-Id",
+        description="Request tracing ID",
+    ),
+) -> CorrelationId:
+    """Return provided correlation ID or generate one."""
+    generator = _get_container().uuid_generator()
+    if x_correlation_id:
+        try:
+            return CorrelationId(x_correlation_id)
+        except ValueError:
+            pass
+
+    generated_id = generator.generate()
+    return CorrelationId(str(generated_id))

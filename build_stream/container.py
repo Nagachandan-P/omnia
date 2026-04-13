@@ -66,6 +66,7 @@ from core.build_image.services import (
     BuildImageConfigService,
 )
 from core.validate.services import ValidateQueueService
+from core.deploy.services import DeployQueueService
 from core.catalog.adapter_policy import _DEFAULT_POLICY_PATH, _DEFAULT_SCHEMA_PATH
 from core.artifacts.value_objects import SafePath
 from common.config import load_config
@@ -207,7 +208,7 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
 
     # --- Deploy services ---
     deploy_queue_service = providers.Factory(
-        ValidateQueueService,
+        DeployQueueService,
         queue_repo=playbook_queue_request_repository,
     )
 
@@ -411,7 +412,7 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
 
     # --- Deploy services ---
     deploy_queue_service = providers.Factory(
-        ValidateQueueService,
+        DeployQueueService,
         queue_repo=playbook_queue_request_repository,
     )
 

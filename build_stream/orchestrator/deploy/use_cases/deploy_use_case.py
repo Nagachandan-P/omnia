@@ -44,8 +44,9 @@ from core.localrepo.value_objects import (
     ExtraVars,
     PlaybookPath,
 )
-from core.validate.entities import ValidateImageOnTestRequest
-from core.validate.services import ValidateQueueService
+from core.deploy.entities import DeployPlaybookRequest
+from core.deploy.exceptions import DeployExecutionError
+from core.deploy.services import DeployQueueService
 
 from orchestrator.deploy.commands.deploy_command import DeployCommand
 from orchestrator.deploy.dtos.deploy_response import DeployResponseDTO
@@ -61,12 +62,16 @@ class DeployUseCase:
 
     Orchestrates deployment with:
     - Job existence and ownership verification
+    - Upstream build stage guard enforcement
     - ImageGroup guard checks (exists, ID match, status == BUILT)
     - ImageGroup status transition: BUILT -> DEPLOYING
-    - Pipeline phase transition to DEPLOY
-    - Stage record creation
+    - Stage record creation (IN_PROGRESS)
     - NFS queue submission for provision playbook
     - Audit trail emission
+
+    Note: Deploy is an intermediate stage. It does NOT mark the job as
+    completed on success. Job completion is handled by downstream stages
+    (restart -> validate).
     """
 
     def __init__(
@@ -75,7 +80,7 @@ class DeployUseCase:
         stage_repo: StageRepository,
         audit_repo: AuditEventRepository,
         image_group_repo: ImageGroupRepository,
-        queue_service: ValidateQueueService,
+        queue_service: DeployQueueService,
         uuid_generator: UUIDGenerator,
     ) -> None:  # pylint: disable=too-many-arguments,too-many-positional-arguments
         """Initialize use case with repository and service dependencies.
@@ -85,7 +90,7 @@ class DeployUseCase:
             stage_repo: Stage repository implementation.
             audit_repo: Audit event repository implementation.
             image_group_repo: ImageGroup repository implementation.
-            queue_service: Queue service for NFS submission.
+            queue_service: Deploy queue service for NFS submission.
             uuid_generator: UUID generator for identifiers.
         """
         self._job_repo = job_repo
@@ -110,7 +115,7 @@ class DeployUseCase:
             ImageGroupMismatchError: If supplied ID doesn't match.
             InvalidStateTransitionError: If ImageGroup not in BUILT status.
             UpstreamStageNotCompletedError: If build-image not completed.
-            ValidationExecutionError: If queue submission fails.
+            DeployExecutionError: If queue submission fails.
         """
         # [1] Validate job
         self._validate_job(command)
@@ -161,7 +166,11 @@ class DeployUseCase:
             )
 
     def _enforce_stage_guard(self, command: DeployCommand) -> None:
-        """Enforce that at least one build-image stage has completed."""
+        """Enforce that at least one build-image stage has completed.
+
+        The deploy stage requires that at least one of the build-image
+        stages (x86_64 or aarch64) has completed successfully.
+        """
         x86_stage_name = StageName(StageType.BUILD_IMAGE_X86_64.value)
         aarch64_stage_name = StageName(StageType.BUILD_IMAGE_AARCH64.value)
 
@@ -214,8 +223,8 @@ class DeployUseCase:
 
         return stage
 
-    def _create_request(self, command: DeployCommand) -> ValidateImageOnTestRequest:
-        """Create deploy request entity (reuses ValidateImageOnTestRequest structure)."""
+    def _create_request(self, command: DeployCommand) -> DeployPlaybookRequest:
+        """Create deploy playbook request entity."""
         playbook_path = PlaybookPath(PROVISION_PLAYBOOK_NAME)
 
         extra_vars_dict = {
@@ -225,7 +234,7 @@ class DeployUseCase:
         }
         extra_vars = ExtraVars(extra_vars_dict)
 
-        return ValidateImageOnTestRequest(
+        return DeployPlaybookRequest(
             job_id=str(command.job_id),
             stage_name=StageType.DEPLOY.value,
             playbook_path=playbook_path,
@@ -239,7 +248,7 @@ class DeployUseCase:
     def _submit_to_queue(
         self,
         command: DeployCommand,
-        request: ValidateImageOnTestRequest,
+        request: DeployPlaybookRequest,
         stage: Stage,
     ) -> None:
         """Submit playbook request to NFS queue for watcher service."""
@@ -285,8 +294,7 @@ class DeployUseCase:
                 f"Queue submission failed for job {command.job_id}",
                 str(command.correlation_id),
             )
-            from core.validate.exceptions import ValidationExecutionError  # pylint: disable=import-outside-toplevel
-            raise ValidationExecutionError(
+            raise DeployExecutionError(
                 message=f"Failed to submit deploy request: {exc}",
                 correlation_id=str(command.correlation_id),
             ) from exc
@@ -313,7 +321,7 @@ class DeployUseCase:
     def _to_response(
         self,
         command: DeployCommand,
-        request: ValidateImageOnTestRequest,
+        request: DeployPlaybookRequest,
     ) -> DeployResponseDTO:
         """Map to response DTO."""
         return DeployResponseDTO(

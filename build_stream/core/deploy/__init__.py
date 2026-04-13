@@ -12,6 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Deploy domain module."""
+"""Deploy domain module.
 
-__all__ = []
+This module contains domain logic for deploy stage operations.
+"""
+
+from core.deploy.entities import DeployPlaybookRequest
+from core.deploy.exceptions import (
+    DeployDomainError,
+    EnvironmentUnavailableError,
+    DeployExecutionError,
+)
+
+__all__ = [
+    "DeployPlaybookRequest",
+    "DeployDomainError",
+    "EnvironmentUnavailableError",
+    "DeployExecutionError",
+]

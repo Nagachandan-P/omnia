@@ -19,7 +19,10 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from api.deploy.dependencies import get_deploy_use_case, _get_container
+from api.deploy.dependencies import (
+    get_deploy_use_case,
+    get_deploy_correlation_id,
+)
 from api.dependencies import verify_token, require_job_write
 from api.deploy.schemas import (
     DeployRequest,
@@ -33,12 +36,15 @@ from core.image_group.exceptions import (
     InvalidStateTransitionError as ImageGroupInvalidStateTransitionError,
 )
 from core.jobs.exceptions import (
+    InvalidStateTransitionError,
     JobNotFoundError,
     UpstreamStageNotCompletedError,
 )
 from core.jobs.value_objects import ClientId, CorrelationId, JobId
-from core.validate.exceptions import (
-    ValidationExecutionError,
+from core.deploy.exceptions import (
+    DeployDomainError,
+    DeployExecutionError,
+    StageGuardViolationError,
 )
 from orchestrator.deploy.commands.deploy_command import DeployCommand
 from orchestrator.deploy.use_cases.deploy_use_case import DeployUseCase
@@ -61,18 +67,6 @@ def _build_error_response(
     )
 
 
-def _get_deploy_correlation_id(x_correlation_id=None):
-    """Get or generate correlation ID."""
-    container = _get_container()
-    generator = container.uuid_generator()
-    if x_correlation_id:
-        try:
-            return CorrelationId(x_correlation_id)
-        except ValueError:
-            pass
-    return CorrelationId(str(generator.generate()))
-
-
 @router.post(
     "/{job_id}/stages/deploy",
     response_model=DeployResponse,
@@ -84,7 +78,7 @@ def _get_deploy_correlation_id(x_correlation_id=None):
         400: {"description": "Invalid request", "model": DeployErrorResponse},
         401: {"description": "Unauthorized", "model": DeployErrorResponse},
         404: {"description": "Job or ImageGroup not found", "model": DeployErrorResponse},
-        409: {"description": "ImageGroup mismatch", "model": DeployErrorResponse},
+        409: {"description": "ImageGroup mismatch or state conflict", "model": DeployErrorResponse},
         412: {"description": "Precondition failed", "model": DeployErrorResponse},
         500: {"description": "Internal error", "model": DeployErrorResponse},
     },
@@ -94,13 +88,15 @@ def create_deploy(
     request_body: DeployRequest,
     token_data: dict = Depends(verify_token),
     use_case: DeployUseCase = Depends(get_deploy_use_case),
+    correlation_id: CorrelationId = Depends(get_deploy_correlation_id),
     _: None = Depends(require_job_write),
 ) -> DeployResponse:
-    """Initiate deployment for a previously built Image Group."""
-    client_id = ClientId(token_data["client_id"])
+    """Initiate deployment for a previously built Image Group.
 
-    # Generate correlation ID
-    correlation_id = _get_deploy_correlation_id()
+    Accepts the request synchronously and returns 202 Accepted.
+    The playbook execution is handled by the NFS queue watcher service.
+    """
+    client_id = ClientId(token_data["client_id"])
 
     logger.info(
         "Deploy request: job_id=%s, client_id=%s, correlation_id=%s, image_group_id=%s",
@@ -145,7 +141,9 @@ def create_deploy(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=_build_error_response(
-                "JOB_NOT_FOUND", exc.message, correlation_id.value,
+                "JOB_NOT_FOUND",
+                exc.message,
+                correlation_id.value,
             ).model_dump(),
         ) from exc
 
@@ -154,7 +152,24 @@ def create_deploy(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=_build_error_response(
-                "IMAGE_GROUP_NOT_FOUND", str(exc), correlation_id.value,
+                "IMAGE_GROUP_NOT_FOUND",
+                str(exc),
+                correlation_id.value,
+            ).model_dump(),
+        ) from exc
+
+    except InvalidStateTransitionError as exc:
+        log_secure_info(
+            "warning",
+            f"Invalid state transition for job {job_id}",
+            str(correlation_id.value),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_build_error_response(
+                "INVALID_STATE_TRANSITION",
+                exc.message,
+                correlation_id.value,
             ).model_dump(),
         ) from exc
 
@@ -167,20 +182,24 @@ def create_deploy(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=_build_error_response(
-                "IMAGEGROUP_MISMATCH", str(exc), correlation_id.value,
+                "IMAGEGROUP_MISMATCH",
+                str(exc),
+                correlation_id.value,
             ).model_dump(),
         ) from exc
 
     except ImageGroupInvalidStateTransitionError as exc:
         log_secure_info(
             "warning",
-            f"Invalid state transition for job {job_id}",
+            f"ImageGroup state precondition failed for job {job_id}",
             str(correlation_id.value),
         )
         raise HTTPException(
             status_code=status.HTTP_412_PRECONDITION_FAILED,
             detail=_build_error_response(
-                "PRECONDITION_FAILED", str(exc), correlation_id.value,
+                "PRECONDITION_FAILED",
+                str(exc),
+                correlation_id.value,
             ).model_dump(),
         ) from exc
 
@@ -193,11 +212,28 @@ def create_deploy(
         raise HTTPException(
             status_code=status.HTTP_412_PRECONDITION_FAILED,
             detail=_build_error_response(
-                "UPSTREAM_STAGE_NOT_COMPLETED", exc.message, correlation_id.value,
+                "UPSTREAM_STAGE_NOT_COMPLETED",
+                exc.message,
+                correlation_id.value,
             ).model_dump(),
         ) from exc
 
-    except ValidationExecutionError as exc:
+    except StageGuardViolationError as exc:
+        log_secure_info(
+            "warning",
+            f"Stage guard violation for job {job_id}",
+            str(correlation_id.value),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_412_PRECONDITION_FAILED,
+            detail=_build_error_response(
+                "STAGE_GUARD_VIOLATION",
+                exc.message,
+                correlation_id.value,
+            ).model_dump(),
+        ) from exc
+
+    except DeployExecutionError as exc:
         log_secure_info(
             "error",
             f"Deploy execution error for job {job_id}",
@@ -206,7 +242,24 @@ def create_deploy(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=_build_error_response(
-                "DEPLOY_EXECUTION_ERROR", exc.message, correlation_id.value,
+                "DEPLOY_EXECUTION_ERROR",
+                exc.message,
+                correlation_id.value,
+            ).model_dump(),
+        ) from exc
+
+    except DeployDomainError as exc:
+        log_secure_info(
+            "error",
+            f"Deploy domain error for job {job_id}",
+            str(correlation_id.value),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=_build_error_response(
+                "DEPLOY_ERROR",
+                exc.message,
+                correlation_id.value,
             ).model_dump(),
         ) from exc
 
@@ -215,6 +268,8 @@ def create_deploy(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=_build_error_response(
-                "INTERNAL_ERROR", "An unexpected error occurred", correlation_id.value,
+                "INTERNAL_ERROR",
+                "An unexpected error occurred",
+                correlation_id.value,
             ).model_dump(),
         ) from exc
