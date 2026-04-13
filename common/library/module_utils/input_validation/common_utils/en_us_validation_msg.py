@@ -328,7 +328,6 @@ POWERSCALE_SERVICE_K8S_JSON_NOT_FOUND_MSG = (
     "service_k8s.json not found. Cannot validate PowerScale telemetry image versions. "
     "Please ensure local_repo.yml has been executed."
 )
-
 def boolean_fail_msg(value):
     """Returns a formatted message indicating boolean_fail_msg."""
     return f"{value} must be set to either true or false."
