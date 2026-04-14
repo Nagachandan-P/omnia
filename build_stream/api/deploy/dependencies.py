@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from api.dependencies import (
     get_db_session,
+    _get_container,
     _create_sql_job_repo,
     _create_sql_stage_repo,
     _create_sql_audit_repo,
@@ -29,12 +30,6 @@ from api.dependencies import (
 )
 from core.jobs.value_objects import CorrelationId
 from orchestrator.deploy.use_cases.deploy_use_case import DeployUseCase
-
-
-def _get_container():
-    """Lazy import of container to avoid circular imports."""
-    from container import container  # pylint: disable=import-outside-toplevel
-    return container
 
 
 def get_deploy_use_case(
