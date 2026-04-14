@@ -53,9 +53,11 @@ from orchestrator.jobs.use_cases import CreateJobUseCase
 from orchestrator.local_repo.use_cases import CreateLocalRepoUseCase
 from orchestrator.common.result_poller import ResultPoller
 from orchestrator.build_image.use_cases import CreateBuildImageUseCase
+from orchestrator.restart.use_cases import CreateRestartUseCase
 from orchestrator.validate.use_cases import ValidateImageOnTestUseCase
 from orchestrator.images.use_cases.list_images_use_case import ListImagesUseCase
 from orchestrator.deploy.use_cases.deploy_use_case import DeployUseCase
+from orchestrator.upload.use_cases.upload_files import UploadFilesUseCase
 
 from core.localrepo.services import (
     InputFileService,
@@ -129,6 +131,8 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
             "api.local_repo.dependencies",
             "api.build_image.routes",
             "api.build_image.dependencies",
+            "api.restart.routes",
+            "api.restart.dependencies",
             "api.validate.routes",
             "api.validate.dependencies",
             "api.images.routes",
@@ -178,16 +182,13 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         NfsPlaybookQueueResultRepository,
     )
 
+    # --- Common Dependencies ---
+    config = providers.Factory(load_config)
+
     # --- Local repo services ---
     input_file_service = providers.Factory(
         InputFileService,
         input_repo=input_repository,
-    )
-
-    # --- Build image services ---
-    build_image_config_service = providers.Factory(
-        BuildImageConfigService,
-        config_repo=input_repository,
     )
 
     playbook_queue_request_service = providers.Factory(
@@ -198,6 +199,12 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
     playbook_queue_result_service = providers.Factory(
         PlaybookQueueResultService,
         result_repo=playbook_queue_result_repository,
+    )
+
+    # --- Build image services ---
+    build_image_config_service = providers.Factory(
+        BuildImageConfigService,
+        config_repo=input_repository,
     )
 
     # --- Validate services ---
@@ -265,6 +272,17 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         image_group_repo=image_group_repository,
     )
 
+    upload_files_use_case = providers.Factory(
+        UploadFilesUseCase,
+        job_repository=job_repository,
+        stage_repository=stage_repository,
+        audit_repository=audit_repository,
+        artifact_store=artifact_store,
+        artifact_metadata_repo=artifact_metadata_repository,
+        uuid_generator=uuid_generator,
+        config=config,
+    )
+
     generate_input_files_use_case = providers.Factory(
         GenerateInputFilesUseCase,
         job_repo=job_repository,
@@ -285,6 +303,15 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         config_service=build_image_config_service,
         queue_service=playbook_queue_request_service,
         inventory_repo=input_repository,
+        uuid_generator=uuid_generator,
+    )
+
+    create_restart_use_case = providers.Factory(
+        CreateRestartUseCase,
+        job_repo=job_repository,
+        stage_repo=stage_repository,
+        audit_repo=audit_repository,
+        queue_service=playbook_queue_request_service,
         uuid_generator=uuid_generator,
     )
 
@@ -330,6 +357,8 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
             "api.local_repo.dependencies",
             "api.build_image.routes",
             "api.build_image.dependencies",
+            "api.restart.routes",
+            "api.restart.dependencies",
             "api.validate.routes",
             "api.validate.dependencies",
             "api.images.routes",
@@ -384,6 +413,9 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
     playbook_queue_result_repository = providers.Singleton(
         NfsPlaybookQueueResultRepository,
     )
+
+    # --- Common Dependencies ---
+    config = providers.Factory(load_config)
 
     # --- Local repo services ---
     input_file_service = providers.Factory(
@@ -471,6 +503,18 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         uuid_generator=uuid_generator,
         image_group_repo=image_group_repository,
     )
+
+    upload_files_use_case = providers.Factory(
+        UploadFilesUseCase,
+        job_repository=job_repository,
+        stage_repository=stage_repository,
+        audit_repository=audit_repository,
+        artifact_store=artifact_store,
+        artifact_metadata_repo=artifact_metadata_repository,
+        uuid_generator=uuid_generator,
+        config=config,
+    )
+
     create_build_image_use_case = providers.Factory(
         CreateBuildImageUseCase,
         job_repo=job_repository,
@@ -479,6 +523,15 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         config_service=build_image_config_service,
         queue_service=playbook_queue_request_service,
         inventory_repo=input_repository,
+        uuid_generator=uuid_generator,
+    )
+
+    create_restart_use_case = providers.Factory(
+        CreateRestartUseCase,
+        job_repo=job_repository,
+        stage_repo=stage_repository,
+        audit_repo=audit_repository,
+        queue_service=playbook_queue_request_service,
         uuid_generator=uuid_generator,
     )
 

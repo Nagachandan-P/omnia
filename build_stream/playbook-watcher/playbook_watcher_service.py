@@ -90,6 +90,7 @@ PLAYBOOK_NAME_TO_PATH = {
     "discovery.yml": "/omnia/discovery/discovery.yml",
     "local_repo.yml": "/omnia/local_repo/local_repo.yml",
     "provision.yml": "/omnia/provision/provision.yml",
+    "set_pxe_boot.yml": "/omnia/utils/set_pxe_boot.yml",
 }
 
 # Logging configuration

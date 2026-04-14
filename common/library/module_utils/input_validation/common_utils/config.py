@@ -37,10 +37,12 @@ OMNIA_REDHAT_REPO = '/opt/omnia/rhel_repo_certs/redhat.repo'
 ADDITIONAL_PACKAGES_SUPPORTED_SUBGROUPS = {
     "x86_64": [
         "slurm_control_node", "slurm_node", "login_node", "login_compiler_node",
-        "service_kube_control_plane", "service_kube_control_plane_first", "service_kube_node"
+        "service_kube_control_plane", "service_kube_control_plane_first", "service_kube_node",
+        "os"
     ],
     "aarch64": [
-         "slurm_node", "login_node", "login_compiler_node"
+         "slurm_node", "login_node", "login_compiler_node",
+         "os"
     ]
 }
 
@@ -190,7 +192,9 @@ FUNCTIONAL_GROUP_LAYER_MAP = {
     "login_compiler_node_aarch64": "management",
     "slurm_control_node_x86_64": "management",
     "slurm_node_x86_64": "compute",
-    "slurm_node_aarch64": "compute"
+    "slurm_node_aarch64": "compute",
+    "os_x86_64": "compute",
+    "os_aarch64": "compute"
 }
 
 # used for security_config.yml validation
