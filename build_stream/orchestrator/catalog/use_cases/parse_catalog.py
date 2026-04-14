@@ -258,10 +258,11 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
     # ------------------------------------------------------------------
 
     def _extract_image_group_id(self, catalog_data: dict) -> str:
-        """Extract ImageGroupID from the catalog JSON top-level key.
+        """Extract ImageGroupID from the Catalog.Identifier field.
 
-        The catalog JSON has exactly one top-level key that serves as the
-        ImageGroupID (e.g., 'omnia-cluster-v1.2').
+        The catalog JSON has a top-level ``Catalog`` object containing an
+        ``Identifier`` field that serves as the ImageGroupID
+        (e.g., ``'image-build'``).
 
         Args:
             catalog_data: Parsed catalog JSON as a dict.
@@ -270,32 +271,26 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
             The ImageGroupID string (1-128 characters).
 
         Raises:
-            InvalidCatalogFormatError: If catalog has zero or multiple
-                top-level keys, or if the key is empty/too long.
+            InvalidCatalogFormatError: If the ``Catalog`` key is missing,
+                the ``Identifier`` field is absent/empty, or the value
+                exceeds the maximum length.
         """
-        top_level_keys = list(catalog_data.keys())
-
-        if len(top_level_keys) == 0:
+        catalog_obj = catalog_data.get("Catalog")
+        if not catalog_obj or not isinstance(catalog_obj, dict):
             raise InvalidCatalogFormatError(
-                "Catalog JSON is empty - no top-level key found"
+                "Catalog JSON missing required 'Catalog' top-level key"
             )
 
-        if len(top_level_keys) > 1:
-            raise InvalidCatalogFormatError(
-                f"Catalog JSON has {len(top_level_keys)} top-level keys; "
-                f"expected exactly 1. Keys found: {top_level_keys}"
-            )
-
-        image_group_id = top_level_keys[0]
+        image_group_id = catalog_obj.get("Identifier", "")
 
         if not image_group_id or not image_group_id.strip():
             raise InvalidCatalogFormatError(
-                "Catalog top-level key is empty or whitespace"
+                "Catalog 'Identifier' field is empty or missing"
             )
 
         if len(image_group_id) > ImageGroupId.MAX_LENGTH:
             raise InvalidCatalogFormatError(
-                f"Catalog top-level key exceeds {ImageGroupId.MAX_LENGTH} "
+                f"Catalog 'Identifier' exceeds {ImageGroupId.MAX_LENGTH} "
                 f"characters (length: {len(image_group_id)})"
             )
 
@@ -326,34 +321,37 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
     ) -> dict:
         """Extract role/image mappings from catalog for build-image.
 
+        Reads the ``Catalog.FunctionalLayer`` list and derives one Image
+        record per layer entry.  Each layer's ``Name`` becomes the role,
+        and the image name defaults to ``<role>.img``.
+
         Args:
             catalog_data: Parsed catalog JSON as a dict.
-            image_group_id: The top-level key (ImageGroupID).
+            image_group_id: The Identifier extracted from Catalog.
 
         Returns:
             Dict with image_group_id, roles, role_images, and catalog info.
         """
-        catalog_content = catalog_data.get(image_group_id, {})
-        roles_section = catalog_content.get("roles", {})
+        catalog_content = catalog_data.get("Catalog", {})
+        functional_layers = catalog_content.get("FunctionalLayer", [])
 
-        roles = sorted(roles_section.keys())
+        roles: List[str] = []
         role_images: Dict[str, str] = {}
-        for role_name, role_config in roles_section.items():
-            image_name = (
-                role_config.get("image_name")
-                if isinstance(role_config, dict) else None
-            )
-            if not image_name:
-                image_name = f"{role_name}.img"
-            role_images[role_name] = image_name
+        for layer in functional_layers:
+            if not isinstance(layer, dict):
+                continue
+            role_name = layer.get("Name", "")
+            if role_name:
+                roles.append(role_name)
+                role_images[role_name] = f"{role_name}.img"
+        roles.sort()
 
         return {
             "image_group_id": image_group_id,
             "roles": roles,
             "role_images": role_images,
-            "os": catalog_content.get("os", ""),
-            "version": catalog_content.get("version", ""),
-            "arch": catalog_content.get("arch", "x86_64"),
+            "name": catalog_content.get("Name", ""),
+            "version": catalog_content.get("Version", ""),
         }
 
     def _store_catalog_metadata_artifact(

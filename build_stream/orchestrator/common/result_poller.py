@@ -24,7 +24,6 @@ and Image records from catalog metadata persisted during parse-catalog.
 
 import json
 import asyncio
-import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -49,8 +48,6 @@ from core.jobs.services import JobStateHelper
 from core.jobs.value_objects import JobId, StageName
 from core.localrepo.entities import PlaybookResult
 from core.localrepo.services import PlaybookQueueResultService
-
-logger = logging.getLogger(__name__)
 
 
 class ResultPoller:
@@ -114,12 +111,12 @@ class ResultPoller:
     async def start(self) -> None:
         """Start the result poller."""
         if self._running:
-            logger.warning("Result poller is already running")
+            log_secure_info("warning", "Result poller is already running")
             return
 
         self._running = True
         self._task = asyncio.create_task(self._poll_loop())
-        logger.info("Result poller started with interval=%ds", self._poll_interval)
+        log_secure_info("info", f"Result poller started with interval={self._poll_interval}s")
 
     async def stop(self) -> None:
         """Stop the result poller."""
@@ -133,7 +130,7 @@ class ResultPoller:
                 await self._task
             except asyncio.CancelledError:
                 pass
-        logger.info("Result poller stopped")
+        log_secure_info("info", "Result poller stopped")
 
     async def _poll_loop(self) -> None:
         """Main polling loop."""
@@ -143,9 +140,9 @@ class ResultPoller:
                     callback=self._on_result_received
                 )
                 if processed_count > 0:
-                    logger.info("Processed %d playbook results", processed_count)
+                    log_secure_info("info", f"Processed {processed_count} playbook results")
             except Exception as exc:  # pylint: disable=broad-except
-                logger.exception("Error polling results: %s", exc)
+                log_secure_info("error", f"Error polling results: {exc}", exc_info=True)
 
             await asyncio.sleep(self._poll_interval)
 
@@ -161,31 +158,32 @@ class ResultPoller:
             stage = self._stage_repo.find_by_job_and_name(result.job_id, stage_name)
 
             if stage is None:
-                logger.error(
-                    "Stage not found for result: job_id=%s, stage=%s",
-                    result.job_id,
-                    result.stage_name,
+                log_secure_info(
+                    "error",
+                    f"Stage not found for result: job_id={result.job_id}, "
+                    f"stage={result.stage_name}",
+                    job_id=str(result.job_id),
                 )
                 return
 
             # Update stage based on result
             # Check if stage is already in terminal state (e.g., after service restart)
             if stage.stage_state in {StageState.COMPLETED, StageState.FAILED, StageState.CANCELLED}:
-                logger.info(
-                    "Stage already in terminal state: job_id=%s, stage=%s, state=%s",
-                    result.job_id,
-                    result.stage_name,
-                    stage.stage_state,
+                log_secure_info(
+                    "info",
+                    f"Stage already in terminal state: job_id={result.job_id}, "
+                    f"stage={result.stage_name}, state={stage.stage_state}",
+                    job_id=str(result.job_id),
                 )
                 # Return early - service will archive the result file automatically
                 return
 
             if result.status == "success":
                 stage.complete()
-                logger.info(
-                    "Stage completed: job_id=%s, stage=%s",
-                    result.job_id,
-                    result.stage_name,
+                log_secure_info(
+                    "info",
+                    f"Stage completed: job_id={result.job_id}, stage={result.stage_name}",
+                    job_id=str(result.job_id),
                 )
 
                 # S1-4 Part B: On build-image success, create ImageGroup + Images
@@ -200,18 +198,26 @@ class ResultPoller:
                         audit_repo=self._audit_repo,
                         uuid_generator=self._uuid_generator,
                         job_id=JobId(result.job_id),
-                        correlation_id=result.request_id.value if hasattr(result.request_id, 'value') else str(result.request_id),
+                        correlation_id=(
+                            result.request_id.value
+                            if hasattr(result.request_id, 'value')
+                            else str(result.request_id)
+                        ),
                         client_id=str(result.job_id),
                     )
+
+                # S1-6: On deploy success, transition ImageGroup DEPLOYING -> DEPLOYED
+                if result.stage_name == "deploy":
+                    self._on_deploy_success(result)
             else:
                 error_code = result.error_code or "PLAYBOOK_FAILED"
                 error_summary = result.error_summary or "Playbook execution failed"
                 stage.fail(error_code=error_code, error_summary=error_summary)
-                logger.warning(
-                    "Stage failed: job_id=%s, stage=%s, error=%s",
-                    result.job_id,
-                    result.stage_name,
-                    error_code,
+                log_secure_info(
+                    "warning",
+                    f"Stage failed: job_id={result.job_id}, "
+                    f"stage={result.stage_name}, error={error_code}",
+                    job_id=str(result.job_id),
                 )
 
                 # Update job state to FAILED when stage fails
@@ -223,17 +229,21 @@ class ResultPoller:
                     stage_name=result.stage_name,
                     error_code=error_code,
                     error_summary=error_summary,
-                    correlation_id=result.request_id.value if hasattr(result.request_id, 'value') else str(result.request_id),
+                    correlation_id=(
+                        result.request_id.value
+                        if hasattr(result.request_id, 'value')
+                        else str(result.request_id)
+                    ),
                     client_id=str(result.job_id),
                 )
 
             # Update log file path if available
             if result.log_file_path:
                 stage.log_file_path = result.log_file_path
-                logger.info(
-                    "Updated stage log path: job_id=%s, stage=%s",
-                    result.job_id,
-                    result.stage_name,
+                log_secure_info(
+                    "info",
+                    f"Updated stage log path: job_id={result.job_id}, stage={result.stage_name}",
+                    job_id=str(result.job_id),
                 )
 
             # Save updated stage
@@ -270,10 +280,11 @@ class ResultPoller:
             )
 
         except Exception as exc:  # pylint: disable=broad-except
-            logger.exception(
-                "Error handling result: job_id=%s, error=%s",
-                result.job_id,
-                exc,
+            log_secure_info(
+                "error",
+                f"Error handling result: job_id={result.job_id}, error={exc}",
+                job_id=str(result.job_id),
+                exc_info=True,
             )
 
     # ------------------------------------------------------------------
@@ -300,20 +311,22 @@ class ResultPoller:
             result: Playbook execution result from NFS queue.
         """
         if self._image_group_repo is None or self._image_repo is None:
-            logger.warning(
-                "ImageGroup/Image repos not available; skipping "
-                "ImageGroup creation for job=%s",
-                result.job_id,
+            log_secure_info(
+                "warning",
+                f"ImageGroup/Image repos not available; skipping "
+                f"ImageGroup creation for job={result.job_id}",
+                job_id=str(result.job_id),
             )
             return
 
         try:
             catalog_metadata = self._load_catalog_metadata(result.job_id)
             if catalog_metadata is None:
-                logger.warning(
-                    "No catalog metadata found for job=%s; "
-                    "skipping ImageGroup creation",
-                    result.job_id,
+                log_secure_info(
+                    "warning",
+                    f"No catalog metadata found for job={result.job_id}; "
+                    f"skipping ImageGroup creation",
+                    job_id=str(result.job_id),
                 )
                 return
 
@@ -344,40 +357,46 @@ class ResultPoller:
                 images.append(image)
             image_group.images = images
 
-            # Persist atomically
+            # Persist: ImageGroup first, then Images.
+            # In ProdContainer each repo may hold a different DB session
+            # (Factory-created via providers.Factory(SessionLocal)).
+            # The images table has a FK to image_groups, so the ImageGroup
+            # row must be committed (visible to other sessions) before the
+            # Image INSERT can satisfy the FK constraint.
             try:
                 self._image_group_repo.save(image_group)
+                if hasattr(self._image_group_repo, 'session'):
+                    self._image_group_repo.session.commit()
+
                 self._image_repo.save_batch(images)
-            except IntegrityError:
-                # Race condition: another completion already created this
-                # ImageGroup (primary key collision). Log and skip.
-                logger.warning(
-                    "ImageGroup '%s' already exists (race condition). "
-                    "Skipping duplicate creation for job=%s.",
-                    image_group_id,
-                    result.job_id,
+                if hasattr(self._image_repo, 'session'):
+                    self._image_repo.session.commit()
+            except IntegrityError as integrity_exc:
+                log_secure_info(
+                    "warning",
+                    f"IntegrityError creating ImageGroup '{image_group_id}' "
+                    f"for job={result.job_id}: {integrity_exc.orig}",
+                    job_id=str(result.job_id),
                 )
                 if hasattr(self._image_group_repo, 'session'):
                     self._image_group_repo.session.rollback()
+                if hasattr(self._image_repo, 'session'):
+                    self._image_repo.session.rollback()
                 return
 
-            # Commit ImageGroup/Image records
-            if hasattr(self._image_group_repo, 'session'):
-                self._image_group_repo.session.commit()
-
-            logger.info(
-                "Build-image SUCCESS for job=%s. Created ImageGroup '%s' "
-                "with %d images (status=BUILT).",
-                result.job_id,
-                image_group_id,
-                len(images),
+            log_secure_info(
+                "info",
+                f"Build-image SUCCESS for job={result.job_id}. Created ImageGroup "
+                f"'{image_group_id}' with {len(images)} images (status=BUILT).",
+                job_id=str(result.job_id),
             )
 
         except Exception as exc:  # pylint: disable=broad-except
-            logger.exception(
-                "Failed to create ImageGroup/Images for job=%s: %s",
-                result.job_id,
-                exc,
+            log_secure_info(
+                "error",
+                f"Failed to create ImageGroup/Images for job={result.job_id}: {exc}",
+                job_id=str(result.job_id),
+                exc_info=True,
             )
 
     def _load_catalog_metadata(self, job_id) -> dict:
@@ -411,9 +430,105 @@ class ResultPoller:
             return json.loads(raw.decode("utf-8"))
 
         except Exception as exc:  # pylint: disable=broad-except
-            logger.warning(
-                "Failed to load catalog metadata for job=%s: %s",
-                job_id,
-                exc,
+            log_secure_info(
+                "warning",
+                f"Failed to load catalog metadata for job={job_id}: {exc}",
+                job_id=str(job_id),
             )
             return None
+
+    # ------------------------------------------------------------------
+    # S1-6: Deploy completion — ImageGroup status transitions
+    # ------------------------------------------------------------------
+
+    def _on_deploy_success(self, result: PlaybookResult) -> None:
+        """Transition ImageGroup from DEPLOYING to DEPLOYED on deploy success."""
+        if self._image_group_repo is None:
+            log_secure_info(
+                "warning",
+                f"ImageGroup repo not available; skipping deploy status "
+                f"update for job={result.job_id}",
+                job_id=str(result.job_id),
+            )
+            return
+
+        try:
+            image_group = self._image_group_repo.find_by_job_id(
+                JobId(str(result.job_id))
+            )
+            if image_group is None:
+                log_secure_info(
+                    "error",
+                    f"Deploy callback: No ImageGroup found for job={result.job_id}.",
+                    job_id=str(result.job_id),
+                )
+                return
+
+            self._image_group_repo.update_status(
+                image_group_id=image_group.id,
+                new_status=ImageGroupStatus.DEPLOYED,
+            )
+
+            if hasattr(self._image_group_repo, 'session'):
+                self._image_group_repo.session.commit()
+
+            log_secure_info(
+                "info",
+                f"Deploy SUCCESS for job={result.job_id}. "
+                f"ImageGroup '{image_group.id}' -> DEPLOYED.",
+                job_id=str(result.job_id),
+            )
+        except Exception as exc:  # pylint: disable=broad-except
+            log_secure_info(
+                "error",
+                "Failed to update ImageGroup status on deploy "
+                f"success for job={result.job_id}: {exc}",
+                job_id=str(result.job_id),
+                exc_info=True,
+            )
+
+    def _on_deploy_failure(self, result: PlaybookResult) -> None:
+        """Transition ImageGroup from DEPLOYING to FAILED on deploy failure."""
+        if self._image_group_repo is None:
+            log_secure_info(
+                "warning",
+                f"ImageGroup repo not available; skipping deploy failure "
+                f"update for job={result.job_id}",
+                job_id=str(result.job_id),
+            )
+            return
+
+        try:
+            image_group = self._image_group_repo.find_by_job_id(
+                JobId(str(result.job_id))
+            )
+            if image_group is None:
+                log_secure_info(
+                    "error",
+                    f"Deploy failure callback: No ImageGroup found for job={result.job_id}.",
+                    job_id=str(result.job_id),
+                )
+                return
+
+            self._image_group_repo.update_status(
+                image_group_id=image_group.id,
+                new_status=ImageGroupStatus.FAILED,
+            )
+
+            if hasattr(self._image_group_repo, 'session'):
+                self._image_group_repo.session.commit()
+
+            log_secure_info(
+                "warning",
+                f"Deploy FAILED for job={result.job_id}. "
+                f"ImageGroup '{image_group.id}' -> FAILED.",
+                job_id=str(result.job_id),
+            )
+        except Exception as exc:  # pylint: disable=broad-except
+            log_secure_info(
+                "error",
+                "Failed to update ImageGroup status on deploy "
+                f"failure for job={result.job_id}: {exc}",
+                job_id=str(result.job_id),
+                exc_info=True,
+            )

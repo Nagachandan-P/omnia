@@ -55,6 +55,8 @@ from orchestrator.common.result_poller import ResultPoller
 from orchestrator.build_image.use_cases import CreateBuildImageUseCase
 from orchestrator.restart.use_cases import CreateRestartUseCase
 from orchestrator.validate.use_cases import ValidateImageOnTestUseCase
+from orchestrator.images.use_cases.list_images_use_case import ListImagesUseCase
+from orchestrator.deploy.use_cases.deploy_use_case import DeployUseCase
 from orchestrator.upload.use_cases.upload_files import UploadFilesUseCase
 
 from core.localrepo.services import (
@@ -66,6 +68,7 @@ from core.build_image.services import (
     BuildImageConfigService,
 )
 from core.validate.services import ValidateQueueService
+from core.deploy.services import DeployQueueService
 from core.catalog.adapter_policy import _DEFAULT_POLICY_PATH, _DEFAULT_SCHEMA_PATH
 from core.artifacts.value_objects import SafePath
 from common.config import load_config
@@ -132,6 +135,10 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
             "api.restart.dependencies",
             "api.validate.routes",
             "api.validate.dependencies",
+            "api.images.routes",
+            "api.images.dependencies",
+            "api.deploy.routes",
+            "api.deploy.dependencies",
             "api.parse_catalog.routes",
             "api.parse_catalog.dependencies",
         ]
@@ -206,6 +213,19 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         queue_repo=playbook_queue_request_repository,
     )
 
+    # --- Deploy services ---
+    deploy_queue_service = providers.Factory(
+        DeployQueueService,
+        queue_repo=playbook_queue_request_repository,
+    )
+
+    # --- Use cases ---
+    artifact_store = providers.Singleton(_create_artifact_store)
+
+    artifact_metadata_repository = providers.Singleton(
+        InMemoryArtifactMetadataRepository,
+    )
+
     # --- Result poller ---
     result_poller = providers.Singleton(
         ResultPoller,
@@ -217,13 +237,8 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         poll_interval=int(os.getenv("RESULT_POLL_INTERVAL", "5")),
         image_group_repo=image_group_repository,
         image_repo=image_repository,
-    )
-
-    # --- Use cases ---
-    artifact_store = providers.Singleton(_create_artifact_store)
-
-    artifact_metadata_repository = providers.Singleton(
-        InMemoryArtifactMetadataRepository,
+        artifact_store=artifact_store,
+        artifact_metadata_repo=artifact_metadata_repository,
     )
 
     create_job_use_case = providers.Factory(
@@ -309,6 +324,21 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         uuid_generator=uuid_generator,
     )
 
+    list_images_use_case = providers.Factory(
+        ListImagesUseCase,
+        image_group_repo=image_group_repository,
+    )
+
+    deploy_use_case = providers.Factory(
+        DeployUseCase,
+        job_repo=job_repository,
+        stage_repo=stage_repository,
+        audit_repo=audit_repository,
+        image_group_repo=image_group_repository,
+        queue_service=deploy_queue_service,
+        uuid_generator=uuid_generator,
+    )
+
 
 class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
     """Production profile container.
@@ -331,6 +361,10 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
             "api.restart.dependencies",
             "api.validate.routes",
             "api.validate.dependencies",
+            "api.images.routes",
+            "api.images.dependencies",
+            "api.deploy.routes",
+            "api.deploy.dependencies",
             "api.parse_catalog.routes",
             "api.parse_catalog.dependencies",
         ]
@@ -410,6 +444,20 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         queue_repo=playbook_queue_request_repository,
     )
 
+    # --- Deploy services ---
+    deploy_queue_service = providers.Factory(
+        DeployQueueService,
+        queue_repo=playbook_queue_request_repository,
+    )
+
+    # --- Use cases ---
+    artifact_store = providers.Singleton(_create_artifact_store)
+
+    artifact_metadata_repository = providers.Factory(
+        SqlArtifactMetadataRepository,
+        session=db_session,
+    )
+
     # --- Result poller ---
     result_poller = providers.Singleton(
         ResultPoller,
@@ -421,14 +469,8 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         poll_interval=int(os.getenv("RESULT_POLL_INTERVAL", "5")),
         image_group_repo=image_group_repository,
         image_repo=image_repository,
-    )
-
-    # --- Use cases ---
-    artifact_store = providers.Singleton(_create_artifact_store)
-
-    artifact_metadata_repository = providers.Factory(
-        SqlArtifactMetadataRepository,
-        session=db_session,
+        artifact_store=artifact_store,
+        artifact_metadata_repo=artifact_metadata_repository,
     )
 
     create_job_use_case = providers.Factory(
@@ -499,6 +541,21 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         stage_repo=stage_repository,
         audit_repo=audit_repository,
         queue_service=validate_queue_service,
+        uuid_generator=uuid_generator,
+    )
+
+    list_images_use_case = providers.Factory(
+        ListImagesUseCase,
+        image_group_repo=image_group_repository,
+    )
+
+    deploy_use_case = providers.Factory(
+        DeployUseCase,
+        job_repo=job_repository,
+        stage_repo=stage_repository,
+        audit_repo=audit_repository,
+        image_group_repo=image_group_repository,
+        queue_service=deploy_queue_service,
         uuid_generator=uuid_generator,
     )
 
