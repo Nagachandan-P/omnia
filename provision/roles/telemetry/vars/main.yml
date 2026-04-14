@@ -205,16 +205,16 @@ victoria_logs_cluster:
         memory: "512Mi"
         cpu: "250m"
 
-# VictoriaLogs ports (no overlap with VMCluster 8400-8482 range)
+# VictoriaLogs ports (VM port + 1000 parity with VMCluster 8400-8482 range)
 victoria_logs_ports:
-  vlinsert_http: 9481        # Ingestion clients → vlinsert (HTTPS, LoadBalancer)
-  vlselect_http: 9491        # Query clients → vlselect (HTTPS, LoadBalancer)
-  vlstorage_http: 9491       # Health checks and admin API (internal)
-  vlstorage_insert: 9401     # vlinsert → vlstorage data sharding (HTTPS, internal)
-  vlstorage_select: 9402     # vlselect → vlstorage query fan-out (HTTPS, internal)
+  vlinsert_http: 9480        # Ingestion clients → vlinsert (HTTPS, LoadBalancer)
+  vlselect_http: 9481        # Query clients → vlselect (HTTPS, LoadBalancer)
+  vlstorage_http: 9482       # Health checks and admin API (internal)
+  vlstorage_insert: 9400     # vlinsert → vlstorage data sharding (HTTPS, internal)
+  vlstorage_select: 9401     # vlselect → vlstorage query fan-out (HTTPS, internal)
   vlagent_syslog: 514        # Syslog receiver plaintext (TCP+UDP)
   vlagent_syslog_tls: 6514   # Syslog receiver TLS (TCP, RFC 5425)
-  vlagent_http: 8429         # VLAgent health checks
+  vlagent_http: 9429         # VLAgent health checks (distinct from vmagent 8429)
 
 # Telemetry shared path configuration
 telemetry_share_path: "{{ hostvars['localhost']['oim_shared_path'] }}/omnia/telemetry"
