@@ -14,7 +14,6 @@
 
 """FastAPI routes for Images API (GET /api/v1/images)."""
 
-import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status
@@ -24,8 +23,6 @@ from api.images.dependencies import get_list_images_use_case
 from api.images.schemas import ListImagesResponse, ErrorResponse
 from api.logging_utils import log_secure_info
 from core.image_group.value_objects import ImageGroupStatus
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/images", tags=["Images"])
 
@@ -83,7 +80,7 @@ def list_images(
         )
         return result
     except Exception as exc:
-        logger.exception("ListImages failed: %s", exc)
+        log_secure_info("error", f"ListImages failed: {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error_code": "INTERNAL_ERROR", "message": "Internal server error"},

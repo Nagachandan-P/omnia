@@ -14,7 +14,6 @@
 
 """FastAPI routes for deploy stage operations."""
 
-import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -48,8 +47,6 @@ from core.deploy.exceptions import (
 )
 from orchestrator.deploy.commands.deploy_command import DeployCommand
 from orchestrator.deploy.use_cases.deploy_use_case import DeployUseCase
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/jobs", tags=["Deploy"])
 
@@ -98,12 +95,11 @@ def create_deploy(
     """
     client_id = ClientId(token_data["client_id"])
 
-    logger.info(
-        "Deploy request: job_id=%s, client_id=%s, correlation_id=%s, image_group_id=%s",
-        job_id,
-        client_id.value,
-        correlation_id.value,
-        request_body.image_group_id,
+    log_secure_info(
+        "info",
+        f"Deploy request: job_id={job_id}, image_group_id={request_body.image_group_id}",
+        identifier=str(correlation_id.value),
+        job_id=job_id,
     )
 
     try:
@@ -137,7 +133,7 @@ def create_deploy(
         )
 
     except JobNotFoundError as exc:
-        logger.warning("Job not found: %s", job_id)
+        log_secure_info("warning", f"Job not found: {job_id}", job_id=job_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=_build_error_response(
@@ -148,7 +144,7 @@ def create_deploy(
         ) from exc
 
     except ImageGroupNotFoundError as exc:
-        logger.warning("ImageGroup not found for job: %s", job_id)
+        log_secure_info("warning", f"ImageGroup not found for job: {job_id}", job_id=job_id)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=_build_error_response(
@@ -264,7 +260,12 @@ def create_deploy(
         ) from exc
 
     except Exception as exc:
-        logger.exception("Unexpected error creating deploy stage")
+        log_secure_info(
+            "error",
+            "Unexpected error creating deploy stage",
+            job_id=job_id,
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=_build_error_response(

@@ -14,7 +14,6 @@
 
 """Deploy use case implementation."""
 
-import logging
 from datetime import datetime, timezone
 
 from api.logging_utils import log_secure_info
@@ -50,8 +49,6 @@ from core.deploy.services import DeployQueueService
 
 from orchestrator.deploy.commands.deploy_command import DeployCommand
 from orchestrator.deploy.dtos.deploy_response import DeployResponseDTO
-
-logger = logging.getLogger(__name__)
 
 PROVISION_PLAYBOOK_NAME = "provision.yml"
 DEFAULT_TIMEOUT_MINUTES = 60
@@ -257,8 +254,9 @@ class DeployUseCase:
             self._stage_repo.save(stage)
         except Exception as save_exc:
             log_secure_info(
-                "Stage start save failed, continuing with queue submission: %s",
-                str(save_exc)
+                "warning",
+                f"Stage start save failed, continuing with queue submission: {save_exc}",
+                job_id=str(command.job_id),
             )
 
         try:
@@ -286,8 +284,9 @@ class DeployUseCase:
                 )
             except Exception as save_exc:
                 log_secure_info(
-                    "Stage fail save failed, stage already modified elsewhere: %s",
-                    str(save_exc)
+                    "warning",
+                    f"Stage fail save failed, stage already modified elsewhere: {save_exc}",
+                    job_id=str(command.job_id),
                 )
             log_secure_info(
                 "error",
@@ -299,10 +298,11 @@ class DeployUseCase:
                 correlation_id=str(command.correlation_id),
             ) from exc
 
-        logger.info(
-            "Deploy request submitted to queue for job %s, correlation_id=%s",
-            command.job_id,
-            command.correlation_id,
+        log_secure_info(
+            "info",
+            f"Deploy request submitted to queue for job {command.job_id}",
+            identifier=str(command.correlation_id),
+            job_id=str(command.job_id),
         )
 
     def _emit_stage_started_event(self, command: DeployCommand) -> None:

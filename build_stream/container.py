@@ -212,6 +212,13 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         queue_repo=playbook_queue_request_repository,
     )
 
+    # --- Use cases ---
+    artifact_store = providers.Singleton(_create_artifact_store)
+
+    artifact_metadata_repository = providers.Singleton(
+        InMemoryArtifactMetadataRepository,
+    )
+
     # --- Result poller ---
     result_poller = providers.Singleton(
         ResultPoller,
@@ -223,13 +230,8 @@ class DevContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         poll_interval=int(os.getenv("RESULT_POLL_INTERVAL", "5")),
         image_group_repo=image_group_repository,
         image_repo=image_repository,
-    )
-
-    # --- Use cases ---
-    artifact_store = providers.Singleton(_create_artifact_store)
-
-    artifact_metadata_repository = providers.Singleton(
-        InMemoryArtifactMetadataRepository,
+        artifact_store=artifact_store,
+        artifact_metadata_repo=artifact_metadata_repository,
     )
 
     create_job_use_case = providers.Factory(
@@ -416,6 +418,14 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         queue_repo=playbook_queue_request_repository,
     )
 
+    # --- Use cases ---
+    artifact_store = providers.Singleton(_create_artifact_store)
+
+    artifact_metadata_repository = providers.Factory(
+        SqlArtifactMetadataRepository,
+        session=db_session,
+    )
+
     # --- Result poller ---
     result_poller = providers.Singleton(
         ResultPoller,
@@ -427,14 +437,8 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         poll_interval=int(os.getenv("RESULT_POLL_INTERVAL", "5")),
         image_group_repo=image_group_repository,
         image_repo=image_repository,
-    )
-
-    # --- Use cases ---
-    artifact_store = providers.Singleton(_create_artifact_store)
-
-    artifact_metadata_repository = providers.Factory(
-        SqlArtifactMetadataRepository,
-        session=db_session,
+        artifact_store=artifact_store,
+        artifact_metadata_repo=artifact_metadata_repository,
     )
 
     create_job_use_case = providers.Factory(
