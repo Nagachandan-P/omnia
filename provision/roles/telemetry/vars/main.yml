@@ -146,6 +146,76 @@ victoria_cluster:
         memory: "1Gi"
         cpu: "1000m"
 
+# ============================================================================
+# VictoriaLogs Cluster Configuration
+# ============================================================================
+# Deployed alongside VictoriaMetrics when 'victoria' is in telemetry_collection_type.
+# Managed by the same VictoriaMetrics operator via VLCluster and VLAgent CRs.
+# See VL_cluster_component_spec.md and VL_Agent_component_spec.md for full design.
+victoria_logs_cluster:
+  tls_enabled: true   # Enable TLS for all inter-component communication (shared victoria-tls-certs secret)
+
+  # vlstorage: Persistent log storage nodes (StatefulSet managed by operator via VLCluster CR)
+  vlstorage:
+    replicas: 3
+    image: "{{ telemetry_images['victoriametrics/victoria-logs'] | default('docker.io/victoriametrics/victoria-logs:v1.49.0') }}"
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "250m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+
+  # vlinsert: Log ingestion gateway (Deployment managed by operator via VLCluster CR)
+  vlinsert:
+    replicas: 2
+    image: "{{ telemetry_images['victoriametrics/victoria-logs'] | default('docker.io/victoriametrics/victoria-logs:v1.49.0') }}"
+    external_access: true   # Expose vlinsert via LoadBalancer service for external log ingestion
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+
+  # vlselect: Log query gateway (Deployment managed by operator via VLCluster CR)
+  vlselect:
+    replicas: 2
+    image: "{{ telemetry_images['victoriametrics/victoria-logs'] | default('docker.io/victoriametrics/victoria-logs:v1.49.0') }}"
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+
+  # VLAgent: Platform-managed log forwarding agent (Deployment managed by operator via VLAgent CR)
+  vlagent:
+    replicas: 1
+    image: "{{ telemetry_images['victoriametrics/vlagent'] | default('docker.io/victoriametrics/vlagent:v1.49.0') }}"
+    pvc_size: "5Gi"   # Buffer storage for retry during vlinsert unavailability
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "50m"
+      limits:
+        memory: "512Mi"
+        cpu: "250m"
+
+# VictoriaLogs ports (no overlap with VMCluster 8400-8482 range)
+victoria_logs_ports:
+  vlinsert_http: 9481        # Ingestion clients → vlinsert (HTTPS, LoadBalancer)
+  vlselect_http: 9491        # Query clients → vlselect (HTTPS, LoadBalancer)
+  vlstorage_http: 9491       # Health checks and admin API (internal)
+  vlstorage_insert: 9401     # vlinsert → vlstorage data sharding (HTTPS, internal)
+  vlstorage_select: 9402     # vlselect → vlstorage query fan-out (HTTPS, internal)
+  vlagent_syslog: 514        # Syslog receiver plaintext (TCP+UDP)
+  vlagent_syslog_tls: 6514   # Syslog receiver TLS (TCP, RFC 5425)
+  vlagent_http: 8429         # VLAgent health checks
+
 # Telemetry shared path configuration
 telemetry_share_path: "{{ hostvars['localhost']['oim_shared_path'] }}/omnia/telemetry"
 
@@ -181,7 +251,9 @@ vmagent:
 strmzi_kafka_tarball_url: "{{ offline_tarball_path }}/{{ strimzi_kafka_pkg }}/{{ strimzi_kafka_pkg }}.tar.gz"
 
 # Victoria Metrics operator tarball configuration
-victoria_operator_pkg: "victoria-metrics-operator-0.57.1"
+# Version must match the Helm chart entry in service_k8s.json (victoria-metrics-operator-0.59.3)
+# Required for VLCluster and VLAgent CRD support (minimum v0.59.0)
+victoria_operator_pkg: "victoria-metrics-operator-0.59.3"
 victoria_operator_tarball_url: "{{ offline_tarball_path }}/{{ victoria_operator_pkg }}/{{ victoria_operator_pkg }}.tar.gz"
 
 # Usage: validate_idrac_inventory.yml
@@ -246,6 +318,19 @@ victoria_templates: >
   {{ victoria_templates_common +
      (victoria_templates_operator_cluster if victoria_cluster.enabled else victoria_templates_operator_single) +
      victoria_templates_test }}
+
+# ============================================================================
+# VictoriaLogs Template Lists
+# ============================================================================
+# VictoriaLogs operator CR templates (used when 'victoria' in telemetry_collection_type)
+# These are applied alongside VictoriaMetrics templates in the same kustomize deployment.
+victorialogs_templates:
+  - src: 'telemetry/victoria/victorialogs-operator-vlcluster.yaml.j2'
+    dest: 'victorialogs-operator-vlcluster.yaml'
+  - src: 'telemetry/victoria/victorialogs-operator-vlagent.yaml.j2'
+    dest: 'victorialogs-operator-vlagent.yaml'
+  - src: 'telemetry/victoria/victorialogs-vlagent-config.yaml.j2'
+    dest: 'victorialogs-vlagent-config.yaml'
 
 kafka_templates:
   - src: 'telemetry/kafka/kafka.kafka.yaml.j2'
