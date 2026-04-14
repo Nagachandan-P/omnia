@@ -25,6 +25,7 @@ from api.local_repo.routes import router as local_repo_router
 from api.build_image.routes import router as build_image_router
 from api.restart.routes import router as restart_router
 from api.validate.routes import router as validate_router
+from api.upload.routes import router as upload_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -37,3 +38,4 @@ api_router.include_router(local_repo_router)
 api_router.include_router(build_image_router)
 api_router.include_router(restart_router)
 api_router.include_router(validate_router)
+api_router.include_router(upload_router)

@@ -110,6 +110,7 @@ class StageType(str, Enum):
     #PROMOTE = "promote"
 
     # New (Release 2 — Deploy Pipeline)
+    UPLOAD = "upload"
     DEPLOY = "deploy"
     PXE_BOOT = "pxe_boot"
     VALIDATE = "validate"
