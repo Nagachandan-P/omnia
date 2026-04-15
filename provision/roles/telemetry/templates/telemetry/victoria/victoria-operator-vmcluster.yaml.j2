@@ -22,7 +22,7 @@ metadata:
   namespace: {{ telemetry_namespace }}
 spec:
   # Retention period from telemetry_config.yml
-  retentionPeriod: "{{ hostvars['localhost']['victoria_configurations']['retention_period'] }}h"
+  retentionPeriod: "{{ hostvars['localhost']['victoria_metrics_configurations']['retention_period'] }}h"
   
   # VMStorage configuration
   vmstorage:
@@ -41,7 +41,7 @@ spec:
             - ReadWriteOnce
           resources:
             requests:
-              storage: {{ hostvars['localhost']['victoria_configurations']['persistence_size'] }}
+              storage: {{ hostvars['localhost']['victoria_metrics_configurations']['persistence_size'] }}
     
     # Resource limits
     resources:

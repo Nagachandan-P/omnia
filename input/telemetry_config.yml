@@ -117,7 +117,7 @@ dcgm_support: true
 #   - single-node: Simple deployment with one pod (suitable for small deployments)
 #   - cluster: High-availability deployment with multiple components
 #               (recommended for production and large-scale deployments)
-victoria_configurations:
+victoria_metrics_configurations:
   # VictoriaMetrics deployment mode
   # Supported values:
   #   - "single-node" : Simple deployment (1 pod, suitable for dev/test)

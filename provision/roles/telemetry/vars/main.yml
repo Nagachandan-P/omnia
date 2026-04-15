@@ -99,12 +99,12 @@ victoria:
   image: "{{ telemetry_images['victoriametrics/victoria-metrics'] | default('victoriametrics/victoria-metrics:v1.128.0') }}"
 
 # VictoriaMetrics Cluster Configuration
-# Deployment mode is controlled by victoria_configurations.deployment_mode in telemetry_config.yml
+# Deployment mode is controlled by victoria_metrics_configurations.deployment_mode in telemetry_config.yml
 # Supported modes: "single-node" or "cluster"
 victoria_cluster:
   # Auto-configured based on telemetry_config.yml
   # true = cluster mode, false = single-node mode
-  enabled: "{{ true if hostvars['localhost']['victoria_configurations']['deployment_mode'] == 'cluster' else false }}"
+  enabled: "{{ true if hostvars['localhost']['victoria_metrics_configurations']['deployment_mode'] == 'cluster' else false }}"
   tls_enabled: true   # Set to true to enable TLS for cluster components
   # VMStorage: Stores raw data and returns query results
   vmstorage:

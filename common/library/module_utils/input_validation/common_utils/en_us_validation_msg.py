@@ -70,7 +70,7 @@ SWITCH_DETAILS_INCOMPLETE_MSG = ("If providing switch details, please provide bo
                                  "and Ports fields.")
 SWITCH_DETAILS_NO_BMC_DETAILS_MSG = ("If switch details are provided then bmc_detail's "
                                     "static_range must also be provided.")
-INVALID_GROUP_NAME_MSG = "Groups must be defined in the form of grp<n> where n is 0-100, or SU<n> where n is 1-100."
+INVALID_GROUP_NAME_MSG = "Groups must be defined in the form of grp<n> where n is 0-99."
 INVALID_LOCATION_ID_MSG = ("location_id must follow the format SU-<n>.RACK-<n> where n is 0-99. "
                           "This input is case-sensitive. Please use uppercase letters only.")
 INVALID_ATTRIBUTES_ROLE_MSG = ("Please provide valid attributes for the role, "
@@ -266,9 +266,8 @@ TELEMETRY_SERVICE_CLUSTER_ENTRY_FOR_LDMS_MISSING_ROLES_CONFIG_MSG= ("requires se
 
 # PowerScale telemetry validation messages
 POWERSCALE_VICTORIA_REQUIRED_MSG = (
-    "PowerScale telemetry requires VictoriaMetrics to be deployed. "
-    "When powerscale_configurations.powerscale_telemetry_support is true, 'victoria' must be included in "
-    "telemetry_collection_type (e.g., 'victoria' or 'victoria,kafka')."
+    "When powerscale_telemetry_support is true, 'victoria' must be included in "
+    "idrac_telemetry_collection_type (e.g., 'victoria' or 'victoria,kafka')."
 )
 POWERSCALE_CSI_DRIVER_MISSING_MSG = (
     "csi_driver_powerscale is not configured in software_config.json. "
@@ -279,19 +278,17 @@ POWERSCALE_SERVICE_CLUSTER_MISSING_MSG = (
     "PowerScale telemetry requires a service cluster."
 )
 POWERSCALE_CONFIGURATIONS_MISSING_MSG = (
-    "powerscale_configurations section is required and must contain powerscale_telemetry_support."
+    "powerscale_configurations section is required when powerscale_telemetry_support is true."
+)
+POWERSCALE_VMAGENT_STORAGE_SIZE_INVALID_MSG = (
+    "must be a non-empty string in format 'XGi' (e.g., '10Gi')"
 )
 POWERSCALE_OTEL_STORAGE_SIZE_INVALID_MSG = (
     "must be a non-empty string in format 'XGi' (e.g., '5Gi')"
 )
 POWERSCALE_CSM_VALUES_PATH_REQUIRED_MSG = (
-    "csm_observability_values_file_path is required when powerscale_configurations.powerscale_telemetry_support is true. "
+    "csm_observability_values_file_path is required when powerscale_telemetry_support is true. "
     "Please provide the path to the CSM Observability values.yaml file."
-)
-POWERSCALE_AUTH_PROXY_HOST_MISSING_MSG = (
-    "karaviMetricsPowerscale.authorization.proxyHost is required in the CSM Observability values file "
-    "when karaviMetricsPowerscale.authorization.enabled is true. "
-    "Please provide the hostname or IP of the CSM Authorization Proxy server."
 )
 def powerscale_csm_values_not_found_msg(path):
     """Returns error message when CSM Observability values.yaml file is not found."""
@@ -320,19 +317,7 @@ POWERSCALE_ADDITIONAL_ENDPOINTS_URL_EMPTY_MSG = (
 POWERSCALE_ADDITIONAL_ENDPOINTS_URL_INVALID_MSG = (
     "URL must start with 'http://' or 'https://'."
 )
-def powerscale_image_version_mismatch_msg(image_name, values_image, service_k8s_image):
-    """Returns error message when CSM values.yaml image version doesn't match service_k8s.json."""
-    return (
-        f"Image version mismatch for '{image_name}': "
-        f"CSM Observability values.yaml has '{values_image}' but "
-        f"service_k8s.json has '{service_k8s_image}'. "
-        f"Please update service_k8s.json to match the values.yaml version "
-        f"and re-run local_repo.yml to mirror the correct image to Pulp."
-    )
-POWERSCALE_SERVICE_K8S_JSON_NOT_FOUND_MSG = (
-    "service_k8s.json not found. Cannot validate PowerScale telemetry image versions. "
-    "Please ensure local_repo.yml has been executed."
-)
+
 def boolean_fail_msg(value):
     """Returns a formatted message indicating boolean_fail_msg."""
     return f"{value} must be set to either true or false."

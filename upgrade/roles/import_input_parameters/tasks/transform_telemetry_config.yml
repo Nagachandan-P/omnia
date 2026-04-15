@@ -44,7 +44,7 @@
 
 - name: Normalize nested backup telemetry sections
   ansible.builtin.set_fact:
-    backup_telemetry_victoria_config: "{{ backup_telemetry_config.victoria_configurations | default({}) }}"
+    backup_telemetry_victoria_config: "{{ backup_telemetry_config.victoria_metrics_configurations | default({}) }}"
     backup_telemetry_kafka_config: "{{ backup_telemetry_config.kafka_configurations | default({}) }}"
 
 - name: Normalize telemetry_config.yml values
