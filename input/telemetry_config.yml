@@ -38,8 +38,6 @@
 # ┌─────────────────┬──────────────────┬─────────────────┬──────────────────┐
 # │ Deployment Mode │ Per-Pod Storage  │ Number of Pods  │ Total Storage    │
 # ├─────────────────┼──────────────────┼─────────────────┼──────────────────┤
-# │ Single-node     │ persistence_size │ 1 pod           │ 1× storage       │
-# ├─────────────────┼──────────────────┼─────────────────┼──────────────────┤
 # │ Cluster         │ persistence_size │ 3 vmstorage     │ 3× storage       │
 # └─────────────────┴──────────────────┴─────────────────┴──────────────────┘
 # Example: 8Gi per pod → Single-node: 8Gi total, Cluster: 24Gi total
@@ -58,7 +56,6 @@
 #
 # COMBINED STORAGE EXAMPLES:
 #   Default (8Gi each): VictoriaMetrics Cluster (24Gi) + Kafka (48Gi) = 72Gi total
-#   Single-node mode:   VictoriaMetrics Single (8Gi) + Kafka (48Gi) = 56Gi total
 #
 # STORAGE OPTIONS:
 #   - VictoriaMetrics: Store iDRAC telemetry in time-series database
@@ -133,7 +130,7 @@ victoria_metrics_configurations:
 # VICTORIALOGS CONFIGURATION
 # ============================================================================
 # VictoriaLogs provides centralized log storage and querying (cluster mode only).
-# Deployed alongside VictoriaMetrics when 'victoria' is in idrac_telemetry_collection_type.
+# Deployed alongside VictoriaMetrics when 'victoria' is in telemetry_collection_type.
 #
 # DEPLOYMENT:
 #   - Always cluster mode (vlstorage, vlinsert, vlselect, VLAgent)
