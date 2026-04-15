@@ -1477,7 +1477,7 @@ def validate_telemetry_config(
     # Validate topic_partitions configuration
     kafka_config = data.get("kafka_configurations", {})
     topic_partitions = kafka_config.get("topic_partitions", [])
-    idrac_telemetry_collection_type = data.get("idrac_telemetry_collection_type", "")
+    telemetry_collection_type = data.get("telemetry_collection_type", "")
     
     # Check if LDMS software is configured but kafka_configurations is missing entirely
     if ldms_support_from_software_config and not kafka_config:
@@ -1538,12 +1538,12 @@ def validate_telemetry_config(
         
         # Validate required topics based on feature flags
         # If iDRAC telemetry is enabled with Kafka, idrac topic is required
-        if idrac_telemetry_support and 'kafka' in idrac_telemetry_collection_type.split(','):
+        if idrac_telemetry_support and 'kafka' in telemetry_collection_type.split(','):
             if 'idrac' not in present_topics:
                 errors.append(create_error_msg(
                     "kafka_configurations.topic_partitions",
                     "missing 'idrac' topic",
-                    "idrac topic is required when idrac_telemetry_support is true and 'kafka' is in idrac_telemetry_collection_type"
+                    "idrac topic is required when idrac_telemetry_support is true and 'kafka' is in telemetry_collection_type"
                 ))
 
         # If LDMS software is configured in software_config.json, ldms topic is required
@@ -1600,58 +1600,57 @@ def validate_telemetry_config(
                     ))
 
     # Validate PowerScale telemetry configuration
-    powerscale_telemetry_support = data.get("powerscale_telemetry_support", False)
+    powerscale_config = data.get("powerscale_configurations")
+    if not powerscale_config:
+        errors.append(create_error_msg(
+            "powerscale_configurations",
+            "not defined",
+            en_us_validation_msg.POWERSCALE_CONFIGURATIONS_MISSING_MSG
+        ))
+    else:
+        powerscale_telemetry_support = powerscale_config.get("powerscale_telemetry_support", False)
 
-    if powerscale_telemetry_support:
-        logger.info("PowerScale telemetry support is enabled, performing PowerScale validation")
+        if powerscale_telemetry_support:
+            logger.info("PowerScale telemetry support is enabled, performing PowerScale validation")
 
-        # Check victoria is in idrac_telemetry_collection_type
-        # PowerScale telemetry pipeline requires VictoriaMetrics (writes to vminsert via shared vmagent)
-        collection_types = [t.strip() for t in idrac_telemetry_collection_type.split(',')]
-        if 'victoria' not in collection_types:
-            errors.append(create_error_msg(
-                "idrac_telemetry_collection_type",
-                idrac_telemetry_collection_type,
-                en_us_validation_msg.POWERSCALE_VICTORIA_REQUIRED_MSG
-            ))
+            # Check victoria is in telemetry_collection_type
+            # PowerScale telemetry pipeline requires VictoriaMetrics (writes to vminsert via shared vmagent)
+            collection_types = [t.strip() for t in telemetry_collection_type.split(',')]
+            if 'victoria' not in collection_types:
+                errors.append(create_error_msg(
+                    "telemetry_collection_type",
+                    telemetry_collection_type,
+                    en_us_validation_msg.POWERSCALE_VICTORIA_REQUIRED_MSG
+                ))
 
-        # Check CSI driver PowerScale is in software_config.json
-        csi_powerscale_found = False
-        if os.path.exists(software_config_file_path):
-            try:
-                with open(software_config_file_path, 'r', encoding='utf-8') as f:
-                    software_config = json.load(f)
-                    softwares = software_config.get("softwares", [])
-                    csi_powerscale_found = any(
-                        software.get("name") == "csi_driver_powerscale" for software in softwares
-                    )
-            except (json.JSONDecodeError, IOError) as e:
-                logger.warn(f"Could not load software_config.json for PowerScale validation: {e}")
+            # Check CSI driver PowerScale is in software_config.json
+            csi_powerscale_found = False
+            if os.path.exists(software_config_file_path):
+                try:
+                    with open(software_config_file_path, 'r', encoding='utf-8') as f:
+                        software_config = json.load(f)
+                        softwares = software_config.get("softwares", [])
+                        csi_powerscale_found = any(
+                            software.get("name") == "csi_driver_powerscale" for software in softwares
+                        )
+                except (json.JSONDecodeError, IOError) as e:
+                    logger.warn(f"Could not load software_config.json for PowerScale validation: {e}")
 
-        if not csi_powerscale_found:
-            errors.append(create_error_msg(
-                "powerscale_telemetry_support",
-                powerscale_telemetry_support,
-                en_us_validation_msg.POWERSCALE_CSI_DRIVER_MISSING_MSG
-            ))
+            if not csi_powerscale_found:
+                errors.append(create_error_msg(
+                    "powerscale_configurations.powerscale_telemetry_support",
+                    powerscale_telemetry_support,
+                    en_us_validation_msg.POWERSCALE_CSI_DRIVER_MISSING_MSG
+                ))
 
-        # Check service cluster is defined
-        if not is_service_cluster_defined:
-            errors.append(create_error_msg(
-                "powerscale_telemetry_support",
-                powerscale_telemetry_support,
-                en_us_validation_msg.POWERSCALE_SERVICE_CLUSTER_MISSING_MSG
-            ))
+            # Check service cluster is defined
+            if not is_service_cluster_defined:
+                errors.append(create_error_msg(
+                    "powerscale_configurations.powerscale_telemetry_support",
+                    powerscale_telemetry_support,
+                    en_us_validation_msg.POWERSCALE_SERVICE_CLUSTER_MISSING_MSG
+                ))
 
-        # Validate powerscale_configurations section
-        powerscale_config = data.get("powerscale_configurations")
-        if not powerscale_config:
-            errors.append(create_error_msg(
-                "powerscale_configurations",
-                "not defined",
-                en_us_validation_msg.POWERSCALE_CONFIGURATIONS_MISSING_MSG
-            ))
-        else:
             # Validate otel_collector_storage_size
             otel_storage = powerscale_config.get("otel_collector_storage_size", "")
             if not otel_storage or not isinstance(otel_storage, str):
@@ -1711,6 +1710,17 @@ def validate_telemetry_config(
                                 "not defined",
                                 en_us_validation_msg.POWERSCALE_OTEL_COLLECTOR_IMAGE_MISSING_MSG
                             ))
+
+                        # Validate Karavi Authorization config in Helm values
+                        karavi_auth = karavi_metrics.get("authorization", {}) if karavi_metrics else {}
+                        if karavi_auth.get("enabled", False):
+                            proxy_host = karavi_auth.get("proxyHost", "")
+                            if not proxy_host or not isinstance(proxy_host, str) or proxy_host.strip() == "":
+                                errors.append(create_error_msg(
+                                    "karaviMetricsPowerscale.authorization.proxyHost",
+                                    proxy_host,
+                                    en_us_validation_msg.POWERSCALE_AUTH_PROXY_HOST_MISSING_MSG
+                                ))
 
                         # Cross-validate image versions between values.yaml and service_k8s.json
                         service_k8s_json_path = os.path.join(

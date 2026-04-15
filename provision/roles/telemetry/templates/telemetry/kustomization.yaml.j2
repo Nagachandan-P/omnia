@@ -1,6 +1,6 @@
 resources:
   - telemetry_secret_creation.yaml
-{% set types = hostvars['localhost']['idrac_telemetry_collection_type'].split(',') %}
+{% set types = hostvars['localhost']['telemetry_collection_type'].split(',') %}
 {% if 'victoria' in types %}
 # VictoriaMetrics Common Resources (RBAC)
   - victoria-vmagent-rbac.yaml
@@ -24,7 +24,7 @@ resources:
 {% if kafka_support %}
   - kafka.kafka.yaml
   - kafka.kafkapump_user.yaml
-{% if hostvars['localhost']['idrac_telemetry_support'] and 'kafka' in hostvars['localhost']['idrac_telemetry_collection_type'].split(',') %}
+{% if hostvars['localhost']['idrac_telemetry_support'] and 'kafka' in hostvars['localhost']['telemetry_collection_type'].split(',') %}
   - kafka.topic_idrac.yaml
 {% endif %}
 {% if hostvars['localhost']['ldms_support'] %}

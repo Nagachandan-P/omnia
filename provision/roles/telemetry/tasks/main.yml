@@ -29,7 +29,7 @@
     - >-
       hostvars['localhost']['idrac_telemetry_support'] or
       hostvars['localhost']['ldms_support'] or
-      hostvars['localhost']['powerscale_telemetry_support'] | default(false) | bool
+      hostvars['localhost']['powerscale_configurations']['powerscale_telemetry_support'] | default(false) | bool
   block:
     - name: Set NFS info fact
       ansible.builtin.set_fact:
@@ -41,7 +41,7 @@
     - name: Deploy PowerScale telemetry metrics
       ansible.builtin.include_tasks: deploy_powerscale_metrics.yml
       when:
-        - hostvars['localhost']['powerscale_telemetry_support'] | default(false) | bool
+        - hostvars['localhost']['powerscale_configurations']['powerscale_telemetry_support'] | default(false) | bool
 
     - name: Generate telemetry deployments
       ansible.builtin.include_tasks: generate_telemetry_deployments.yml
