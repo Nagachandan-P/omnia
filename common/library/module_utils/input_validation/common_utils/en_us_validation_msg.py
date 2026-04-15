@@ -267,8 +267,8 @@ TELEMETRY_SERVICE_CLUSTER_ENTRY_FOR_LDMS_MISSING_ROLES_CONFIG_MSG= ("requires se
 # PowerScale telemetry validation messages
 POWERSCALE_VICTORIA_REQUIRED_MSG = (
     "PowerScale telemetry requires VictoriaMetrics to be deployed. "
-    "When powerscale_telemetry_support is true, 'victoria' must be included in "
-    "idrac_telemetry_collection_type (e.g., 'victoria' or 'victoria,kafka')."
+    "When powerscale_configurations.powerscale_telemetry_support is true, 'victoria' must be included in "
+    "telemetry_collection_type (e.g., 'victoria' or 'victoria,kafka')."
 )
 POWERSCALE_CSI_DRIVER_MISSING_MSG = (
     "csi_driver_powerscale is not configured in software_config.json. "
@@ -279,14 +279,19 @@ POWERSCALE_SERVICE_CLUSTER_MISSING_MSG = (
     "PowerScale telemetry requires a service cluster."
 )
 POWERSCALE_CONFIGURATIONS_MISSING_MSG = (
-    "powerscale_configurations section is required when powerscale_telemetry_support is true."
+    "powerscale_configurations section is required and must contain powerscale_telemetry_support."
 )
 POWERSCALE_OTEL_STORAGE_SIZE_INVALID_MSG = (
     "must be a non-empty string in format 'XGi' (e.g., '5Gi')"
 )
 POWERSCALE_CSM_VALUES_PATH_REQUIRED_MSG = (
-    "csm_observability_values_file_path is required when powerscale_telemetry_support is true. "
+    "csm_observability_values_file_path is required when powerscale_configurations.powerscale_telemetry_support is true. "
     "Please provide the path to the CSM Observability values.yaml file."
+)
+POWERSCALE_AUTH_PROXY_HOST_MISSING_MSG = (
+    "karaviMetricsPowerscale.authorization.proxyHost is required in the CSM Observability values file "
+    "when karaviMetricsPowerscale.authorization.enabled is true. "
+    "Please provide the hostname or IP of the CSM Authorization Proxy server."
 )
 def powerscale_csm_values_not_found_msg(path):
     """Returns error message when CSM Observability values.yaml file is not found."""
