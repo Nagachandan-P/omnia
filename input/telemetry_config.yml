@@ -114,13 +114,11 @@ dcgm_support: true
 # Used for iDRAC telemetry when 'victoria' is enabled in telemetry_collection_type.
 #
 # DEPLOYMENT MODES:
-#   - single-node: Simple deployment with one pod (suitable for small deployments)
 #   - cluster: High-availability deployment with multiple components
 #               (recommended for production and large-scale deployments)
 victoria_metrics_configurations:
   # The amount of storage allocated for EACH VictoriaMetrics persistent volume.
   # IMPORTANT: Total VictoriaMetrics storage depends on deployment mode:
-  #   - Single-node mode: Total storage = persistence_size × 1 pod
   #   - Cluster mode: Total storage = persistence_size × 3 vmstorage pods
   #   - Example (cluster): 8Gi × 3 = 24Gi total VictoriaMetrics storage
   # Accepted values: in the form of "X[Ki|Mi|Gi|Ti|Pi|Ei]"
