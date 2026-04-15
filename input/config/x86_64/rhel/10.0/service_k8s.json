@@ -17,6 +17,8 @@
       { "package": "docker.io/victoriametrics/vmstorage", "type": "image", "tag": "v1.128.0-cluster" },
       { "package": "docker.io/victoriametrics/vminsert", "type": "image", "tag": "v1.128.0-cluster" },
       { "package": "docker.io/victoriametrics/vmselect", "type": "image", "tag": "v1.128.0-cluster" },
+      { "package": "docker.io/victoriametrics/victoria-logs", "type": "image", "tag": "v1.49.0" },
+      { "package": "docker.io/victoriametrics/vlagent", "type": "image", "tag": "v1.49.0" },
       { "package": "docker.io/alpine/kubectl", "tag": "1.34.1", "type": "image" },
       { "package": "docker.io/curlimages/curl", "type": "image", "tag": "8.17.0" },
       { "package": "docker.io/rmohr/activemq", "type": "image", "tag": "5.15.9" },
