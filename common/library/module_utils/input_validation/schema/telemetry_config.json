@@ -173,7 +173,7 @@
       ]
     }
   },
-  "required": ["idrac_telemetry_support", "dcgm_support", "telemetry_collection_type", "ldms_sampler_configurations", "ldms_agg_port", "ldms_store_port", "ldms_sampler_port", "powerscale_telemetry_support" ],
+  "required": ["idrac_telemetry_support", "dcgm_support", "telemetry_collection_type", "ldms_sampler_configurations", "ldms_agg_port", "ldms_store_port", "ldms_sampler_port", "powerscale_configurations" ],
   "$defs": {
     "kafka_configurations": {
       "type": "object",
