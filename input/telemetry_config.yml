@@ -118,24 +118,6 @@ dcgm_support: true
 #   - cluster: High-availability deployment with multiple components
 #               (recommended for production and large-scale deployments)
 victoria_metrics_configurations:
-  # VictoriaMetrics deployment mode
-  # Supported values:
-  #   - "single-node" : Simple deployment (1 pod, suitable for dev/test)
-  #   - "cluster"     : High-availability deployment (7 pods, recommended for production)
-  # Default: "cluster"
-  #
-  # Cluster Mode Benefits:
-  #   - High availability (no single point of failure)
-  #   - Horizontal scalability (scale components independently)
-  #   - Better performance (4x ingestion, 2x query speed)
-  #   - Production-ready architecture
-  #
-  # Single-Node Benefits:
-  #   - Simple setup (fewer resources)
-  #   - Suitable for small deployments (<10 nodes)
-  #   - Lower resource usage (~4Gi memory vs ~10Gi for cluster)
-  deployment_mode: "cluster"
-
   # The amount of storage allocated for EACH VictoriaMetrics persistent volume.
   # IMPORTANT: Total VictoriaMetrics storage depends on deployment mode:
   #   - Single-node mode: Total storage = persistence_size × 1 pod

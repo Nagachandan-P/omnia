@@ -35,7 +35,7 @@
   loop: "{{ victoria_templates }}"
   when: "'victoria' in hostvars['localhost']['telemetry_collection_type'].split(',')"
   tags: telemetry_deployment
-  # NOTE: victoria_templates is automatically set based on deployment_mode in telemetry_config.yml
+  # NOTE: victoria_templates is automatically set based on victoria_deployment_mode in vars/main.yml
   #       - cluster mode: includes vmstorage, vminsert, vmselect templates
   #       - single-node mode: includes victoria-statefulset template
 

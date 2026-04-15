@@ -99,7 +99,7 @@ victoria_metrics_configurations:
   # Supported values:
   #   - "single-node" : Simple deployment (1 pod, suitable for dev/test)
   #   - "cluster"     : High-availability deployment (7 pods, recommended for production)
-  # Default: "cluster"
+  # Default: "cluster" (configured in vars/main.yml as victoria_deployment_mode)
   #
   # Cluster Mode Benefits:
   #   - High availability (no single point of failure)
@@ -111,7 +111,6 @@ victoria_metrics_configurations:
   #   - Simple setup (fewer resources)
   #   - Suitable for small deployments (<10 nodes)
   #   - Lower resource usage (~4Gi memory vs ~10Gi for cluster)
-  deployment_mode: {{ telemetry_victoria_deployment_mode | default('cluster') | to_json }}
 
   # The amount of storage allocated for EACH VictoriaMetrics persistent volume.
   # IMPORTANT: Total VictoriaMetrics storage depends on deployment mode:

@@ -8,8 +8,8 @@ resources:
   # TLS secret for VictoriaMetrics cluster components
   - victoria-tls-secret.yaml
 {% endif %}
-  # VictoriaMetrics Operator-based Deployment (mode: {{ hostvars['localhost']['victoria_metrics_configurations']['deployment_mode'] }})
-{% if hostvars['localhost']['victoria_metrics_configurations']['deployment_mode'] == 'cluster' %}
+  # VictoriaMetrics Operator-based Deployment (mode: {{ victoria_deployment_mode }})
+{% if victoria_deployment_mode == 'cluster' %}
   # Cluster Mode: VMCluster CR (operator manages StatefulSets)
   - victoria-operator-vmcluster.yaml
 {% else %}
