@@ -257,7 +257,7 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
     # S1-4 Part A: ImageGroup ID extraction and uniqueness
     # ------------------------------------------------------------------
 
-    def _extract_image_group_id(self, catalog_data: dict) -> str:
+    def _extract_image_group_id(self, catalog_data: dict) -> ImageGroupId:
         """Extract ImageGroupID from the Catalog.Identifier field.
 
         The catalog JSON has a top-level ``Catalog`` object containing an
@@ -268,7 +268,7 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
             catalog_data: Parsed catalog JSON as a dict.
 
         Returns:
-            The ImageGroupID string (1-128 characters).
+            An ``ImageGroupId`` value object (validated, 1-128 characters).
 
         Raises:
             InvalidCatalogFormatError: If the ``Catalog`` key is missing,
@@ -281,26 +281,20 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
                 "Catalog JSON missing required 'Catalog' top-level key"
             )
 
-        image_group_id = catalog_obj.get("Identifier", "")
+        raw_id = catalog_obj.get("Identifier", "")
 
-        if not image_group_id or not image_group_id.strip():
+        try:
+            return ImageGroupId(raw_id)
+        except ValueError as exc:
             raise InvalidCatalogFormatError(
-                "Catalog 'Identifier' field is empty or missing"
-            )
+                f"Catalog 'Identifier' is invalid: {exc}"
+            ) from exc
 
-        if len(image_group_id) > ImageGroupId.MAX_LENGTH:
-            raise InvalidCatalogFormatError(
-                f"Catalog 'Identifier' exceeds {ImageGroupId.MAX_LENGTH} "
-                f"characters (length: {len(image_group_id)})"
-            )
-
-        return image_group_id
-
-    def _check_image_group_uniqueness(self, image_group_id: str) -> None:
+    def _check_image_group_uniqueness(self, image_group_id: ImageGroupId) -> None:
         """Check that no ImageGroup with this ID already exists.
 
         Args:
-            image_group_id: The extracted ImageGroupID from the catalog.
+            image_group_id: The validated ImageGroupId from the catalog.
 
         Raises:
             DuplicateImageGroupError: If an ImageGroup with this ID
@@ -312,12 +306,12 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
             )
             return
 
-        exists = self._image_group_repo.exists(ImageGroupId(image_group_id))
+        exists = self._image_group_repo.exists(image_group_id)
         if exists:
-            raise DuplicateImageGroupError(image_group_id)
+            raise DuplicateImageGroupError(str(image_group_id))
 
     def _extract_catalog_metadata(
-        self, catalog_data: dict, image_group_id: str
+        self, catalog_data: dict, image_group_id: ImageGroupId
     ) -> dict:
         """Extract role/image mappings from catalog for build-image.
 
@@ -327,7 +321,7 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
 
         Args:
             catalog_data: Parsed catalog JSON as a dict.
-            image_group_id: The Identifier extracted from Catalog.
+            image_group_id: The validated ImageGroupId from the catalog.
 
         Returns:
             Dict with image_group_id, roles, role_images, and catalog info.
@@ -347,7 +341,7 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
         roles.sort()
 
         return {
-            "image_group_id": image_group_id,
+            "image_group_id": str(image_group_id),
             "roles": roles,
             "role_images": role_images,
             "name": catalog_content.get("Name", ""),

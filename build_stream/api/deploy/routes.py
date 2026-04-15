@@ -34,6 +34,7 @@ from core.image_group.exceptions import (
     ImageGroupNotFoundError,
     InvalidStateTransitionError as ImageGroupInvalidStateTransitionError,
 )
+from core.image_group.value_objects import ImageGroupId
 from core.jobs.exceptions import (
     InvalidStateTransitionError,
     JobNotFoundError,
@@ -115,11 +116,23 @@ def create_deploy(
         ) from exc
 
     try:
+        validated_image_group_id = ImageGroupId(request_body.image_group_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_build_error_response(
+                "INVALID_IMAGE_GROUP_ID",
+                f"Invalid image_group_id: {exc}",
+                correlation_id.value,
+            ).model_dump(),
+        ) from exc
+
+    try:
         command = DeployCommand(
             job_id=validated_job_id,
             client_id=client_id,
             correlation_id=correlation_id,
-            image_group_id=request_body.image_group_id,
+            image_group_id=validated_image_group_id,
         )
         result = use_case.execute(command)
 
