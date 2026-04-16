@@ -237,6 +237,26 @@
             fi
             echo "[INFO] NVIDIA driver prerequisite satisfied."
 
+             # NVIDIA driver version check (Eng Spec Section 11, Pipeline 1 Step 5)
+            DRIVER_VERSION=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -1 | tr -d '[:space:]')
+            DRIVER_MAJOR=$(echo "$DRIVER_VERSION" | cut -d. -f1)
+            if [ -n "$DRIVER_MAJOR" ] && [ "$DRIVER_MAJOR" -ge 550 ] 2>/dev/null; then
+                echo "[INFO] NVIDIA driver version $DRIVER_VERSION meets minimum requirement (>= 550.x)."
+            else
+                echo "[ERROR] NVIDIA driver version ${DRIVER_VERSION:-unknown} does not meet minimum requirement (>= 550.x). Skipping DCGM setup."
+                exit 1
+            fi
+
+            # CUDA version check (Functional Spec VC-007: minimum CUDA 12.x required)
+            CUDA_VERSION=$(nvidia-smi 2>/dev/null | grep "CUDA Version" | sed 's/.*CUDA Version: *//' | sed 's/ .*//')
+            CUDA_MAJOR=$(echo "$CUDA_VERSION" | cut -d. -f1)
+            if [ -n "$CUDA_MAJOR" ] && [ "$CUDA_MAJOR" -ge 12 ] 2>/dev/null; then
+                echo "[INFO] CUDA version $CUDA_VERSION meets minimum requirement (>= 12.x)."
+            else
+                echo "[ERROR] CUDA version ${CUDA_VERSION:-unknown} does not meet minimum requirement (>= 12.x). Skipping DCGM setup."
+                exit 1
+            fi
+
             # Check if datacenter-gpu-manager package is installed
             if ! rpm -q datacenter-gpu-manager-4-core &>/dev/null; then
                 echo "[ERROR] datacenter-gpu-manager-4-core RPM not installed. Skipping DCGM setup."
