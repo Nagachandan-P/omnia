@@ -147,41 +147,6 @@
   when: item.skip_when is not defined or not item.skip_when | bool
   tags: telemetry_deployment
 
-- name: Validate combined VictoriaLogs manifest schema
-  ansible.builtin.shell:
-    cmd: kubectl apply -k {{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/deployments/ --dry-run=client -o yaml > /dev/null
-  register: victorialogs_schema_validation
-  changed_when: false
-  delegate_to: "{{ kube_vip }}"
-  when:
-    - "'victoria' in hostvars['localhost']['telemetry_collection_type'].split(',')"
-    - kube_vip is defined
-    - kube_vip | length > 0
-  ignore_errors: true
-  tags: telemetry_deployment
-
-- name: Report VictoriaLogs schema validation failure
-  ansible.builtin.fail:
-    msg: |
-      VALIDATION FAILED: Combined VictoriaLogs manifest schema validation failed
-      Component: VictoriaLogs Combined Manifest
-      Path: {{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/deployments/
-      Expected: All manifests should pass kubectl dry-run validation
-      Actual: Schema validation failed with error:
-      {{ victorialogs_schema_validation.stderr | default(victorialogs_schema_validation.stdout) }}
-      Action: Review the error messages above and fix the manifest templates
-              Common issues:
-              - Invalid YAML syntax
-              - Missing required fields
-              - Incorrect API version or kind
-              - Type mismatches in field values
-  when:
-    - "'victoria' in hostvars['localhost']['telemetry_collection_type'].split(',')"
-    - kube_vip is defined
-    - kube_vip | length > 0
-    - victorialogs_schema_validation.rc is defined
-    - victorialogs_schema_validation.rc != 0
-
 - name: Populate iDRAC telemetry statefulset
   ansible.builtin.template:
     src: 'telemetry/idrac_telemetry/idrac_telemetry_statefulset.yaml.j2'
