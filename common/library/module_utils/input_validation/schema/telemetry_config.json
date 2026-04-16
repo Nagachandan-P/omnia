@@ -241,18 +241,9 @@
       ],
       "additionalProperties": false
     },
-    "victoria_configurations": {
+    "victoria_metrics_configurations": {
       "type": "object",
       "properties": {
-        "deployment_mode": {
-          "type": "string",
-          "enum": ["single-node", "cluster"],
-          "default": "cluster",
-          "description": "VictoriaMetrics deployment mode. 'single-node' for simple deployment (1 pod), 'cluster' for high-availability deployment (7 pods). Default: 'cluster'",
-          "errorMessage": {
-            "enum": "deployment_mode must be either 'single-node' or 'cluster'"
-          }
-        },
         "persistence_size": {
           "type": "string",
           "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)$"
@@ -263,7 +254,6 @@
         }
       },
       "required": [
-        "deployment_mode",
         "persistence_size",
         "retention_period"
       ],
@@ -312,9 +302,9 @@
         }
       },
       "then": {
-        "required": ["victoria_configurations", "victoria_logs_configurations"],
+        "required": ["victoria_metrics_configurations", "victoria_logs_configurations"],
         "properties": {
-          "victoria_configurations": { "$ref": "#/$defs/victoria_configurations" },
+          "victoria_metrics_configurations": { "$ref": "#/$defs/victoria_metrics_configurations" },
           "victoria_logs_configurations": { "$ref": "#/$defs/victoria_logs_configurations" }
         }
       }
@@ -329,10 +319,10 @@
         }
       },
       "then": {
-        "required": ["kafka_configurations", "victoria_configurations", "victoria_logs_configurations"],
+        "required": ["kafka_configurations", "victoria_metrics_configurations", "victoria_logs_configurations"],
         "properties": {
           "kafka_configurations": { "$ref": "#/$defs/kafka_configurations" },
-          "victoria_configurations": { "$ref": "#/$defs/victoria_configurations" },
+          "victoria_metrics_configurations": { "$ref": "#/$defs/victoria_metrics_configurations" },
           "victoria_logs_configurations": { "$ref": "#/$defs/victoria_logs_configurations" }
         }
       }

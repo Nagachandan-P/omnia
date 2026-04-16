@@ -38,8 +38,6 @@
 # ┌─────────────────┬──────────────────┬─────────────────┬──────────────────┐
 # │ Deployment Mode │ Per-Pod Storage  │ Number of Pods  │ Total Storage    │
 # ├─────────────────┼──────────────────┼─────────────────┼──────────────────┤
-# │ Single-node     │ persistence_size │ 1 pod           │ 1× storage       │
-# ├─────────────────┼──────────────────┼─────────────────┼──────────────────┤
 # │ Cluster         │ persistence_size │ 3 vmstorage     │ 3× storage       │
 # └─────────────────┴──────────────────┴─────────────────┴──────────────────┘
 # Example: 8Gi per pod → Single-node: 8Gi total, Cluster: 24Gi total
@@ -58,7 +56,6 @@
 #
 # COMBINED STORAGE EXAMPLES:
 #   Default (8Gi each): VictoriaMetrics Cluster (24Gi) + Kafka (48Gi) = 72Gi total
-#   Single-node mode:   VictoriaMetrics Single (8Gi) + Kafka (48Gi) = 56Gi total
 #
 # STORAGE OPTIONS:
 #   - VictoriaMetrics: Store iDRAC telemetry in time-series database
@@ -114,31 +111,11 @@ dcgm_support: true
 # Used for iDRAC telemetry when 'victoria' is enabled in telemetry_collection_type.
 #
 # DEPLOYMENT MODES:
-#   - single-node: Simple deployment with one pod (suitable for small deployments)
 #   - cluster: High-availability deployment with multiple components
 #               (recommended for production and large-scale deployments)
-victoria_configurations:
-  # VictoriaMetrics deployment mode
-  # Supported values:
-  #   - "single-node" : Simple deployment (1 pod, suitable for dev/test)
-  #   - "cluster"     : High-availability deployment (7 pods, recommended for production)
-  # Default: "cluster"
-  #
-  # Cluster Mode Benefits:
-  #   - High availability (no single point of failure)
-  #   - Horizontal scalability (scale components independently)
-  #   - Better performance (4x ingestion, 2x query speed)
-  #   - Production-ready architecture
-  #
-  # Single-Node Benefits:
-  #   - Simple setup (fewer resources)
-  #   - Suitable for small deployments (<10 nodes)
-  #   - Lower resource usage (~4Gi memory vs ~10Gi for cluster)
-  deployment_mode: "cluster"
-
+victoria_metrics_configurations:
   # The amount of storage allocated for EACH VictoriaMetrics persistent volume.
   # IMPORTANT: Total VictoriaMetrics storage depends on deployment mode:
-  #   - Single-node mode: Total storage = persistence_size × 1 pod
   #   - Cluster mode: Total storage = persistence_size × 3 vmstorage pods
   #   - Example (cluster): 8Gi × 3 = 24Gi total VictoriaMetrics storage
   # Accepted values: in the form of "X[Ki|Mi|Gi|Ti|Pi|Ei]"
@@ -153,7 +130,7 @@ victoria_configurations:
 # VICTORIALOGS CONFIGURATION
 # ============================================================================
 # VictoriaLogs provides centralized log storage and querying (cluster mode only).
-# Deployed alongside VictoriaMetrics when 'victoria' is in idrac_telemetry_collection_type.
+# Deployed alongside VictoriaMetrics when 'victoria' is in telemetry_collection_type.
 #
 # DEPLOYMENT:
 #   - Always cluster mode (vlstorage, vlinsert, vlselect, VLAgent)
