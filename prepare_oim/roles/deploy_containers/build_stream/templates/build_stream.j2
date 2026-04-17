@@ -30,14 +30,6 @@ Network=host
 # Environment variables
 Environment=HOST={{ build_stream_host_ip }}
 Environment=PORT={{ build_stream_port }}
-Environment=PULP_BASE_URL={{ pulp_base_url }}
-Environment=PULP_USERNAME=admin
-Environment=PULP_PASSWORD={{ pulp_password }}
-Environment=PULP_VERIFY_SSL=true
-
-# Pulp SSL verification (for connecting to Pulp API)
-Environment=PULP_CA_BUNDLE=/etc/pulp/certs/pulp_webserver.crt
-Environment=REQUESTS_CA_BUNDLE=/etc/pulp/certs/pulp_webserver.crt
 
 # Build Stream SSL certificates (for HTTPS server)
 Environment=SSL_KEYFILE=/etc/ssl/omnia/bs_key.pem
@@ -58,7 +50,6 @@ Environment=BUILD_STREAM_CONFIG_PATH="/opt/omnia/build_stream/build_stream.ini"
 # Volume mounts (shared from omnia_core)
 Volume={{ omnia_path }}/omnia:/opt/omnia{{ selinux_option }}
 Volume={{ build_stream_ssl_dir }}:/etc/ssl/omnia:ro{{ selinux_option | regex_replace('^:', ',') }}
-Volume={{ build_stream_pulp_cert_host_dir }}:{{ build_stream_pulp_cert_container_path }}:ro{{ selinux_option | regex_replace('^:', ',') }}
 
 [Service]
 Restart=always
