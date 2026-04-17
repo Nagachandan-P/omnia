@@ -49,7 +49,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 BASE_URL = "https://100.10.0.28:8010"
 CLIENT_NAME = "demo-client"
 AUTH_USERNAME = "admin"
-AUTH_PASSWORD = "dell1234"
+AUTH_PASSWORD = ""
 CREDENTIALS_FILE = Path(__file__).parent / "demo_client_credentials.json"
 
 BUILD_STREAM_ARTIFACT_ROOT = "/opt/omnia/build_stream/artifacts"
