@@ -34,7 +34,6 @@ Environment=PORT={{ build_stream_port }}
 # Build Stream SSL certificates (for HTTPS server)
 Environment=SSL_KEYFILE=/etc/ssl/omnia/bs_key.pem
 Environment=SSL_CERTFILE=/etc/ssl/omnia/bs_cert.pem
-Environment=SYSTEM_ANCHOR={{ build_stream_ca_trust_anchor }}
 
 # Database configuration
 Environment=DATABASE_URL=postgresql://{{ postgres_user }}:{{ postgres_password }}@localhost:5432/{{ postgres_db_name }}
