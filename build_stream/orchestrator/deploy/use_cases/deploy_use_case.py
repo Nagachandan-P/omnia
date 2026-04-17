@@ -125,7 +125,7 @@ class DeployUseCase:
         guard_check(
             image_group=image_group,
             stage_name="deploy",
-            requested_image_group_id=command.image_group_id,
+            requested_image_group_id=str(command.image_group_id),
         )
 
         # [4] Transition ImageGroup status -> DEPLOYING
@@ -226,8 +226,8 @@ class DeployUseCase:
 
         extra_vars_dict = {
             "job_id": str(command.job_id),
-            "image_key": command.image_group_id,
-            "image_group_id": command.image_group_id,
+            "image_key": str(command.image_group_id),
+            "image_group_id": str(command.image_group_id),
         }
         extra_vars = ExtraVars(extra_vars_dict)
 
@@ -329,6 +329,6 @@ class DeployUseCase:
             stage_name=StageType.DEPLOY.value,
             status="accepted",
             submitted_at=request.submitted_at,
-            image_group_id=command.image_group_id,
+            image_group_id=str(command.image_group_id),
             correlation_id=str(command.correlation_id),
         )

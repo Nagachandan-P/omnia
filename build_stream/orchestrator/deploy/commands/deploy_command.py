@@ -16,6 +16,7 @@
 
 from dataclasses import dataclass
 
+from core.image_group.value_objects import ImageGroupId
 from core.jobs.value_objects import ClientId, CorrelationId, JobId
 
 
@@ -33,4 +34,4 @@ class DeployCommand:
     job_id: JobId
     client_id: ClientId
     correlation_id: CorrelationId
-    image_group_id: str
+    image_group_id: ImageGroupId
