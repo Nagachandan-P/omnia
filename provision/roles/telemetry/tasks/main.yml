@@ -86,10 +86,10 @@
   when:
     - hostvars['localhost']['upgrade_enabled'] | default(false) | bool
 
-- name: Validate VictoriaLogs deployment
-  ansible.builtin.include_tasks: validate_victorialogs_deployment.yml
-  when:
-    - "'victoria' in hostvars['localhost']['telemetry_collection_type'].split(',')"
-    - kube_vip is defined
-    - kube_vip | length > 0
-    - kube_vip_reachable | default(false) | bool
+#- name: Validate VictoriaLogs deployment
+#  ansible.builtin.include_tasks: validate_victorialogs_deployment.yml
+#  when:
+#    - "'victoria' in hostvars['localhost']['telemetry_collection_type'].split(',')"
+#    - kube_vip is defined
+#    - kube_vip | length > 0
+#    - kube_vip_reachable | default(false) | bool

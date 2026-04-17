@@ -35,10 +35,7 @@ spec:
       tag: {{ victoria_logs_cluster.vlstorage.image.split(':')[1] }}
       pullPolicy: IfNotPresent
 
-#    ports:
-#      http: {{ victoria_logs_ports.vlstorage_http }}
-#      insert: {{ victoria_logs_ports.vlstorage_insert }}
-#      select: {{ victoria_logs_ports.vlstorage_select }}
+    # Ports are managed by operator defaults (9491, 9400, 9401)
 
     storageDataPath: /vlstorage-data
     storage:
@@ -115,8 +112,7 @@ spec:
       tag: {{ victoria_logs_cluster.vlinsert.image.split(':')[1] }}
       pullPolicy: IfNotPresent
 
-#    ports:
-#      http: {{ victoria_logs_ports.vlinsert_http }}
+    # Ports are managed by operator defaults (9481)
 
     resources:
       requests:
@@ -144,6 +140,12 @@ spec:
       tls: "true"
       tlsCertFile: "/etc/victoria/certs/server.crt"
       tlsKeyFile: "/etc/victoria/certs/server.key"
+      # Internal TLS communication with vlstorage
+      storageNode.tlsEnabled: "true"
+      storageNode.tlsCertFile: "/etc/victoria/certs/server.crt"
+      storageNode.tlsKeyFile: "/etc/victoria/certs/server.key"
+      storageNode.tlsCAFile: "/etc/victoria/certs/ca.crt"
+      storageNode.tlsInsecureSkipVerify: "false"
 
     volumes:
       - name: victoria-tls-certs
@@ -179,8 +181,7 @@ spec:
       tag: {{ victoria_logs_cluster.vlselect.image.split(':')[1] }}
       pullPolicy: IfNotPresent
 
-#    ports:
-#      http: {{ victoria_logs_ports.vlselect_http }}
+    # Ports are managed by operator defaults (9471)
 
     serviceSpec:
       useAsDefault: true
@@ -213,6 +214,12 @@ spec:
       tls: "true"
       tlsCertFile: "/etc/victoria/certs/server.crt"
       tlsKeyFile: "/etc/victoria/certs/server.key"
+      # Internal TLS communication with vlstorage
+      storageNode.tlsEnabled: "true"
+      storageNode.tlsCertFile: "/etc/victoria/certs/server.crt"
+      storageNode.tlsKeyFile: "/etc/victoria/certs/server.key"
+      storageNode.tlsCAFile: "/etc/victoria/certs/ca.crt"
+      storageNode.tlsInsecureSkipVerify: "false"
 
     volumes:
       - name: victoria-tls-certs
