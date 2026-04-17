@@ -89,7 +89,7 @@
     mode: "{{ build_stream_ssl_file_mode }}"
 
 # -------------------------------------------------------------------
-# 5) Pull container image
+# 4) Pull container image
 # -------------------------------------------------------------------
 - name: Pull omnia_build_stream image from Docker Hub
   containers.podman.podman_image:
@@ -105,7 +105,7 @@
   when: image_pull_result is succeeded
 
 # -------------------------------------------------------------------
-# 6) Generate SSL certificates (idempotent)
+# 5) Generate SSL certificates (idempotent)
 # -------------------------------------------------------------------
 - name: Check if Build Stream SSL certificates exist
   ansible.builtin.stat:
@@ -383,7 +383,7 @@
             immediate: true
 
 # --------------------------------------------------------------------
-# 8) Validate health API endpoint https://{{ admin_ip }}:{{ build_stream_port }}/health"
+# 7) Validate health API endpoint https://{{ admin_ip }}:{{ build_stream_port }}/health"
 # -------------------------------------------------------------------
     - name: Verify API endpoint health
       ansible.builtin.uri:
