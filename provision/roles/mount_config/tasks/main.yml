@@ -20,6 +20,14 @@
     file: "{{ software_config_file }}"
     name: software_config
 
+- name: Generate cloud-init mounts module compatible format form mounts
+  ansible.builtin.include_tasks: cloud_init.yml
+
+- name: Read mounts
+  debug:
+    var: mounts
+  debugger: always
+
 - name: Check if slurm support is true
   ansible.builtin.set_fact:
     slurm_support: "{{ software_config.softwares | selectattr('name', 'in', ['slurm', 'slurm_custom']) | list | length > 0 }}"
@@ -75,3 +83,4 @@
 - name: Install NFS client with bolt-on support
   ansible.builtin.include_tasks: nfs_client.yml
   with_items: "{{ storage_to_be_mounted }}"
+

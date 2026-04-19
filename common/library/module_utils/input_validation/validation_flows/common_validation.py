@@ -586,18 +586,18 @@ def validate_storage_config(
 
     allowed_options = {"nosuid", "rw", "sync", "hard", "intr"}
 
-    for nfs_client_params in data["nfs_client_params"]:
-        client_mount_options = nfs_client_params["client_mount_options"]
-        client_mount_options_set = set(client_mount_options.split(","))
+    # for nfs_client_params in data["mounts"]:
+    #     client_mount_options = nfs_client_params["mount_point"]
+    #     client_mount_options_set = set(client_mount_options.split(","))
 
-        if not (client_mount_options_set.issubset(allowed_options)):
-            errors.append(
-                create_error_msg(
-                    "client_mount_options",
-                    client_mount_options,
-                    en_us_validation_msg.CLIENT_MOUNT_OPTIONS_FAIL_MSG,
-                )
-            )
+        # if not (client_mount_options_set.issubset(allowed_options)):
+        #     errors.append(
+        #         create_error_msg(
+        #             "client_mount_options",
+        #             client_mount_options,
+        #             en_us_validation_msg.CLIENT_MOUNT_OPTIONS_FAIL_MSG,
+        #         )
+        #     )
 
         # nfs_strg_name = nfs_client_params["nfs_name"]
         # matching_clusters = get_matching_clusters_for_nfs(nfs_strg_name, omnia_config_json)
@@ -952,7 +952,7 @@ def validate_k8s(data, admin_networks, softwares, ha_config, tag_names, errors,
             cluster_name = kluster.get("cluster_name")
             deployment = kluster.get("deployment")
             if deployment:
-                nfs_names = [st.get('nfs_name') for st in st_config.get('nfs_client_params')]
+                nfs_names = [st.get('name') for st in st_config.get('mounts', [])]
                 k8s_nfs = kluster.get("nfs_storage_name")
                 if not k8s_nfs:
                     errors.append(
@@ -1106,7 +1106,7 @@ def validate_omnia_config(
     # slurm L2
     if (("slurm" in sw_list or "slurm_custom" in sw_list) and "slurm" in tag_names):     
         slurm_nfs = [clst.get('nfs_storage_name') for clst in data.get('slurm_cluster')]
-        nfs_names = [st.get('nfs_name') for st in st_config.get('nfs_client_params')]
+        nfs_names = [st.get('name') for st in st_config.get('mounts')]
 
         diff_set = set(slurm_nfs).difference(set(nfs_names))
         if diff_set:
