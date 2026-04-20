@@ -85,11 +85,11 @@ data:
     remoteWrite:
       # vlinsert endpoint (in-cluster FQDN)
       # Operator creates service as vlinsert-victoria-logs-cluster
-      # Port 9480: HTTPS ingestion endpoint
+      # Port 9481: ingestion endpoint (HTTPS when tls_enabled, HTTP otherwise)
       # Path: /insert/jsonline — primary VictoriaLogs ingestion format
       # Query params:
       #   _stream_fields=hostname,app_name — stream identification for sharding
-      url: "https://vlinsert-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.local:9480/insert/jsonline?_stream_fields=hostname,app_name"
+      url: "{{ 'https' if victoria_logs_cluster.tls_enabled else 'http' }}://vlinsert-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.local:9481/insert/jsonline?_stream_fields=hostname,app_name"
 
 {% if victoria_logs_cluster.tls_enabled %}
       # TLS configuration for remoteWrite client

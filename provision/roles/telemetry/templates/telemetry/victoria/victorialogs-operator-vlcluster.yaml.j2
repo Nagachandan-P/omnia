@@ -140,6 +140,8 @@ spec:
       tls: "true"
       tlsCertFile: "/etc/victoria/certs/server.crt"
       tlsKeyFile: "/etc/victoria/certs/server.key"
+      storageNode.tls: "true"
+      storageNode.tlsCAFile: "/etc/victoria/certs/ca.crt"
 
     volumes:
       - name: victoria-tls-certs
@@ -208,6 +210,8 @@ spec:
       tls: "true"
       tlsCertFile: "/etc/victoria/certs/server.crt"
       tlsKeyFile: "/etc/victoria/certs/server.key"
+      storageNode.tls: "true"
+      storageNode.tlsCAFile: "/etc/victoria/certs/ca.crt"
 
     volumes:
       - name: victoria-tls-certs

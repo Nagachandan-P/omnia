@@ -59,15 +59,13 @@ spec:
   # Forward logs to VictoriaLogs vlinsert endpoint
   # Supports JSON Lines format with optional TLS
   remoteWrite:
-    - url: http://vlinsert-victoria-logs-cluster:9480/insert/jsonline
+{% if victoria_logs_cluster.tls_enabled %}
+    - url: https://vlinsert-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.local:9481/insert/jsonline
       tlsConfig:
         ca: /etc/victoria/certs/ca.crt
-      queueConfig:
-        capacity: 10000
-        maxShards: 200
-        minShards: 1
-        maxSamplesPerSend: 1000
-        flushInterval: 1s
+{% else %}
+    - url: http://vlinsert-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.local:9481/insert/jsonline
+{% endif %}
 
   # ========================================
   # Resource Allocation
