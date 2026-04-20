@@ -140,12 +140,6 @@ spec:
       tls: "true"
       tlsCertFile: "/etc/victoria/certs/server.crt"
       tlsKeyFile: "/etc/victoria/certs/server.key"
-      # Internal TLS communication with vlstorage
-      storageNode.tlsEnabled: "true"
-      storageNode.tlsCertFile: "/etc/victoria/certs/server.crt"
-      storageNode.tlsKeyFile: "/etc/victoria/certs/server.key"
-      storageNode.tlsCAFile: "/etc/victoria/certs/ca.crt"
-      storageNode.tlsInsecureSkipVerify: "false"
 
     volumes:
       - name: victoria-tls-certs
@@ -214,12 +208,6 @@ spec:
       tls: "true"
       tlsCertFile: "/etc/victoria/certs/server.crt"
       tlsKeyFile: "/etc/victoria/certs/server.key"
-      # Internal TLS communication with vlstorage
-      storageNode.tlsEnabled: "true"
-      storageNode.tlsCertFile: "/etc/victoria/certs/server.crt"
-      storageNode.tlsKeyFile: "/etc/victoria/certs/server.key"
-      storageNode.tlsCAFile: "/etc/victoria/certs/ca.crt"
-      storageNode.tlsInsecureSkipVerify: "false"
 
     volumes:
       - name: victoria-tls-certs
