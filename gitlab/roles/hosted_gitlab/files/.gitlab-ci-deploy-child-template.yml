@@ -285,7 +285,9 @@ deploy:
       echo "  ============================================================"
       echo "  Deploy Stage Result:"
       echo "  ============================================================"
-      DEPLOY_RESULT=$(jq -r '(first(.stages[]? | select(.stage_name == "deploy") | .stage_state)) // "COMPLETED"' status_response.json 2>/dev/null || echo "COMPLETED")
+      DEPLOY_RESULT=$(jq -r \
+        '(first(.stages[]? | select(.stage_name == "deploy") | .stage_state)) // "COMPLETED"' \
+        status_response.json 2>/dev/null || echo "COMPLETED")
       JOB_STATE_DEPLOY=$(jq -r '.job_state // "UNKNOWN"' status_response.json)
       printf "  %-22s %s\n" "Job ID:"         "${JOB_ID}"
       printf "  %-22s %s\n" "Image Group ID:" "${IMAGE_GROUP_ID}"
@@ -402,7 +404,9 @@ restart:
       echo "  ============================================================"
       echo "  Restart Stage Result:"
       echo "  ============================================================"
-      RESTART_RESULT=$(jq -r '(first(.stages[]? | select(.stage_name == "restart") | .stage_state)) // "COMPLETED"' status_response.json 2>/dev/null || echo "COMPLETED")
+      RESTART_RESULT=$(jq -r \
+        '(first(.stages[]? | select(.stage_name == "restart") | .stage_state)) // "COMPLETED"' \
+        status_response.json 2>/dev/null || echo "COMPLETED")
       JOB_STATE_RESTART=$(jq -r '.job_state // "UNKNOWN"' status_response.json)
       printf "  %-22s %s\n" "Job ID:"         "${JOB_ID}"
       printf "  %-22s %s\n" "Image Group ID:" "${IMAGE_GROUP_ID}"
