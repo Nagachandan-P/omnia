@@ -25,7 +25,7 @@ from ansible.module_utils.input_validation.common_utils.validation_utils import 
 
 
 def validate_powerscale_telemetry_config(
-    data, telemetry_collection_type, software_config_file_path,
+    data, powerscale_collection_targets, software_config_file_path,
     is_service_cluster_defined, config_paths, logger, errors
 ):
     """
@@ -33,7 +33,8 @@ def validate_powerscale_telemetry_config(
 
     Args:
         data (dict): Telemetry configuration data.
-        telemetry_collection_type (str): Telemetry collection type (e.g., "victoria,kafka").
+        powerscale_collection_targets (list): PowerScale collection targets list
+                                              e.g. ["victoria_metrics", "victoria_logs"].
         software_config_file_path (str): Path to software_config.json.
         is_service_cluster_defined (bool): Whether service cluster is defined.
         config_paths (dict): Dictionary containing resolved config file paths.
@@ -54,13 +55,12 @@ def validate_powerscale_telemetry_config(
         if powerscale_telemetry_support:
             logger.info("PowerScale telemetry support is enabled, performing PowerScale validation")
 
-            # Check victoria is in telemetry_collection_type
-            # PowerScale telemetry pipeline requires VictoriaMetrics (writes to vminsert via shared vmagent)
-            collection_types = [t.strip() for t in telemetry_collection_type.split(',')]
-            if 'victoria' not in collection_types:
+            # PowerScale requires at least victoria_metrics in collection_targets
+            # (writes metrics via vmagent-powerscale to victoria_metrics)
+            if 'victoria_metrics' not in powerscale_collection_targets:
                 errors.append(create_error_msg(
-                    "telemetry_collection_type",
-                    telemetry_collection_type,
+                    "telemetry_sources.powerscale.collection_targets",
+                    powerscale_collection_targets,
                     en_us_validation_msg.POWERSCALE_VICTORIA_REQUIRED_MSG
                 ))
 

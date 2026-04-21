@@ -47,8 +47,7 @@ spec:
         app: {{ idrac_telemetry_k8s_name }}
     spec:
       volumes:
-{% set types = hostvars['localhost']['telemetry_collection_type'].split(',') %}
-{% if 'kafka' in types %}
+{% if kafka_support %}
         # Mount Kafka cluster CA certificate for TLS verification
         - name: kafka-cluster-ca-cert
           secret:
@@ -163,7 +162,7 @@ spec:
             - name: MYSQL_HOST_PORT
               value: "{{ mysqldb_container_port1 }}"
 
-{% if 'kafka' in types %}
+{% if 'kafka' in (telemetry_config.telemetry_sources.idrac.collection_targets | default([])) %}
         - name: kafka-pump
           image: {{ kafkapump_image }}
           imagePullPolicy: IfNotPresent
@@ -199,7 +198,7 @@ spec:
               value: "0"
 {% endif %}
 
-{% if 'victoria' in types %}
+{% if 'victoria_metrics' in (telemetry_config.telemetry_sources.idrac.collection_targets | default([])) %}
         - name: victoria-pump
           image: {{ victoriapump_image }}
           imagePullPolicy: IfNotPresent
