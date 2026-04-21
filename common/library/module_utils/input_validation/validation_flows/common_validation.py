@@ -1,4 +1,4 @@
-# Copyright 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,12 +21,13 @@ import csv
 import ipaddress
 import json
 import os
-import re
 from collections import Counter
 
 import yaml
 import ansible.module_utils.input_validation.common_utils.data_fetch as fetch
 from ansible.module_utils.input_validation.validation_flows import csi_driver_validation
+from ansible.module_utils.input_validation.validation_flows import powerscale_authorization_validation
+from ansible.module_utils.input_validation.validation_flows import powerscale_telemetry_validation
 import ansible.module_utils.input_validation.common_utils.data_validation as validate
 from ansible.module_utils.input_validation.common_utils import (
     config,
@@ -322,7 +323,7 @@ def validate_software_config(
                 "Please resolve the issues first before proceeding.",
             )
         )
-    
+
     if additional_packages_warnings:
         logger.info(
             "[INFO] Additional packages validation completed with warnings. "
@@ -915,8 +916,8 @@ def is_ip_in_range(ip_str, ip_range_str):
         return False
 
 
-def validate_k8s(data, admin_networks, softwares, ha_config, tag_names, errors, 
-                 st_config, module, input_file_path):
+def validate_k8s(data, admin_networks, softwares, ha_config, tag_names, errors,
+                 st_config, module, input_file_path, logger):
     """
     Validates Kubernetes cluster configurations.
 
@@ -925,6 +926,7 @@ def validate_k8s(data, admin_networks, softwares, ha_config, tag_names, errors,
         admin_networks (dict): A dictionary containing admin network information.
         softwares (list): A list of software name sin software_config.
         errors (list): A list to store error messages.
+        logger (object): Logger object for logging.
     """
     admin_dynamic_range = admin_networks["admin_network"]["dynamic_range"]
     primary_oim_admin_ip = admin_networks["admin_network"]["primary_oim_admin_ip"]
@@ -1019,7 +1021,7 @@ def validate_k8s(data, admin_networks, softwares, ha_config, tag_names, errors,
 
                     csi_secret_file_path = kluster.get("csi_powerscale_driver_secret_file_path")
                     csi_values_file_path = kluster.get("csi_powerscale_driver_values_file_path")
-                    
+
                     # Validate secret file path
                     if not csi_secret_file_path or \
                     not csi_secret_file_path.strip() or \
@@ -1044,6 +1046,15 @@ def validate_k8s(data, admin_networks, softwares, ha_config, tag_names, errors,
                                 )
                             )
                         csi_driver_validation.validate_powerscale_secret_and_values_file(csi_secret_file_path,csi_values_file_path, errors, input_file_path)
+
+                # PowerScale Authorization validation
+                input_dir = os.path.dirname(input_file_path)
+                software_config_file_path = os.path.join(input_dir, "software_config.json")
+                config_paths = get_config_file_paths(input_dir, data, software_config_file_path)
+
+                powerscale_authorization_validation.validate_powerscale_authorization(
+                    kluster, softwares, input_file_path, config_paths, logger, errors
+                )
 
 def validate_omnia_config(
         input_file_path,
@@ -1103,9 +1114,9 @@ def validate_omnia_config(
         for k in ["service_k8s_cluster_ha"]:
             ha_config[k] = [xha["cluster_name"] for xha in ha_config.get(k, [])]
         validate_k8s(data, admin_networks, sw_list, ha_config, tag_names,
-                        errors, st_config, module, input_file_path)
+                        errors, st_config, module, input_file_path, logger)
     # slurm L2
-    if (("slurm" in sw_list or "slurm_custom" in sw_list) and "slurm" in tag_names):     
+    if (("slurm" in sw_list or "slurm_custom" in sw_list) and "slurm" in tag_names):
         slurm_nfs = [clst.get('nfs_storage_name') for clst in data.get('slurm_cluster')]
         nfs_names = [st.get('nfs_name') for st in st_config.get('nfs_client_params')]
 
@@ -1117,16 +1128,16 @@ def validate_omnia_config(
                     "slurm NFS not provided",
                     f"NFS name {', '.join(diff_set)} required for slurm is not defined in {storage_config}"
                     ))
-        
+
         # Validate node_hardware_defaults requires node_discovery_mode=homogeneous
         for clst in data.get('slurm_cluster', []):
             node_hardware_defaults = clst.get('node_hardware_defaults')
             node_discovery_mode = clst.get('node_discovery_mode')
-            
+
             # Normalize mode to lowercase for case-insensitive comparison
             if node_discovery_mode and isinstance(node_discovery_mode, str):
                 node_discovery_mode = node_discovery_mode.lower()
-            
+
             if node_hardware_defaults and len(node_hardware_defaults) > 0:
                 if not node_discovery_mode or node_discovery_mode != 'homogeneous':
                     group_names = list(node_hardware_defaults.keys())
@@ -1139,7 +1150,7 @@ def validate_omnia_config(
                             f"Either set 'node_discovery_mode: \"homogeneous\"' to use the hardware specifications, "
                             f"or remove 'node_hardware_defaults' to use heterogeneous discovery."
                         ))
-        
+
         cnfg_src = [clst.get('config_sources', {}) for clst in data.get('slurm_cluster')]
         skip_conf_validation = os.path.exists("/opt/omnia/input/.skip_slurm_conf_validation")
         cnfg_src = [clst.get('config_sources', {}) for clst in data.get('slurm_cluster')]
@@ -1193,7 +1204,7 @@ def check_is_service_cluster_functional_groups_defined(
     # Get the directory containing the input file
     input_dir = os.path.dirname(input_file_path)
     provision_config_path = os.path.join(input_dir, "provision_config.yml")
-    
+
     # Check if provision_config.yml exists
     if not os.path.exists(provision_config_path):
         errors.append(
@@ -1204,14 +1215,14 @@ def check_is_service_cluster_functional_groups_defined(
             )
         )
         return False
-    
+
     try:
         # Load provision_config.yml to get pxe_mapping_file_path
         with open(provision_config_path, 'r', encoding='utf-8') as f:
             provision_config = yaml.safe_load(f)
-        
+
         pxe_mapping_file_path = provision_config.get('pxe_mapping_file_path', '')
-        
+
         if not pxe_mapping_file_path or not os.path.exists(pxe_mapping_file_path):
             errors.append(
                 create_error_msg(
@@ -1221,14 +1232,14 @@ def check_is_service_cluster_functional_groups_defined(
                 )
             )
             return False
-        
+
         # Read the mapping file and check for service_kube_node functional groups
         with open(pxe_mapping_file_path, 'r', encoding='utf-8') as fh:
             raw_lines = fh.readlines()
-        
+
         # Remove blank lines
         non_comment_lines = [ln for ln in raw_lines if ln.strip()]
-        
+
         if not non_comment_lines:
             errors.append(
                 create_error_msg(
@@ -1238,15 +1249,15 @@ def check_is_service_cluster_functional_groups_defined(
                 )
             )
             return False
-        
+
         # Use csv.DictReader to parse the mapping file
         reader = csv.DictReader(non_comment_lines)
-        
+
         # Check if all required service cluster functional groups are present
         # Required: service_kube_node_, service_kube_control_plane_
         has_kube_node = False
         has_control_plane = False
-        
+
         for row in reader:
             functional_group = row.get('FUNCTIONAL_GROUP_NAME', '').strip()
             if functional_group.startswith('service_kube_node_'):
@@ -1255,10 +1266,10 @@ def check_is_service_cluster_functional_groups_defined(
             elif functional_group.startswith('service_kube_control_plane_'):
                 has_control_plane = True
                 logger.info(f"Service cluster functional group found: {functional_group}")
-        
+
         # Both must be present for a complete service cluster
         service_cluster_found = has_kube_node and has_control_plane
-        
+
         if not service_cluster_found:
             missing = []
             if not has_kube_node:
@@ -1266,9 +1277,9 @@ def check_is_service_cluster_functional_groups_defined(
             if not has_control_plane:
                 missing.append('service_kube_control_plane_*')
             logger.info(f"Service cluster incomplete. Missing functional groups: {', '.join(missing)}")
-        
+
         return service_cluster_found
-        
+
     except (yaml.YAMLError, IOError, csv.Error) as e:
         errors.append(
             create_error_msg(
@@ -1278,6 +1289,42 @@ def check_is_service_cluster_functional_groups_defined(
             )
         )
         return False
+
+def get_config_file_paths(input_dir, data, software_config_file_path):
+    """
+    Dynamically resolves config file paths based on cluster OS type and version.
+
+    Args:
+        input_dir (str): Input directory path.
+        data (dict): Configuration data (may contain cluster_os_type, cluster_os_version).
+        software_config_file_path (str): Path to software_config.json.
+
+    Returns:
+        dict: Dictionary containing resolved file paths:
+              - service_k8s_json_path: Path to service_k8s.json
+              - csi_driver_powerscale_json_path: Path to csi_driver_powerscale.json
+    """
+    # Try reading cluster_os_type/version from data first, then from software_config.json
+    cluster_os_type = data.get("cluster_os_type", "rhel")
+    cluster_os_version = data.get("cluster_os_version", "10.0")
+
+    if os.path.exists(software_config_file_path):
+        try:
+            with open(software_config_file_path, 'r', encoding='utf-8') as scf:
+                sc_data = json.load(scf)
+                cluster_os_type = sc_data.get("cluster_os_type", cluster_os_type)
+                cluster_os_version = sc_data.get("cluster_os_version", cluster_os_version)
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    config_base_path = os.path.join(input_dir, "config", "x86_64", cluster_os_type, cluster_os_version)
+    service_k8s_json_path = os.path.join(config_base_path, "service_k8s.json")
+    csi_driver_powerscale_json_path = os.path.join(config_base_path, "csi_driver_powerscale.json")
+
+    return {
+        "service_k8s_json_path": service_k8s_json_path,
+        "csi_driver_powerscale_json_path": csi_driver_powerscale_json_path
+    }
 
 def check_is_slurm_cluster_functional_groups_defined(
     errors, input_file_path, omnia_base_dir, project_name, logger, module
@@ -1299,7 +1346,7 @@ def check_is_slurm_cluster_functional_groups_defined(
     # Get the directory containing the input file
     input_dir = os.path.dirname(input_file_path)
     provision_config_path = os.path.join(input_dir, "provision_config.yml")
-    
+
     # Check if provision_config.yml exists
     if not os.path.exists(provision_config_path):
         errors.append(
@@ -1310,14 +1357,14 @@ def check_is_slurm_cluster_functional_groups_defined(
             )
         )
         return False
-    
+
     try:
         # Load provision_config.yml to get pxe_mapping_file_path
         with open(provision_config_path, 'r', encoding='utf-8') as f:
             provision_config = yaml.safe_load(f)
-        
+
         pxe_mapping_file_path = provision_config.get('pxe_mapping_file_path', '')
-        
+
         if not pxe_mapping_file_path or not os.path.exists(pxe_mapping_file_path):
             errors.append(
                 create_error_msg(
@@ -1327,14 +1374,14 @@ def check_is_slurm_cluster_functional_groups_defined(
                 )
             )
             return False
-        
+
         # Read the mapping file and check for slurm functional groups
         with open(pxe_mapping_file_path, 'r', encoding='utf-8') as fh:
             raw_lines = fh.readlines()
-        
+
         # Remove blank lines
         non_comment_lines = [ln for ln in raw_lines if ln.strip()]
-        
+
         if not non_comment_lines:
             errors.append(
                 create_error_msg(
@@ -1344,15 +1391,15 @@ def check_is_slurm_cluster_functional_groups_defined(
                 )
             )
             return False
-        
+
         # Use csv.DictReader to parse the mapping file
         reader = csv.DictReader(non_comment_lines)
-        
+
         # Check if all required slurm cluster functional groups are present
         # Required: slurm_control_node_, slurm_node
         has_slurm_control = False
         has_slurm_node = False
-        
+
         for row in reader:
             functional_group = row.get('FUNCTIONAL_GROUP_NAME', '').strip()
             if functional_group.startswith('slurm_control_node_'):
@@ -1361,10 +1408,10 @@ def check_is_slurm_cluster_functional_groups_defined(
             elif functional_group.startswith('slurm_node_'):
                 has_slurm_node = True
                 logger.info(f"Slurm cluster functional group found: {functional_group}")
-        
+
         # Both must be present for a complete slurm cluster
         slurm_cluster_found = has_slurm_control and has_slurm_node
-        
+
         if not slurm_cluster_found:
             missing = []
             if not has_slurm_control:
@@ -1372,9 +1419,9 @@ def check_is_slurm_cluster_functional_groups_defined(
             if not has_slurm_node:
                 missing.append('slurm_node_')
             logger.info(f"Slurm cluster incomplete. Missing functional groups: {', '.join(missing)}")
-        
+
         return slurm_cluster_found
-        
+
     except (yaml.YAMLError, IOError, csv.Error) as e:
         errors.append(
             create_error_msg(
@@ -1432,7 +1479,7 @@ def validate_telemetry_config(
             "idrac_telemetry_support can be",
             idrac_telemetry_support,
             en_us_validation_msg.TELEMETRY_SERVICE_CLUSTER_ENTRY_MISSING_ROLES_CONFIG_MSG
-            )    
+            )
         )
 
     is_slurm_cluster_defined = check_is_slurm_cluster_functional_groups_defined(errors,
@@ -1441,15 +1488,15 @@ def validate_telemetry_config(
                                 project_name,
                                 logger,
                                 module)
-    
+
     # Determine LDMS support from software_config.json
     # software_config.json is in the same directory as telemetry_config.yml
     ldms_support_from_software_config = False
     input_dir = os.path.dirname(input_file_path)
     software_config_file_path = os.path.join(input_dir, "software_config.json")
-    
+
     logger.info(f"Checking for LDMS software in: {software_config_file_path}")
-    
+
     if os.path.exists(software_config_file_path):
         try:
             with open(software_config_file_path, 'r', encoding='utf-8') as f:
@@ -1473,12 +1520,12 @@ def validate_telemetry_config(
             en_us_validation_msg.TELEMETRY_SERVICE_CLUSTER_ENTRY_FOR_LDMS_MISSING_ROLES_CONFIG_MSG
             )
         )
-    
+
     # Validate topic_partitions configuration
     kafka_config = data.get("kafka_configurations", {})
     topic_partitions = kafka_config.get("topic_partitions", [])
     telemetry_collection_type = data.get("telemetry_collection_type", "")
-    
+
     # Check if LDMS software is configured but kafka_configurations is missing entirely
     if ldms_support_from_software_config and not kafka_config:
         errors.append(create_error_msg(
@@ -1487,7 +1534,7 @@ def validate_telemetry_config(
             "LDMS software is configured in software_config.json, but kafka_configurations section is missing in telemetry_config.yml. "
             "Please define kafka_configurations with at least the 'ldms' topic in topic_partitions."
         ))
-    
+
     # Check if LDMS software is configured but no topics are defined
     if ldms_support_from_software_config and kafka_config and not topic_partitions:
         errors.append(create_error_msg(
@@ -1496,7 +1543,7 @@ def validate_telemetry_config(
             "LDMS software is configured in software_config.json, but kafka_configurations.topic_partitions is not defined. "
             "Please define at least the 'ldms' topic in topic_partitions."
         ))
-    
+
     if topic_partitions:
         # Ensure at least one topic is defined
         if len(topic_partitions) < 1:
@@ -1505,11 +1552,11 @@ def validate_telemetry_config(
                 "is empty",
                 "At least one Kafka topic must be defined"
             ))
-        
+
         # Collect topic names and validate each one
         topic_names = []
         allowed_topics = {"idrac", "ldms"}
-        
+
         for idx, topic in enumerate(topic_partitions):
             if "name" not in topic:
                 errors.append(create_error_msg(
@@ -1518,10 +1565,10 @@ def validate_telemetry_config(
                     "Each topic must have a 'name' field"
                 ))
                 continue
-            
+
             topic_name = topic.get("name")
             topic_names.append(topic_name)
-            
+
             # Validate each topic name individually
             if topic_name not in allowed_topics:
                 errors.append(create_error_msg(
@@ -1529,13 +1576,13 @@ def validate_telemetry_config(
                     topic_name,
                     f"Invalid topic name '{topic_name}'. Only 'idrac' and 'ldms' are allowed as Kafka topic names. Custom topic names are not supported."
                 ))
-        
+
         present_topics = set(topic_names)
-        
+
         # Debug logging
         logger.info(f"Telemetry validation - Present topics: {present_topics}")
         logger.info(f"Telemetry validation - Allowed topics: {allowed_topics}")
-        
+
         # Validate required topics based on feature flags
         # If iDRAC telemetry is enabled with Kafka, idrac topic is required
         if idrac_telemetry_support and 'kafka' in telemetry_collection_type.split(','):
@@ -1557,7 +1604,7 @@ def validate_telemetry_config(
             ))
         elif ldms_support_from_software_config:
             logger.info(f"LDMS topic validation PASSED - 'ldms' found in present_topics: {present_topics}")
-        
+
         # Check for duplicate topic names
         if len(topic_names) != len(set(topic_names)):
             duplicates = [name for name in topic_names if topic_names.count(name) > 1]
@@ -1600,260 +1647,11 @@ def validate_telemetry_config(
                     ))
 
     # Validate PowerScale telemetry configuration
-    powerscale_config = data.get("powerscale_configurations")
-    if not powerscale_config:
-        errors.append(create_error_msg(
-            "powerscale_configurations",
-            "not defined",
-            en_us_validation_msg.POWERSCALE_CONFIGURATIONS_MISSING_MSG
-        ))
-    else:
-        powerscale_telemetry_support = powerscale_config.get("powerscale_telemetry_support", False)
-
-        if powerscale_telemetry_support:
-            logger.info("PowerScale telemetry support is enabled, performing PowerScale validation")
-
-            # Check victoria is in telemetry_collection_type
-            # PowerScale telemetry pipeline requires VictoriaMetrics (writes to vminsert via shared vmagent)
-            collection_types = [t.strip() for t in telemetry_collection_type.split(',')]
-            if 'victoria' not in collection_types:
-                errors.append(create_error_msg(
-                    "telemetry_collection_type",
-                    telemetry_collection_type,
-                    en_us_validation_msg.POWERSCALE_VICTORIA_REQUIRED_MSG
-                ))
-
-            # Check CSI driver PowerScale is in software_config.json
-            csi_powerscale_found = False
-            if os.path.exists(software_config_file_path):
-                try:
-                    with open(software_config_file_path, 'r', encoding='utf-8') as f:
-                        software_config = json.load(f)
-                        softwares = software_config.get("softwares", [])
-                        csi_powerscale_found = any(
-                            software.get("name") == "csi_driver_powerscale" for software in softwares
-                        )
-                except (json.JSONDecodeError, IOError) as e:
-                    logger.warn(f"Could not load software_config.json for PowerScale validation: {e}")
-
-            if not csi_powerscale_found:
-                errors.append(create_error_msg(
-                    "powerscale_configurations.powerscale_telemetry_support",
-                    powerscale_telemetry_support,
-                    en_us_validation_msg.POWERSCALE_CSI_DRIVER_MISSING_MSG
-                ))
-
-            # Check service cluster is defined
-            if not is_service_cluster_defined:
-                errors.append(create_error_msg(
-                    "powerscale_configurations.powerscale_telemetry_support",
-                    powerscale_telemetry_support,
-                    en_us_validation_msg.POWERSCALE_SERVICE_CLUSTER_MISSING_MSG
-                ))
-
-            # Validate otel_collector_storage_size
-            otel_storage = powerscale_config.get("otel_collector_storage_size", "")
-            if not otel_storage or not isinstance(otel_storage, str):
-                errors.append(create_error_msg(
-                    "powerscale_configurations.otel_collector_storage_size",
-                    otel_storage,
-                    en_us_validation_msg.POWERSCALE_OTEL_STORAGE_SIZE_INVALID_MSG
-                ))
-
-            # Validate csm_observability_values_file_path
-            csm_values_path = powerscale_config.get("csm_observability_values_file_path", "")
-            if not csm_values_path or not isinstance(csm_values_path, str) or csm_values_path.strip() == "":
-                errors.append(create_error_msg(
-                    "powerscale_configurations.csm_observability_values_file_path",
-                    csm_values_path,
-                    en_us_validation_msg.POWERSCALE_CSM_VALUES_PATH_REQUIRED_MSG
-                ))
-            elif not os.path.exists(csm_values_path):
-                errors.append(create_error_msg(
-                    "powerscale_configurations.csm_observability_values_file_path",
-                    csm_values_path,
-                    en_us_validation_msg.powerscale_csm_values_not_found_msg(csm_values_path)
-                ))
-            else:
-                # Validate the CSM Observability values.yaml content
-                try:
-                    with open(csm_values_path, 'r', encoding='utf-8') as f:
-                        csm_values = yaml.safe_load(f)
-                    if not isinstance(csm_values, dict):
-                        errors.append(create_error_msg(
-                            "powerscale_configurations.csm_observability_values_file_path",
-                            csm_values_path,
-                            en_us_validation_msg.POWERSCALE_CSM_VALUES_INVALID_YAML_MSG
-                        ))
-                    else:
-                        # Validate required keys
-                        karavi_metrics = csm_values.get("karaviMetricsPowerscale", {})
-                        if not karavi_metrics:
-                            errors.append(create_error_msg(
-                                "csm_observability_values_file_path",
-                                csm_values_path,
-                                en_us_validation_msg.POWERSCALE_CSM_VALUES_MISSING_KARAVI_SECTION_MSG
-                            ))
-                        else:
-                            # Validate image reference exists
-                            if not karavi_metrics.get("image"):
-                                errors.append(create_error_msg(
-                                    "karaviMetricsPowerscale.image",
-                                    "not defined",
-                                    en_us_validation_msg.POWERSCALE_CSM_METRICS_IMAGE_MISSING_MSG
-                                ))
-
-                        otel_config = csm_values.get("otelCollector", {})
-                        if not otel_config or not otel_config.get("image"):
-                            errors.append(create_error_msg(
-                                "otelCollector.image",
-                                "not defined",
-                                en_us_validation_msg.POWERSCALE_OTEL_COLLECTOR_IMAGE_MISSING_MSG
-                            ))
-
-                        # Validate Karavi Authorization config in Helm values
-                        karavi_auth = karavi_metrics.get("authorization", {}) if karavi_metrics else {}
-                        if karavi_auth.get("enabled", False):
-                            proxy_host = karavi_auth.get("proxyHost", "")
-                            if not proxy_host or not isinstance(proxy_host, str) or proxy_host.strip() == "":
-                                errors.append(create_error_msg(
-                                    "karaviMetricsPowerscale.authorization.proxyHost",
-                                    proxy_host,
-                                    en_us_validation_msg.POWERSCALE_AUTH_PROXY_HOST_MISSING_MSG
-                                ))
-
-                        # Cross-validate image versions between values.yaml and service_k8s.json
-                        service_k8s_json_path = os.path.join(
-                            input_dir, "config", "x86_64",
-                            data.get("cluster_os_type", "rhel") if "cluster_os_type" in data else "rhel",
-                            data.get("cluster_os_version", "10.0") if "cluster_os_version" in data else "10.0",
-                            "service_k8s.json"
-                        )
-                        # Try reading cluster_os_type/version from software_config.json
-                        if os.path.exists(software_config_file_path):
-                            try:
-                                with open(software_config_file_path, 'r', encoding='utf-8') as scf:
-                                    sc_data = json.load(scf)
-                                    sc_os_type = sc_data.get("cluster_os_type", "rhel")
-                                    sc_os_version = sc_data.get("cluster_os_version", "10.0")
-                                    service_k8s_json_path = os.path.join(
-                                        input_dir, "config", "x86_64",
-                                        sc_os_type, sc_os_version, "service_k8s.json"
-                                    )
-                            except (json.JSONDecodeError, IOError):
-                                pass
-
-                        if os.path.exists(service_k8s_json_path):
-                            try:
-                                with open(service_k8s_json_path, 'r', encoding='utf-8') as sk8s_f:
-                                    service_k8s_data = json.load(sk8s_f)
-
-                                # Build lookup: package -> tag from service_k8s.json
-                                sk8s_images = {}
-                                for entry in service_k8s_data.get("service_k8s", {}).get("cluster", []):
-                                    if entry.get("type") == "image" and "tag" in entry:
-                                        sk8s_images[entry["package"]] = entry["tag"]
-
-                                # Images to cross-validate: (description, values.yaml image, service_k8s package key)
-                                images_to_check = []
-
-                                if karavi_metrics and karavi_metrics.get("image"):
-                                    images_to_check.append((
-                                        "csm-metrics-powerscale",
-                                        karavi_metrics["image"],
-                                        "quay.io/dell/container-storage-modules/csm-metrics-powerscale"
-                                    ))
-                                if otel_config and otel_config.get("image"):
-                                    images_to_check.append((
-                                        "opentelemetry-collector",
-                                        otel_config["image"],
-                                        "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector"
-                                    ))
-                                karavi_auth = karavi_metrics.get("authorization", {}) if karavi_metrics else {}
-                                sidecar_proxy = karavi_auth.get("sidecarProxy", {})
-                                if sidecar_proxy and sidecar_proxy.get("image"):
-                                    # csm-authorization-sidecar is in csi_driver_powerscale.json, not service_k8s.json
-                                    csi_ps_json_path = os.path.join(
-                                        os.path.dirname(service_k8s_json_path), "csi_driver_powerscale.json"
-                                    )
-                                    if os.path.exists(csi_ps_json_path):
-                                        try:
-                                            with open(csi_ps_json_path, 'r', encoding='utf-8') as csi_f:
-                                                csi_ps_data = json.load(csi_f)
-                                            for entry in csi_ps_data.get("csi_driver_powerscale", {}).get("cluster", []):
-                                                if (entry.get("type") == "image" and
-                                                        entry.get("package") == "quay.io/dell/container-storage-modules/csm-authorization-sidecar"):
-                                                    sidecar_values_tag = sidecar_proxy["image"].split(":")[-1] if ":" in sidecar_proxy["image"] else ""
-                                                    if sidecar_values_tag and sidecar_values_tag != entry["tag"]:
-                                                        errors.append(create_error_msg(
-                                                            "powerscale image: csm-authorization-sidecar",
-                                                            sidecar_proxy["image"],
-                                                            en_us_validation_msg.powerscale_image_version_mismatch_msg(
-                                                                "csm-authorization-sidecar",
-                                                                sidecar_proxy["image"],
-                                                                f"{entry['package']}:{entry['tag']}"
-                                                            )
-                                                        ))
-                                                    else:
-                                                        logger.info(f"Image version match for csm-authorization-sidecar: {sidecar_values_tag}")
-                                                    break
-                                        except (json.JSONDecodeError, IOError) as csi_err:
-                                            logger.warn(f"Could not read csi_driver_powerscale.json: {csi_err}")
-
-                                for img_name, values_image, sk8s_key in images_to_check:
-                                    if sk8s_key in sk8s_images:
-                                        # Extract tag from values.yaml image (format: registry/repo:tag)
-                                        values_tag = values_image.split(":")[-1] if ":" in values_image else ""
-                                        sk8s_tag = sk8s_images[sk8s_key]
-                                        if values_tag and values_tag != sk8s_tag:
-                                            sk8s_full = f"{sk8s_key}:{sk8s_tag}"
-                                            errors.append(create_error_msg(
-                                                f"powerscale image: {img_name}",
-                                                values_image,
-                                                en_us_validation_msg.powerscale_image_version_mismatch_msg(
-                                                    img_name, values_image, sk8s_full
-                                                )
-                                            ))
-                                        else:
-                                            logger.info(f"Image version match for {img_name}: {values_tag}")
-                                    else:
-                                        logger.warn(f"Image {sk8s_key} not found in service_k8s.json, skipping version check")
-
-                            except (json.JSONDecodeError, IOError) as sk8s_err:
-                                logger.warn(f"Could not read service_k8s.json for image version validation: {sk8s_err}")
-                        else:
-                            logger.warn(f"service_k8s.json not found at {service_k8s_json_path}, skipping image version validation")
-
-                        logger.info("CSM Observability values.yaml validation passed")
-                except (yaml.YAMLError, IOError) as e:
-                    errors.append(create_error_msg(
-                        "powerscale_configurations.csm_observability_values_file_path",
-                        csm_values_path,
-                        en_us_validation_msg.powerscale_csm_values_parse_error_msg(str(e))
-                    ))
-
-            # Validate additional_remote_write_endpoints
-            additional_endpoints = powerscale_config.get("additional_remote_write_endpoints", [])
-            if additional_endpoints and isinstance(additional_endpoints, list):
-                if len(additional_endpoints) > 5:
-                    logger.warn(f"More than 5 additional_remote_write_endpoints configured ({len(additional_endpoints)}). "
-                                "This may impact performance.")
-                for idx, endpoint in enumerate(additional_endpoints):
-                    if not isinstance(endpoint, dict):
-                        continue
-                    url = endpoint.get("url", "")
-                    if not url or not isinstance(url, str):
-                        errors.append(create_error_msg(
-                            f"powerscale_configurations.additional_remote_write_endpoints[{idx}].url",
-                            url,
-                            en_us_validation_msg.POWERSCALE_ADDITIONAL_ENDPOINTS_URL_EMPTY_MSG
-                        ))
-                    elif not url.startswith("http://") and not url.startswith("https://"):
-                        errors.append(create_error_msg(
-                            f"powerscale_configurations.additional_remote_write_endpoints[{idx}].url",
-                            url,
-                            en_us_validation_msg.POWERSCALE_ADDITIONAL_ENDPOINTS_URL_INVALID_MSG
-                        ))
+    config_paths = get_config_file_paths(input_dir, data, software_config_file_path)
+    powerscale_telemetry_validation.validate_powerscale_telemetry_config(
+        data, telemetry_collection_type, software_config_file_path,
+        is_service_cluster_defined, config_paths, logger, errors
+    )
 
     return errors
 
