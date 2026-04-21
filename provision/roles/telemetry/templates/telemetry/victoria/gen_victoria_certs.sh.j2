@@ -86,6 +86,13 @@ DNS.35 = vlstorage-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.l
 DNS.36 = vlstorage-victoria-logs-cluster-0.vlstorage-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.local
 DNS.37 = vlstorage-victoria-logs-cluster-1.vlstorage-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.local
 DNS.38 = vlstorage-victoria-logs-cluster-2.vlstorage-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.local
+# VLAgent service (operator-managed)
+DNS.39 = vlagent-vlagent
+DNS.40 = vlagent-vlagent.{{ telemetry_namespace }}
+DNS.41 = vlagent-vlagent.{{ telemetry_namespace }}.svc
+DNS.42 = vlagent-vlagent.{{ telemetry_namespace }}.svc.cluster.local
+# VLAgent StatefulSet pod FQDN (operator-managed, 1 replica)
+DNS.43 = vlagent-vlagent-0.vlagent-vlagent.{{ telemetry_namespace }}.svc.cluster.local
 IP.1 = 127.0.0.1
 EOF
 
