@@ -14,6 +14,10 @@
 ---
 
 - name: Check kube_vip reachability
+  when:
+    - kube_vip is defined
+    - kube_vip | length > 0
+  tags: telemetry_deployment
   block:
     - name: Set kube_vip reachability fact to false initially
       ansible.builtin.set_fact:
@@ -46,8 +50,3 @@
           - Reachable: {{ kube_vip_reachable }}
           - Status: {% if kube_vip_reachable %}✅ REACHABLE{% else %}❌ NOT REACHABLE{% endif %}
       tags: telemetry_deployment
-
-  when:
-    - kube_vip is defined
-    - kube_vip | length > 0
-  tags: telemetry_deployment
