@@ -96,18 +96,18 @@ SERVICE_K8S_ENTRY_MISSING_SOFTWARE_CONFIG_MSG = ("The role service_kube_control_
     "but the service_k8s package entry is missing in software_config.json. "
     "To deploy Kubernetes in the service_k8s cluster, the package must be added to software_config.json.")
 SERVICE_NODE_ENTRY_INVALID_ROLES_CONFIG_MSG = ("The 'service_node' role defined in roles_config.yml"
-    " is not currently supported and is reserved for future use. Please remove or update this role" 
+    " is not currently supported and is reserved for future use. Please remove or update this role"
     " to avoid configuration errors.")
 
 # Functional Groups Config Validation Messages
 
 EMPTY_OR_SYNTAX_ERROR_FUNCTIONAL_GROUPS_CONFIG_MSG = (
-    "The functional_groups_config.yml file is empty or has syntax errors." 
+    "The functional_groups_config.yml file is empty or has syntax errors."
     "It must contain a valid 'functional_groups' section with proper YAML formatting."
     "Check the file content and rerun the playbook."
 )
 MISSING_GROUPS_SECTION_MSG = (
-    "The functional_groups_config.yml file is empty or has syntax errors." 
+    "The functional_groups_config.yml file is empty or has syntax errors."
     "It must contain a valid 'groups' section with proper YAML formatting."
     "Check the file content and rerun the playbook."
 )
@@ -130,7 +130,7 @@ LOGIN_NODE_WITHOUT_SLURM_MSG = (
     "Please make sure cluster name is same for slurm cluster and login_node functional groups."
 )
 SLURM_NODE_PARENT_MISSING_MSG = (
-    "Functional group '{name}' must have a non-empty 'parent' field."    
+    "Functional group '{name}' must have a non-empty 'parent' field."
 )
 MISSING_FUNCTIONAL_GROUPS_SECTION_MSG = (
     "The 'functional_groups' section is missing or null. It must be a non-empty list."
@@ -215,7 +215,6 @@ K8S_SERVICE_ADDRESSES_FAIL_MSG = ("k8s_service_addresses are empty. "
                                   "Please provide k8s_service_addresses value.")
 K8S_POD_NETWORK_CIDR_FAIL_MSG = ("k8s_pod_network_cidr is empty. "
                                  "Please provide a k8s_pod_network_cidr value.")
-INTEL_GAUDI_FAIL_MSG = "should not be false as intel_gaudi exists in software_config.json"
 CSI_DRIVER_SECRET_FAIL_MSG = "CSI Powerscale driver secret file path should not be empty."
 CSI_DRIVER_VALUES_FAIL_MSG = "CSI Powerscale driver values file path should not be empty."
 
@@ -249,10 +248,6 @@ SWITCH_SNMP3_PASSWORD_FAIL_MSG = ("switch_snmp3_password must be at least 3 char
 
 
 # telemetry_config.yml
-KAFKA_ENABLE_FEDERATED_IDRAC_TELEMETRY_COLLECTION= ("requires federated_idrac_telemetry_collection "
-                                             "to be enabled. Please rerun the playbook "
-                                             "with federated_idrac_telemetry_collection true"
-                                             "in telemetry_config.yml.")
 TELEMETRY_SERVICE_CLUSTER_ENTRY_MISSING_ROLES_CONFIG_MSG= ("requires service k8s roles(service_kube_control_plane and service_kube_node)"
                                              " to be defined in 'pxe_mapping_file.csv'. Please either configure "
                                              "service k8s roles in the mapping file "
@@ -329,20 +324,49 @@ def powerscale_image_version_mismatch_msg(image_name, values_image, service_k8s_
         f"Please update service_k8s.json to match the values.yaml version "
         f"and re-run local_repo.yml to mirror the correct image to Pulp."
     )
-POWERSCALE_SERVICE_K8S_JSON_NOT_FOUND_MSG = (
-    "service_k8s.json not found. Cannot validate PowerScale telemetry image versions. "
-    "Please ensure local_repo.yml has been executed."
+
+# PowerScale CSM Authorization validation messages
+POWERSCALE_AUTH_CSI_DRIVER_MISSING_MSG = (
+    "PowerScale CSM Authorization requires 'csi_driver_powerscale' to be present in software_config.json."
+)
+POWERSCALE_AUTH_SERVICE_CLUSTER_MISSING_MSG = (
+    "PowerScale CSM Authorization requires service cluster nodes (service_kube_node_*, "
+    "service_kube_control_plane_*) to be defined in the PXE mapping file."
+)
+POWERSCALE_AUTH_CSM_VALUES_PATH_REQUIRED_MSG = (
+    "csm_authorization_values_file_path is required when powerscale_authorization.enabled is true."
+)
+def powerscale_auth_csm_values_not_found_msg(path):
+    """Returns error message when CSM Authorization values.yaml file is not found."""
+    return (
+        f"CSM Authorization values file does not exist at path: {path}. "
+        "Please verify the file path is correct."
+    )
+def powerscale_auth_csm_values_validation_error_msg(error):
+    """Returns error message when CSM Authorization values.yaml validation fails."""
+    return f"Error validating CSM Authorization image versions: {error}"
+POWERSCALE_AUTH_TENANTS_REQUIRED_MSG = (
+    "At least one tenant must be defined when powerscale_authorization.enabled is true."
+)
+def powerscale_auth_tenant_roles_required_msg(tenant_name):
+    """Returns error message when a tenant has no roles defined."""
+    return (
+        f"At least one role must be defined for tenant '{tenant_name}'."
+    )
+def powerscale_auth_image_version_mismatch_msg(image_name, values_version, csi_version):
+    """Returns error message when CSM Authorization image version doesn't match csi_driver_powerscale.json."""
+    return (
+        f"Image version for {image_name} in CSM Authorization values.yaml ({values_version}) "
+        f"does not match csi_driver_powerscale.json ({csi_version}). "
+        f"Please ensure both files use the same version."
+    )
+POWERSCALE_AUTH_CSI_JSON_NOT_FOUND_MSG = (
+    "csi_driver_powerscale.json not found. Cannot validate CSM Authorization image versions. "
+    "Please ensure the file exists at input/config/x86_64/rhel/10.0/csi_driver_powerscale.json."
 )
 def boolean_fail_msg(value):
     """Returns a formatted message indicating boolean_fail_msg."""
     return f"{value} must be set to either true or false."
-APPLIANCE_K8S_POD_NET_CIDR_FAIL_MSG = ("appliance_k8s_pod_net_cidr value is either empty or "
-                                      "invalid. Please provide CIDR notation such as "
-                                      "192.168.0.0/16")
-K8S_PROMETHEUS_SUPPORT_FAIL_MSG = ("k8s_prometheus_support must be True when "
-                                   "prometheus_gaudi_support is True.")
-PROMETHEUS_SCRAPE_INTERVAL_FAIL_MSG = ("prometheus_scrape_interval must be at least 15 when "
-                                      "prometheus_gaudi_support is True.")
 
 # security_config.yml
 DOMAIN_NAME_FAIL_MSG = "domain_name is empty. Please provide a domain_name value."
@@ -433,12 +457,6 @@ IB_SUBNET_IN_ADMIN_RANGE_MSG = (
 
 # telemetry
 MANDATORY_FIELD_FAIL_MSG = "must not be empty"
-MYSQLDB_USER_FAIL_MSG = "username should not be kept 'root'."
-FUZZY_OFFSET_FAIL_MSG = "should be between 60 and omnia_telemetry_collection_interval value"
-METRIC_COLLECTION_TIMEOUT_FAIL_MSG = ("should be greater than 0 and less than "
-                                      "omnia_telemetry_collection_interval value")
-MOUNT_LOCATION_FAIL_MSG = "should have '/' at the end of the path"
-GRAFANA_PASSWORD_FAIL_MSG = "should not be kept 'admin'"
 
 # security
 FILE_PATH_FAIL_MSG = "path does not exist"
@@ -458,12 +476,6 @@ MULT_SHARE_FAIL_MSG = "Exactly one entry should be present in nfs_client_params 
     k8s_share as true in storage_config.yml"
 BEEGFS_UMOUNT_CLIENT_FAIL_MSG = "should be set to true since beegfs_mounts value has been changed"
 
-# server_spec
-SERVER_SPEC_NICNETWORKS_FAIL_MSG = ("in server_spec.yml must exist within network_spec.yml as a "
-                                    "network name. Please check both files")
-def server_spec_network_key_fail_msg(nic_device):
-    """Returns a formatted message indicating server_spec_network_key_fail_msg."""
-    return f"in server_spec.yml does not start with '{nic_device}' (nicdevices)"
 IP_OVERLAP_FAIL_MSG = ("admin network, bmc network and k8 network and IP ranges should "
                        "not have any IP overlap. Check omnia_config.yml and network_spec.yml")
 TELEMETRY_IP_OVERLAP_FAIL_MSG = ("admin network, telemetry network and IP ranges should "
@@ -523,7 +535,7 @@ BUILD_STREAM_PORT_RANGE_MSG = "build_stream_port must be an integer between 1 an
 BUILD_STREAM_PORT_INUSE_MSG = (
     "Port {port} is already in use and is not serving build_stream on {host_ip}. Please choose another free port."
 )
- 
+
 BUILD_STREAM_HOST_IP_REQUIRED_MSG = (
     "Field 'build_stream_host_ip' is mandatory in build_stream_config.yml. "
     "Please provide a valid IPv4 address (OIM admin IP or OIM public IP)."
