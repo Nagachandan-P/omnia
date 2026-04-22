@@ -8,8 +8,8 @@ echo "Waiting for victoria-metrics-operator to be ready..."
 kubectl wait --for=condition=available --timeout=300s deployment -l app.kubernetes.io/name=victoria-metrics-operator -n telemetry || true
 echo "Waiting for victoria_logs CRDs to be registered..."
 for i in {1..30}; do
-  if kubectl get crd vlclusters.operator.victoria_metrics.com >/dev/null 2>&1 && \
-     kubectl get crd vlagents.operator.victoria_metrics.com >/dev/null 2>&1; then
+  if kubectl get crd vlclusters.operator.victoriametrics.com >/dev/null 2>&1 && \
+     kubectl get crd vlagents.operator.victoriametrics.com >/dev/null 2>&1; then
     echo "victoria_logs CRDs are ready"
     break
   fi
