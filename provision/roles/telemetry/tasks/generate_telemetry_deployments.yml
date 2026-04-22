@@ -44,10 +44,10 @@
     src: "{{ item.src }}"
     dest: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/deployments/{{ item.dest }}"
     mode: "{{ hostvars['localhost']['file_permissions_644'] }}"
-  loop: "{{ victoria_logs_templates }}"
+  loop: "{{ victorialogs_templates }}"
   when: victoria_logs_support | default(false) | bool
   tags: telemetry_deployment
-  # NOTE: victoria_logs_templates includes VLCluster CR, VLAgent CR, and VLAgent ConfigMap
+  # NOTE: victorialogs_templates includes VLCluster CR, VLAgent CR, and VLAgent ConfigMap
 
 - name: Kafka configurations
   when: kafka_support
