@@ -28,7 +28,6 @@
             {"package": "slurm-pam_slurm", "type": "rpm", "repo_name": "slurm_custom"},
             {"package": "kernel-devel", "type": "rpm", "repo_name": "appstream"},
             {"package": "kernel-headers", "type": "rpm", "repo_name": "appstream"},
-            {"package": "mpich", "url": ""},
             {
             "package": "nvhpc_2025_2511_Linux_x86_64_cuda_13.0",
             "type": "tarball",

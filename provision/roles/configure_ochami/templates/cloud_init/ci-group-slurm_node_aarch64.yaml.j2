@@ -119,7 +119,7 @@
             # Create mount point
             mkdir -p /usr/local/cuda
 
-            cuda_nfs_share="{{ cloud_init_nfs_path }}/hpc_tools/cuda/usr/local/cuda"
+            cuda_nfs_share="{{ cloud_init_nfs_path }}/hpc_tools/cuda"
 
             echo "[INFO] Mounting CUDA toolkit from NFS: $cuda_nfs_share"
             mount -t nfs "$cuda_nfs_share" /usr/local/cuda
@@ -219,31 +219,50 @@
                 exit 0
             fi
             echo "[INFO] NVIDIA driver prerequisite satisfied."
-
-            # Detect CUDA major version from nvidia-smi
-            echo "[INFO] Detecting CUDA version from NVIDIA driver..."
-            CUDA_VERSION=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -n1 | awk -F'.' '{print $1}')
             
+            # Display nvidia-smi output for verification
+            echo "========== NVIDIA Driver & GPU Information =========="
+            nvidia-smi 2>&1
+            echo "====================================================="
+
+            # Detect CUDA major version for DCGM package selection
+            echo "[INFO] Detecting CUDA version for DCGM package compatibility..."
+            # Try to get CUDA version from nvidia-smi
+            CUDA_VERSION=$(nvidia-smi | grep "CUDA Version" | awk '{print $9}' | cut -d'.' -f1)
+
             # Fallback: Try to get CUDA version from nvcc if available
-            if [ -z "$CUDA_VERSION" ] || [ "$CUDA_VERSION" -lt "12" ]; then
+            if [ -z "$CUDA_VERSION" ]; then
                 if command -v nvcc &>/dev/null; then
                     CUDA_VERSION=$(nvcc --version | grep "release" | awk '{print $5}' | cut -d',' -f1 | cut -d'.' -f1)
                     echo "[INFO] CUDA version detected from nvcc: $CUDA_VERSION"
                 else
-                    echo "[ERROR] Could not detect CUDA version from nvidia-smi or nvcc. Skipping DCGM setup."
+                    echo "[ERROR] Could not detect CUDA version from nvidia-smi or nvcc."
+                    echo "[ERROR] CUDA toolkit is required for DCGM package version detection. Skipping DCGM setup."
                     exit 1
                 fi
             else
-                echo "[INFO] CUDA major version detected: $CUDA_VERSION"
+                echo "[INFO] CUDA major version detected from nvidia-smi: $CUDA_VERSION"
             fi
 
             # Install datacenter-gpu-manager-4-cuda${CUDA_VERSION} via dnf with weak dependencies
             echo "[INFO] Installing datacenter-gpu-manager-4-cuda${CUDA_VERSION} package..."
-            if ! dnf install -y --nogpgcheck --setopt=install_weak_deps=True datacenter-gpu-manager-4-cuda${CUDA_VERSION}; then
+            if ! dnf install -y --setopt=install_weak_deps=True datacenter-gpu-manager-4-cuda${CUDA_VERSION}; then
                 echo "[ERROR] Failed to install datacenter-gpu-manager-4-cuda${CUDA_VERSION}. Skipping DCGM setup."
                 exit 1
             fi
             echo "[INFO] datacenter-gpu-manager-4-cuda${CUDA_VERSION} installed successfully."
+
+            # Install multinode diagnostic plugin for CUDA 12+ (optional but recommended for HPC)
+            if [ "$CUDA_VERSION" -ge "12" ]; then
+                echo "[INFO] Installing DCGM multinode diagnostic plugin for HPC cluster support..."
+                if dnf install -y --nogpgcheck datacenter-gpu-manager-4-multinode-cuda${CUDA_VERSION}; then
+                    echo "[INFO] DCGM multinode plugin installed successfully."
+                else
+                    echo "[WARN] Failed to install multinode plugin. Continuing without it."
+                fi
+            else
+                echo "[INFO] Multinode plugin requires CUDA 12+. Current version: $CUDA_VERSION. Skipping."
+            fi
 
             # Enable and start DCGM daemon (SB-003)
             echo "[INFO] Enabling and starting {{ dcgm_service_name }}.service..."
@@ -276,8 +295,11 @@
             # GPU discovery (SB-004)
             echo "[INFO] Enumerating GPUs via dcgmi discovery..."
             if command -v dcgmi &>/dev/null; then
-                dcgmi discovery -l
-                echo "[SUCCESS] GPU discovery completed."
+                echo "========== GPU Discovery Output =========="
+                dcgmi discovery -l 2>&1
+                GPU_COUNT=$(dcgmi discovery -l 2>/dev/null | grep -c "GPU")
+                echo "=========================================="
+                echo "[SUCCESS] GPU discovery completed. Found $GPU_COUNT GPU(s)."
             else
                 echo "[WARN] dcgmi command not found. Skipping GPU enumeration."
             fi
@@ -326,6 +348,7 @@
             echo "{{ cloud_init_nfs_path}}/hpc_tools/container_images  /hpc_tools/container_images   nfs defaults,_netdev 0 0" >> /etc/fstab
             echo "{{ cloud_init_nfs_path }}/ssh {{ client_mount_path }}/slurm/ssh nfs defaults,_netdev 0 0" >> /etc/fstab
             echo "{{ cloud_init_nfs_path}}/hpc_tools/scripts  /hpc_tools/scripts   nfs defaults,_netdev 0 0" >> /etc/fstab
+            echo "{{ cloud_init_nfs_path}}/hpc_tools/cuda  /hpc_tools/cuda   nfs defaults,_netdev 0 0" >> /etc/fstab
             echo "{{ cloud_init_nfs_path}}/hpc_tools/cuda  /hpc_tools/cuda   nfs defaults,_netdev 0 0" >> /etc/fstab
             echo "{{ cloud_init_nfs_path }}/cert  /cert   nfs defaults,_netdev 0 0" >> /etc/fstab
             echo "{{ cloud_init_slurm_nfs_path }} {{ client_mount_path }} nfs defaults,_netdev 0 0" >> /etc/fstab
@@ -558,8 +581,7 @@
         - /usr/local/bin/configure_dirs_and_mounts.sh
         - cp /cert/pulp_webserver.crt /etc/pki/ca-trust/source/anchors && update-ca-trust
         - sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/dnf/dnf.conf
-        - /usr/local/bin/install_nvidia_driver.sh
-        - /usr/local/bin/setup_dcgm.sh
+
         - bash /usr/local/bin/doca-install.sh && bash /usr/local/bin/configure-ib-network.sh
         - /usr/local/bin/configure_slurmd_setup.sh
         - /usr/local/bin/configure_munge_and_pam.sh
@@ -613,6 +635,8 @@
 
         - /usr/local/bin/setup_nvhpc_sdk.sh
         - /usr/local/bin/export_nvhpc_env.sh
+        - /usr/local/bin/install_nvidia_driver.sh
+        - /usr/local/bin/setup_dcgm.sh
         - systemctl restart slurmd
 
         - echo "Cloud-Init has completed successfully."
