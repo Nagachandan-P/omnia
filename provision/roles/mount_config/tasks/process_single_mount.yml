@@ -101,6 +101,91 @@
           loop_control:
             label: "{{ item }}"
 
-- name: Reset skip_mount flag
-  ansible.builtin.set_fact:
-    skip_mount: false
+    - name: Add mount to host-specific map if groups field specified
+      when: mount_item.groups is defined and mount_item.groups | length > 0 and group_host_map | length > 0
+      block:
+        - name: Resolve target hostnames from groups
+          ansible.builtin.set_fact:
+            target_hostnames: >-
+              {{
+                mount_item.groups | map('extract', group_host_map, []) | flatten | unique | list
+              }}
+
+        - name: Add mount to host_mount_map for each target hostname
+          ansible.builtin.set_fact:
+            host_mount_map: >-
+              {{
+                host_mount_map | combine({
+                  item: (host_mount_map[item] | default({}) | combine({
+                    'mounts': (host_mount_map[item].mounts | default([])) + [cloud_init_mount_array]
+                  }, recursive=True))
+                })
+              }}
+          loop: "{{ target_hostnames }}"
+          loop_control:
+            label: "{{ item }}"
+
+        - name: Add permission runcmd entries to host_mount_map if permissions specified
+          when: mount_item.permissions is defined
+          block:
+            - name: Build permission runcmd commands for host-specific mounts
+              ansible.builtin.set_fact:
+                host_perm_owner: "{{ mount_item.permissions.owner | default('root') }}"
+                host_perm_group: "{{ mount_item.permissions.group | default('root') }}"
+                host_perm_mode: "{{ mount_item.permissions.mode | default('0644') }}"
+
+            - name: Build permission commands
+              ansible.builtin.set_fact:
+                host_permission_runcmds:
+                  - "mkdir -p {{ mount_item.mount_point }}"
+                  - "chown {{ host_perm_owner }}:{{ host_perm_group }} {{ mount_item.mount_point }}"
+                  - "chmod {{ host_perm_mode }} {{ mount_item.mount_point }}"
+
+            - name: Add permission commands to host_mount_map
+              ansible.builtin.set_fact:
+                host_mount_map: >-
+                  {{
+                    host_mount_map | combine({
+                      item: (host_mount_map[item] | default({}) | combine({
+                        'runcmd': (host_mount_map[item].runcmd | default([])) + host_permission_runcmds
+                      }, recursive=True, list_merge='append'))
+                    })
+                  }}
+              loop: "{{ target_hostnames }}"
+              loop_control:
+                label: "{{ item }}"
+
+        - name: Add node_key runcmd entries to host_mount_map if node_key specified
+          when: mount_item.node_key is defined and mount_item.node_mount_point is defined
+          block:
+            - name: Map node_key to cloud-init metadata variable
+              ansible.builtin.set_fact:
+                host_cloud_init_node_var: "{{ '{{ ds.meta_data.instance_data.' + mount_item.node_key + ' }}' }}"
+
+            - name: Build runcmd to create node-specific subdirectory and mount points
+              ansible.builtin.set_fact:
+                host_node_mount_runcmds: >
+                  {{
+                    [
+                      'mkdir -p {{ mount_item.mount_point }}/' ~ host_cloud_init_node_var
+                    ] +
+                    (
+                      mount_item.node_mount_point | map('regex_replace', '^/(.*)$',
+                        'mkdir -p {{ mount_item.mount_point }}/' ~ host_cloud_init_node_var ~ '/\1'
+                      ) | list
+                    )
+                  }}
+
+            - name: Add node mount point commands to host_mount_map
+              ansible.builtin.set_fact:
+                host_mount_map: >
+                  {{
+                    host_mount_map | combine({
+                      item: (host_mount_map[item] | default({}) | combine({
+                        'runcmd': (host_mount_map[item].runcmd | default([])) + host_node_mount_runcmds
+                      }, recursive=True, list_merge='append'))
+                    })
+                  }}
+              loop: "{{ target_hostnames }}"
+              loop_control:
+                label: "{{ item }}"

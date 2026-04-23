@@ -20,13 +20,24 @@
     file: "{{ software_config_file }}"
     name: software_config
 
+# - ansible.builtin.debug:
+#     var: hostvars['localhost']['oim_shared_path']
+#   debugger: always
+
+# - name: Set PXE mapping file path if provided
+#   ansible.builtin.set_fact:
+#     pxe_mapping_file_path: "{{ hostvars['localhost']['pxe_mapping_file_path'] | default('') }}"
+
+
+# TODO: modify mounts to include mount_params
+
 - name: Generate cloud-init mounts module compatible format form mounts
   ansible.builtin.include_tasks: cloud_init.yml
 
 - name: Read mounts
   debug:
     var: mounts
-  debugger: always
+  # debugger: always
 
 - name: Check if slurm support is true
   ansible.builtin.set_fact:
@@ -50,7 +61,7 @@
 
     - name: Select the nfs client parameters for slurm
       ansible.builtin.set_fact:
-        slurm_nfs: "{{ nfs_client_params | selectattr('nfs_name', 'in', filter_slurm_nfs) | list }}"
+        slurm_nfs: "{{ mounts | selectattr('name', 'in', filter_slurm_nfs) | list }}"
 
     - name: Add the slurm nfs
       ansible.builtin.set_fact:
@@ -70,7 +81,7 @@
 
     - name: Select the nfs client parameters for service_k8s
       ansible.builtin.set_fact:
-        service_k8s_nfs: "{{ nfs_client_params | selectattr('nfs_name', 'in', filter_service_k8s_nfs) | list }}"
+        service_k8s_nfs: "{{ mounts | selectattr('name', 'in', filter_service_k8s_nfs) | list }}"
 
     - name: Add the service_k8s nfs
       ansible.builtin.set_fact:
@@ -80,7 +91,14 @@
   ansible.builtin.debug:
     msg: "{{ storage_to_be_mounted }}"
 
-- name: Install NFS client with bolt-on support
-  ansible.builtin.include_tasks: nfs_client.yml
+- name: Install NFS client with bolt-on support (Slurm/K8s selections)
+  ansible.builtin.include_tasks: mount_on_oim.yml
   with_items: "{{ storage_to_be_mounted }}"
+
+- name: Mount entries from mounts[] flagged for OIM (mount_on_oim=true)
+  ansible.builtin.include_tasks: mount_on_oim.yml
+  loop: "{{ mounts | default([]) | selectattr('mount_on_oim', 'equalto', true) | list }}"
+  loop_control:
+    loop_var: item
+    label: "{{ item.name | default(item.mount_point | default('unnamed')) }}"
 

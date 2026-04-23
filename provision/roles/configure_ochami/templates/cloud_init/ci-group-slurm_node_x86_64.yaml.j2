@@ -11,7 +11,12 @@
         settings: [append]
       - name: dict
         settings: [no_replace, recurse_list]
-
+      mounts:
+{% if cloud_init_groups_dict[functional_group_name].mounts is defined %}
+{% for mount in cloud_init_groups_dict[functional_group_name].mounts %}
+        - {{ mount }}
+{% endfor %}
+{% endif %}
       users:
         - name: root
           ssh_authorized_keys: "{{ read_ssh_key.stdout }}"
@@ -554,7 +559,16 @@
             {{ lookup('template', 'templates/hpc_tools/export_nvhpc_env.sh.j2') | indent(12) }}
 
       runcmd:
-        - rm -rf /var/lib/cloud/instance
+{# Host-specific runcmd entries #}
+{% if host_mount_map is defined and host_mount_map | length > 0 %}
+{% if ds.meta_data.instance_data.local_hostname in host_mount_map %}
+{% if host_mount_map[ds.meta_data.instance_data.local_hostname].runcmd is defined %}
+{% for cmd in host_mount_map[ds.meta_data.instance_data.local_hostname].runcmd %}
+        - {{ cmd }}
+{% endfor %}
+{% endif %}
+{% endif %}
+{% endif %}
         - /usr/local/bin/set-ssh.sh
         - /usr/local/bin/install_nvidia_driver.sh
 {% if dcgm_support %}
@@ -622,5 +636,4 @@
         - /usr/local/bin/setup_nvhpc_sdk.sh
         - /usr/local/bin/export_nvhpc_env.sh
         - systemctl restart slurmd
-
         - echo "Cloud-Init has completed successfully."

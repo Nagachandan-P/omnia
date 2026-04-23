@@ -11,7 +11,12 @@
         settings: [append]
       - name: dict
         settings: [no_replace, recurse_list]
-
+      mounts:
+{% if cloud_init_groups_dict[functional_group_name].mounts is defined %}
+{% for mount in cloud_init_groups_dict[functional_group_name].mounts %}
+        - {{ mount }}
+{% endfor %}
+{% endif %}
       users:
         - name: root
           ssh_authorized_keys: "{{ read_ssh_key.stdout }}"
@@ -549,6 +554,23 @@
           content: |
             {{ lookup('template', 'templates/hpc_tools/export_nvhpc_env.sh.j2') | indent(12) }}
 
+      mounts:
+{% if cloud_init_groups_dict[functional_group_name].mounts is defined %}
+{% for mount in cloud_init_groups_dict[functional_group_name].mounts %}
+        - {{ mount }}
+{% endfor %}
+{% endif %}
+{# Host-specific mounts #}
+{% if host_mount_map is defined and host_mount_map | length > 0 %}
+{% if ds.meta_data.instance_data.local_hostname in host_mount_map %}
+{% if host_mount_map[ds.meta_data.instance_data.local_hostname].mounts is defined %}
+{% for mount in host_mount_map[ds.meta_data.instance_data.local_hostname].mounts %}
+        - {{ mount }}
+{% endfor %}
+{% endif %}
+{% endif %}
+{% endif %}
+
       runcmd:
         - rm -rf /var/lib/cloud/instance
         - /usr/local/bin/set-ssh.sh
@@ -614,5 +636,16 @@
         - /usr/local/bin/setup_nvhpc_sdk.sh
         - /usr/local/bin/export_nvhpc_env.sh
         - systemctl restart slurmd
+
+{# Host-specific runcmd entries #}
+{% if host_mount_map is defined and host_mount_map | length > 0 %}
+{% if ds.meta_data.instance_data.local_hostname in host_mount_map %}
+{% if host_mount_map[ds.meta_data.instance_data.local_hostname].runcmd is defined %}
+{% for cmd in host_mount_map[ds.meta_data.instance_data.local_hostname].runcmd %}
+        - {{ cmd }}
+{% endfor %}
+{% endif %}
+{% endif %}
+{% endif %}
 
         - echo "Cloud-Init has completed successfully."

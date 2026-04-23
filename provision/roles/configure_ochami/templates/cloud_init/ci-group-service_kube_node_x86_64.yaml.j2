@@ -308,6 +308,16 @@
             systemctl restart kubelet
             # Mark initialization complete so all of above is skipped on reboot!
             touch "$MARKER"
+{# Host-specific runcmd entries #}
+{% if host_mount_map is defined and host_mount_map | length > 0 %}
+{% if ds.meta_data.instance_data.local_hostname in host_mount_map %}
+{% if host_mount_map[ds.meta_data.instance_data.local_hostname].runcmd is defined %}
+{% for cmd in host_mount_map[ds.meta_data.instance_data.local_hostname].runcmd %}
+            {{ cmd }}
+{% endfor %}
+{% endif %}
+{% endif %}
+{% endif %}
             echo "Cloud-Init has completed successfully."
 
           else
