@@ -185,9 +185,9 @@ def process_functional_group(fg_name, arch, os_version, input_project_dir,
 
 def build_functional_group_name(project_name, cluster_os_type, cluster_os_version, base_fg_name):
     """
-    Build functional group name with project_name_cluster_os_name_cluster_os_version prefix.
+    Build functional group name with project_name_cluster_os_name_cluster_os_version suffix.
     
-    Format: {project_name}_{cluster_os_type}_{cluster_os_version}_{base_fg_name}
+    Format: {base_fg_name}_{project_name}_{cluster_os_type}_{cluster_os_version}
     
     Args:
         project_name (str): Project name from input_project_dir basename.
@@ -198,7 +198,7 @@ def build_functional_group_name(project_name, cluster_os_type, cluster_os_versio
     Returns:
         str: New functional group name.
     """
-    return f"{project_name}_{cluster_os_type}_{cluster_os_version}_{base_fg_name}"
+    return f"{base_fg_name}_{project_name}_{cluster_os_type}_{cluster_os_version}"
 
 
 def run_module():
