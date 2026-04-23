@@ -332,7 +332,7 @@
               ipAddressPools:
               - first-pool
 
-{% if hostvars['localhost']['idrac_telemetry_support'] or hostvars['localhost']['ldms_support'] %}
+{% if idrac_telemetry_support or ldms_support %}
         - path: /root/telemetry.sh
           owner: root:root
           permissions: '0755'
@@ -1045,7 +1045,7 @@
 {% include 'powerscale/deploy_powerscale_telemetry.sh.j2' %}
 {% endif %}
 
-{% if hostvars['localhost']['idrac_telemetry_support'] or hostvars['localhost']['ldms_support'] %}
+{% if idrac_telemetry_support or ldms_support %}
             echo "Applying Telemetry Kubernetes deployments"
             /root/telemetry.sh
 {% endif %}

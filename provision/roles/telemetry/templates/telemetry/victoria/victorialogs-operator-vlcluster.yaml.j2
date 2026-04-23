@@ -45,7 +45,7 @@ spec:
             - ReadWriteOnce
           resources:
             requests:
-              storage: {{ hostvars['localhost']['victoria_logs_configurations']['storage_size'] }}
+              storage: {{ telemetry_config.telemetry_sinks.victoria_logs.storage_size }}
 
     resources:
       requests:
@@ -79,7 +79,7 @@ spec:
         tolerationSeconds: 5
 
     extraArgs:
-      retentionPeriod: "{{ hostvars['localhost']['victoria_logs_configurations']['retention_period'] }}h"
+      retentionPeriod: "{{ telemetry_config.telemetry_sinks.victoria_logs.retention_period }}h"
 {% if victoria_logs_cluster.tls_enabled %}
       tls: "true"
       tlsCertFile: "/etc/victoria/certs/server.crt"
