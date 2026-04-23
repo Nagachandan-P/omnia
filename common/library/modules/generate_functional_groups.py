@@ -38,9 +38,9 @@ def load_software_config(software_config_path, module):
 
 def build_functional_group_name(project_name, cluster_os_type, cluster_os_version, base_fg_name):
     """
-    Build functional group name with project_name_cluster_os_type_cluster_os_version suffix.
+    Build functional group name with project_name_cluster_os_type_cluster_os_version PREFIX.
     
-    Format: {base_fg_name}_{project_name}_{cluster_os_type}_{cluster_os_version}
+    Format: {project_name}_{cluster_os_type}_{cluster_os_version}_{base_fg_name}
     
     Args:
         project_name (str): Project name from input_project_dir basename.
@@ -51,7 +51,7 @@ def build_functional_group_name(project_name, cluster_os_type, cluster_os_versio
     Returns:
         str: New functional group name.
     """
-    return f"{base_fg_name}_{project_name}_{cluster_os_type}_{cluster_os_version}"
+    return f"{project_name}_{cluster_os_type}_{cluster_os_version}_{base_fg_name}"
 
 
 def load_omnia_config(omnia_config_path, module):

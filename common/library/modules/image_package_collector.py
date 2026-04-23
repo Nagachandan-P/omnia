@@ -304,13 +304,8 @@ def run_module():
             packages.extend(additional_role_pkgs)
             packages = deduplicate_list(packages)
 
-        # Build new functional group name with project_name_cluster_os_type_cluster_os_version prefix
-        new_fg_name = build_functional_group_name(
-            project_name, cluster_os_type, os_version, fg_name
-        )
-
-        compute_images_dict[new_fg_name] = {
-            "functional_group": new_fg_name,
+        compute_images_dict[fg_name] = {
+            "functional_group": fg_name,
             "packages": packages
         }
 
