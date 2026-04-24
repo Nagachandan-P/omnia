@@ -262,8 +262,13 @@ TELEMETRY_SERVICE_CLUSTER_ENTRY_FOR_LDMS_MISSING_ROLES_CONFIG_MSG= ("requires se
 # PowerScale telemetry validation messages
 POWERSCALE_VICTORIA_REQUIRED_MSG = (
     "PowerScale telemetry requires VictoriaMetrics to be deployed. "
-    "When powerscale_configurations.powerscale_telemetry_support is true, 'victoria' must be included in "
-    "telemetry_collection_type (e.g., 'victoria' or 'victoria,kafka')."
+    "When telemetry_sources.powerscale.metrics_enabled is true, 'victoria_metrics' must be included in "
+    "collection_targets (e.g., 'victoria_metrics' or 'victoria_metrics,victoria_logs')."
+)
+POWERSCALE_VICTORIA_LOGS_REQUIRED_MSG = (
+    "PowerScale logs collection requires VictoriaLogs to be deployed. "
+    "When telemetry_sources.powerscale.logs_enabled is true, 'victoria_logs' must be included in "
+    "collection_targets (e.g., 'victoria_metrics,victoria_logs')."
 )
 POWERSCALE_CSI_DRIVER_MISSING_MSG = (
     "csi_driver_powerscale is not configured in software_config.json. "
@@ -274,13 +279,14 @@ POWERSCALE_SERVICE_CLUSTER_MISSING_MSG = (
     "PowerScale telemetry requires a service cluster."
 )
 POWERSCALE_CONFIGURATIONS_MISSING_MSG = (
-    "powerscale_configurations section is required and must contain powerscale_telemetry_support."
+    "powerscale_configurations section is required when telemetry_sources.powerscale.metrics_enabled is true. "
+    "It must contain csm_observability_values_file_path."
 )
 POWERSCALE_OTEL_STORAGE_SIZE_INVALID_MSG = (
     "must be a non-empty string in format 'XGi' (e.g., '5Gi')"
 )
 POWERSCALE_CSM_VALUES_PATH_REQUIRED_MSG = (
-    "csm_observability_values_file_path is required when powerscale_configurations.powerscale_telemetry_support is true. "
+    "csm_observability_values_file_path is required when telemetry_sources.powerscale.metrics_enabled is true. "
     "Please provide the path to the CSM Observability values.yaml file."
 )
 POWERSCALE_AUTH_PROXY_HOST_MISSING_MSG = (

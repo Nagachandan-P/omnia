@@ -131,19 +131,20 @@ telemetry_sources:
   # --------------------------------------------------------------------------
   # Collects: Storage metrics from Dell PowerScale clusters
   # Requires: CSM Observability (Karavi) values file configured
-  # Data path: CSM Metrics PowerScale → OTEL Collector → vmagent-powerscale → victoria_metrics
+  # Data path: CSM Metrics PowerScale → OTEL Collector → vmagent(shared) → victoria_metrics
   powerscale:
     # Enable or disable PowerScale metrics collection
     # Default: true
     metrics_enabled: true
 
     # Enable or disable PowerScale logs collection
-    # Default: false
-    logs_enabled: false
+    # Default: true
+    logs_enabled: true
 
-    # PowerScale uses dedicated vmagent-powerscale (no Kafka, no Vector)
+    # PowerScale uses dedicated vmagent(shared) (no Kafka, no Vector)
     collection_targets:
       - "victoria_metrics"
+      - "victoria_logs"
 
 
 # ============================================================================
@@ -312,10 +313,10 @@ ldms_configurations:
 # clusters using the CSM (Container Storage Modules) Metrics PowerScale exporter.
 #
 # DATA PIPELINE:
-#   CSM Metrics PowerScale → OTEL Collector → vmagent-powerscale → victoria_metrics
+#   CSM Metrics PowerScale → OTEL Collector → vmagent(shared) → victoria_metrics
 #
-# NOTE: PowerScale does NOT use Vector bridges. It has a dedicated vmagent instance
-#       (vmagent-powerscale) that writes directly to victoria_metrics.
+# NOTE: PowerScale does NOT use Vector bridges. It uses the shared vmagent instance
+#       that writes directly to victoria_metrics.
 powerscale_configurations:
   # PVC size for OTEL Collector metric batching and buffering
   # Accepted values: in the form of "X[Ki|Mi|Gi|Ti|Pi|Ei]"
