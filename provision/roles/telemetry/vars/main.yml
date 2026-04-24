@@ -20,7 +20,8 @@ service_cluster_metadata_path: "/opt/omnia/.data/service_cluster_metadata.yml"
 metadata_perm: "0644"
 
 # Usage: read_software_config.yml
-k8s_packages_file: "{{ input_project_dir }}/config/x86_64/{{ software_config.cluster_os_type }}/{{ software_config.cluster_os_version }}/service_k8s.json"
+# Versioned JSON file: service_k8s_v<version>.json (e.g., service_k8s_v1.35.1.json)
+k8s_packages_file: "{{ input_project_dir }}/config/x86_64/{{ software_config.cluster_os_type }}/{{ software_config.cluster_os_version }}/service_k8s_v{{ hostvars['localhost']['service_k8s_version'] }}.json"
 
 # Usage: secrets_creation.yml
 mysqldb_secrets_name: mysqldb-credentials
@@ -68,7 +69,7 @@ kafka:
   service_name: "kafka-headless"
   lb_service_name: "kafka-loadbalancer"
   container_port1: 9093
-  # Kafka images from service_k8s.json
+  # Kafka images from service_k8s_<version>.json
   operator_image: "{{ telemetry_images['strimzi/operator'] | default('quay.io/strimzi/operator:0.48.0') }}"
   kafka_image: "{{ telemetry_images['strimzi/kafka'] | default('quay.io/strimzi/kafka:0.48.0-kafka-4.1.0') }}"
   bridge_image: "{{ telemetry_images['strimzi/kafka-bridge'] | default('quay.io/strimzi/kafka-bridge:0.33.1') }}"
@@ -85,8 +86,8 @@ kafka:
       name: "ldms"
       consumer_group: "ldms-consumer-group"
 
-# Dynamic image configuration from service_k8s.json
-# Images and versions are read dynamically from input/config/x86_64/rhel/10.0/service_k8s.json
+# Dynamic image configuration from service_k8s_<version>.json
+# Images and versions are read dynamically from input/config/x86_64/rhel/10.0/service_k8s_<version>.json
 telemetry_images: "{{ service_k8s_images | default({}) }}"
 
 # Usage: victoriametric_deployment.yml

@@ -252,15 +252,23 @@ def validate_software_config(
     for software_pkg in data['softwares']:
         software = software_pkg['name']
         arch_list = software_pkg.get('arch')
+        # Get software version for versioned JSON files (e.g., service_k8s_v1.35.1.json)
+        software_version = software_pkg.get('version')
         for arch in arch_list:
             json_path = get_json_file_path(
-                software, cluster_os_type, cluster_os_version, input_file_path, arch)
+                software, cluster_os_type, cluster_os_version, input_file_path, arch,
+                software_version=software_version)
             # Check if json_path is None or if the JSON syntax is invalid
             if not json_path:
+                # Construct expected filename for error message
+                if software == "service_k8s" and software_version:
+                    expected_file = f"{software}_v{software_version}.json"
+                else:
+                    expected_file = f"{software}.json"
                 errors.append(
                     create_error_msg(
                         "Validation Error: ", software,
-                        f"is present in software_config.json. JSON file not found: {software}.json"
+                        f"is present in software_config.json. JSON file not found: {expected_file}"
                     )
                 )
             else:
