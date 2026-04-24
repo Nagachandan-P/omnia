@@ -17,7 +17,7 @@
 openchami_git_repo: https://github.com/OpenCHAMI/deployment-recipes.git
 openchami_share_dir: /opt/omnia/openchami
 openchami_clone_path: "{{ openchami_share_dir }}/deployment-recipes"
-openchami_git_version: 92310bd537c05c201d5156137357bb742b09d5e0
+openchami_git_version: bf1f6dfdc7f6107a4227568987faedb1b79b95fa
 clone_retry: "5"
 clone_delay: "10"
 dir_permissions_755: "0755"
@@ -48,11 +48,11 @@ openchami_bss_tag: "v1.32.1"
 openchami_cloud_init_tag: "v1.3.0"
 openchami_coresmd_tag: "v0.4.0"
 # Third-party image tags for OpenCHAMI
-minio_tag: "latest"
+minio_release_tag: "RELEASE.2026-04-17T00-00-00Z"
 postgres_tag: "11.5-alpine"
 hydra_tag: "v2.3"
 haproxy_tag: "latest"
-registry_tag: "latest"
+registry_tag: "3.1.0"
 curl_tag: "latest"
 acme_tag: "3.1.1"
 
@@ -64,7 +64,7 @@ openchami_images:
   - "ghcr.io/openchami/bss:{{ openchami_bss_tag }}"
   - "ghcr.io/openchami/cloud-init:{{ openchami_cloud_init_tag }}"
   - "ghcr.io/openchami/coresmd:{{ openchami_coresmd_tag }}"
-  - "docker.io/minio/minio:{{ minio_tag }}"
+  - "docker.io/pgsty/minio:{{ minio_release_tag }}"
   - "docker.io/library/postgres:{{ postgres_tag }}"
   - "docker.io/oryd/hydra:{{ hydra_tag }}"
   - "cgr.dev/chainguard/haproxy:{{ haproxy_tag }}"
