@@ -131,6 +131,12 @@
             {{ lookup('template', 'templates/nodes/apptainer_mirror.conf.j2') | indent(12) }}
 
       runcmd:
+{# Mount-specific runcmd entries #}
+{% if cloud_init_groups_dict[functional_group_name].b64_runcmd is defined %}
+{% for cmd in cloud_init_groups_dict[functional_group_name].b64_runcmd %}
+        - {{ cmd | b64decode }}
+{% endfor %}
+{% endif %}
         - /usr/local/bin/set-ssh.sh
         # Ensure Slurm NFS root is mounted at client_mount_path (e.g. /share_omnia)
         - mkdir -p {{ client_mount_path }}/slurm/ssh

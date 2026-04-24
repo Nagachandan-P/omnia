@@ -245,6 +245,12 @@
             {{ lookup('template', 'templates/hpc_tools/configure_nvhpc_env.sh.j2') | indent(12) }}
 
       runcmd:
+{# Mount-specific runcmd entries #}
+{% if cloud_init_groups_dict[functional_group_name].b64_runcmd is defined %}
+{% for cmd in cloud_init_groups_dict[functional_group_name].b64_runcmd %}
+        - {{ cmd | b64decode }}
+{% endfor %}
+{% endif %}
         - /usr/local/bin/set-ssh.sh
         - /usr/local/bin/install_cuda_toolkit.sh
         # Ensure Slurm NFS root is mounted at client_mount_path (e.g. /share_omnia)

@@ -54,8 +54,7 @@
             },
             "node_key": {
               "type": "string",
-              "description": "ds.meta_data key for per-node bind mounts (e.g., local_hostname). When present, generates bind mounts under mount_point/<node_key_value>/",
-              "enum": ["local_hostname", "local_ipv4", "instance_id"]
+              "description": "cloud_init variable for per-node bind mounts (e.g., local_hostname, ds.meta_data.instance_data.local_ipv4). When present, generates bind mounts under mount_point/<node_key_value>/"
             },
             "node_mount_point": {
               "type": "array",
@@ -176,8 +175,7 @@
             },
             "node_key": {
               "type": "string",
-              "description": "ds.meta_data key for per-node bind mounts. When present, fs_type is forced to none and mnt_opts to bind.",
-              "enum": ["local_hostname", "local_ipv4", "instance_id"]
+              "description": "ds.meta_data key for per-node bind mounts. When present, fs_type is forced to none and mnt_opts to bind."
             },
             "node_mount_point": {
               "type": "array",
@@ -198,7 +196,7 @@
               },
               "uniqueItems": true
             },
-            "group": {
+            "groups": {
               "type": "array",
               "description": "List of GROUP_NAME values from pxe_mapping_file.csv. Mutually exclusive with functional_group_prefix.",
               "items": {

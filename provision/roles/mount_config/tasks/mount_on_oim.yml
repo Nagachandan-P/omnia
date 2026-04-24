@@ -13,29 +13,11 @@
 #  limitations under the License.
 ---
 ## Mount an entry on the OIM node.
-## Supports two schemas:
-## 1) New mounts[] schema: {source, mount_point, fs_type?, mnt_opts?}
-## 2) Legacy slurm/k8s schema: {server_ip, server_share_path, client_share_path?, client_mount_options?}
-
-- name: Determine input schema (new vs legacy)
-  ansible.builtin.set_fact:
-    is_new_schema: "{{ 'source' in item and 'mount_point' in item }}"
-
-- name: Validate required fields (new schema)
-  when: is_new_schema | bool
-  ansible.builtin.assert:
-    that:
-      - item.source is defined
-      - item.mount_point is defined
-    fail_msg: "mount_on_oim (new schema) requires 'source' and 'mount_point'"
-
 - name: Initialize client mount path (new schema)
-  when: is_new_schema | bool
   ansible.builtin.set_fact:
     client_mount_path: "{{ item.mount_point }}"
 
 - name: Derive NFS src for new schema (localhost remap)
-  when: is_new_schema | bool
   block:
     - name: Derive NFS source path component
       ansible.builtin.set_fact:
@@ -50,36 +32,6 @@
       ansible.builtin.set_fact:
         nfs_src: "{{ item.source }}"
       when: item.source is not match('^localhost:')
-
-- name: Validate required fields (legacy schema)
-  when: not is_new_schema | bool
-  ansible.builtin.assert:
-    that:
-      - item.server_ip is defined
-      - item.server_share_path is defined
-    fail_msg: "mount_on_oim (legacy schema) requires 'server_ip' and 'server_share_path'"
-
-- name: Initialize client mount path (legacy schema)
-  when: not is_new_schema | bool
-  ansible.builtin.set_fact:
-    client_mount_path: "{{ (item.client_share_path | default('')) | length > 0 and item.client_share_path or item.server_share_path }}"
-
-- name: Build NFS src for legacy schema
-  when: not is_new_schema | bool
-  block:
-    - name: Use admin_nic_ip when server_ip is localhost
-      ansible.builtin.set_fact:
-        nfs_server_ip: "{{ hostvars['127.0.0.1']['admin_nic_ip'] }}"
-      when: item.server_ip == 'localhost'
-
-    - name: Use explicit server_ip
-      ansible.builtin.set_fact:
-        nfs_server_ip: "{{ item.server_ip }}"
-      when: item.server_ip != 'localhost'
-
-    - name: Compose legacy nfs_src
-      ansible.builtin.set_fact:
-        nfs_src: "{{ nfs_server_ip }}:{{ item.server_share_path }}"
 
 - name: Create the directory for mounting on OIM
   ansible.builtin.file:

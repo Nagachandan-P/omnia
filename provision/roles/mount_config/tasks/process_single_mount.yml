@@ -61,18 +61,18 @@
         - name: Build permission runcmd commands
           ansible.builtin.set_fact:
             permission_runcmds:
-              - "mkdir -p {{ mount_item.mount_point }}"
-              - "chown {{ perm_owner }}:{{ perm_group }} {{ mount_item.mount_point }}"
-              - "chmod {{ perm_mode }} {{ mount_item.mount_point }}"
+              - "{{ ('mkdir -p ' ~ mount_item.mount_point) | b64encode }}"
+              - "{{ ('chown ' ~ perm_owner ~ ':' ~ perm_group ~ ' ' ~ mount_item.mount_point) | b64encode }}"
+              - "{{ ('chmod ' ~ perm_mode ~ ' ' ~ mount_item.mount_point) | b64encode }}"
 
         - name: Add permission commands to each target functional group
           ansible.builtin.set_fact:
             cloud_init_groups_dict: >-
               {{ cloud_init_groups_dict | combine({
                 item: (cloud_init_groups_dict[item] | default({}) | combine({
-                  'runcmd': (cloud_init_groups_dict[item].runcmd | default([])) + permission_runcmds
-                }, recursive=True, list_merge='append'))
-              }, recursive=True, list_merge='append') }}
+                  'b64_runcmd': (cloud_init_groups_dict[item].b64_runcmd | default([])) + permission_runcmds
+                }, recursive=True, list_merge='replace'))
+              }, recursive=True, list_merge='replace') }}
           loop: "{{ target_functional_groups }}"
           loop_control:
             label: "{{ item }}"
@@ -80,23 +80,49 @@
     - name: Add node_key bind mount runcmd entries if node_key specified
       when: mount_item.node_key is defined and mount_item.node_mount_point is defined
       block:
-        - name: Build bind mount runcmd commands for each node mount point
+        - name: Map node_key to cloud-init metadata variable
           ansible.builtin.set_fact:
-            bind_mount_runcmds: >-
+            ci_data_var: "{{ '{% raw %}{{ ' + mount_item.node_key + ' }}{% endraw %}' }}"
+
+        - debug:
+            var: ci_data_var
+          # debugger: always
+
+        - name: Normalize node_mount_point to list
+          ansible.builtin.set_fact:
+            node_bind_mount_points: >-
               {{
-                mount_item.node_mount_point | default([]) | map('regex_replace', '^(.*)$',
-                  'mount --bind ' + mount_item.mount_point + ' \1'
-                ) | list
+                mount_item.node_mount_point
+                if (mount_item.node_mount_point is iterable and not (mount_item.node_mount_point is string))
+                else [mount_item.node_mount_point]
               }}
 
-        - name: Add bind mount commands to each target functional group
+        - name: Build bind mount runcmd entries (fstab + mount) per node mount point
+          ansible.builtin.set_fact:
+            bind_fstab_runcmds: >-
+              {{
+                ([
+                  (('mkdir -p ' ~ mount_item.mount_point ~ '/' ~ ci_data_var ~ item) | b64encode),
+                  (('mkdir -p ' ~ item) | b64encode),
+                  (('echo "' ~ mount_item.mount_point ~ '/' ~ ci_data_var ~ item ~ ' ' ~ item ~ ' none bind,_netdev 0 0" >> /etc/fstab') | b64encode),
+                  (('mount -a') | b64encode)
+                ])
+              }}
+          loop: "{{ node_bind_mount_points }}"
+
+        - debug:
+            var: (item | b64decode)
+          loop: "{{ bind_fstab_runcmds }}"
+          # debugger: always
+
+        - name: Add bind fstab commands to each target functional group (runcmd)
           ansible.builtin.set_fact:
             cloud_init_groups_dict: >-
               {{ cloud_init_groups_dict | combine({
                 item: (cloud_init_groups_dict[item] | default({}) | combine({
-                  'runcmd': (cloud_init_groups_dict[item].runcmd | default([])) + bind_mount_runcmds
-                }, recursive=True, list_merge='append'))
-              }, recursive=True, list_merge='append') }}
+                  'b64_runcmd': (cloud_init_groups_dict[item].b64_runcmd | default([])) + bind_fstab_runcmds
+                }, recursive=True, list_merge='replace'))
+              }, recursive=True, list_merge='replace') }}
           loop: "{{ target_functional_groups }}"
           loop_control:
             label: "{{ item }}"
@@ -137,9 +163,9 @@
             - name: Build permission commands
               ansible.builtin.set_fact:
                 host_permission_runcmds:
-                  - "mkdir -p {{ mount_item.mount_point }}"
-                  - "chown {{ host_perm_owner }}:{{ host_perm_group }} {{ mount_item.mount_point }}"
-                  - "chmod {{ host_perm_mode }} {{ mount_item.mount_point }}"
+                  - "{{ ('mkdir -p ' ~ mount_item.mount_point) | b64encode }}"
+                  - "{{ ('chown ' ~ host_perm_owner ~ ':' ~ host_perm_group ~ ' ' ~ mount_item.mount_point) | b64encode }}"
+                  - "{{ ('chmod ' ~ host_perm_mode ~ ' ' ~ mount_item.mount_point) | b64encode }}"
 
             - name: Add permission commands to host_mount_map
               ansible.builtin.set_fact:
@@ -147,8 +173,8 @@
                   {{
                     host_mount_map | combine({
                       item: (host_mount_map[item] | default({}) | combine({
-                        'runcmd': (host_mount_map[item].runcmd | default([])) + host_permission_runcmds
-                      }, recursive=True, list_merge='append'))
+                        'b64_runcmd': (host_mount_map[item].b64_runcmd | default([])) + host_permission_runcmds
+                      }, recursive=True, list_merge='replace'))
                     })
                   }}
               loop: "{{ target_hostnames }}"
@@ -164,15 +190,15 @@
 
             - name: Build runcmd to create node-specific subdirectory and mount points
               ansible.builtin.set_fact:
-                host_node_mount_runcmds: >
+                host_node_mount_runcmds: >-
                   {{
                     [
-                      'mkdir -p {{ mount_item.mount_point }}/' ~ host_cloud_init_node_var
+                      ('mkdir -p ' ~ mount_item.mount_point ~ '/' ~ host_cloud_init_node_var) | b64encode
                     ] +
                     (
                       mount_item.node_mount_point | map('regex_replace', '^/(.*)$',
-                        'mkdir -p {{ mount_item.mount_point }}/' ~ host_cloud_init_node_var ~ '/\1'
-                      ) | list
+                        'mkdir -p ' ~ mount_item.mount_point ~ '/' ~ host_cloud_init_node_var ~ '/\1'
+                      ) | map('b64encode') | list
                     )
                   }}
 
@@ -182,7 +208,7 @@
                   {{
                     host_mount_map | combine({
                       item: (host_mount_map[item] | default({}) | combine({
-                        'runcmd': (host_mount_map[item].runcmd | default([])) + host_node_mount_runcmds
+                        'b64_runcmd': (host_mount_map[item].b64_runcmd | default([])) + host_node_mount_runcmds
                       }, recursive=True, list_merge='append'))
                     })
                   }}

@@ -553,26 +553,13 @@
           permissions: '{{ file_mode_755 }}'
           content: |
             {{ lookup('template', 'templates/hpc_tools/export_nvhpc_env.sh.j2') | indent(12) }}
-
-      mounts:
-{% if cloud_init_groups_dict[functional_group_name].mounts is defined %}
-{% for mount in cloud_init_groups_dict[functional_group_name].mounts %}
-        - {{ mount }}
-{% endfor %}
-{% endif %}
-{# Host-specific mounts #}
-{% if host_mount_map is defined and host_mount_map | length > 0 %}
-{% if ds.meta_data.instance_data.local_hostname in host_mount_map %}
-{% if host_mount_map[ds.meta_data.instance_data.local_hostname].mounts is defined %}
-{% for mount in host_mount_map[ds.meta_data.instance_data.local_hostname].mounts %}
-        - {{ mount }}
-{% endfor %}
-{% endif %}
-{% endif %}
-{% endif %}
-
       runcmd:
-        - rm -rf /var/lib/cloud/instance
+{# Mount-specific runcmd entries #}
+{% if cloud_init_groups_dict[functional_group_name].b64_runcmd is defined %}
+{% for cmd in cloud_init_groups_dict[functional_group_name].b64_runcmd %}
+        - {{ cmd | b64decode }}
+{% endfor %}
+{% endif %}
         - /usr/local/bin/set-ssh.sh
         - /usr/local/bin/install_nvidia_driver.sh
 {% if dcgm_support %}

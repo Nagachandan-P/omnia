@@ -97,7 +97,7 @@
 
 - name: Mount entries from mounts[] flagged for OIM (mount_on_oim=true)
   ansible.builtin.include_tasks: mount_on_oim.yml
-  loop: "{{ mounts | default([]) | selectattr('mount_on_oim', 'equalto', true) | list }}"
+  loop: "{{ mounts | default([]) | selectattr('mount_on_oim', 'defined') | selectattr('mount_on_oim', 'equalto', true) | list }}"
   loop_control:
     loop_var: item
     label: "{{ item.name | default(item.mount_point | default('unnamed')) }}"
