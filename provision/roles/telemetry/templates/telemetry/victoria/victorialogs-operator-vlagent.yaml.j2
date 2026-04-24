@@ -123,45 +123,29 @@ spec:
   # ========================================
   # Service Exposure Configuration
   # ========================================
-  # Service type: LoadBalancer (MetalLB) or NodePort (fallback)
+  # Service type: LoadBalancer (MetalLB assigns external IP)
   # Exposes syslog receivers (:514 TCP+UDP, :6514 TLS) for external log sources
-{% if metalLB_deployed | default(false) %}
   serviceSpec:
     useAsDefault: true
     spec:
       type: LoadBalancer
-{% else %}
-  serviceSpec:
-    useAsDefault: true
-    spec:
-      type: NodePort
-{% endif %}
-
-  # ========================================
-  # Port Configuration
-  # ========================================
-  # Syslog receivers (platform-provided scrape targets)
-  # - :514 TCP+UDP — plaintext syslog (RFC 3164/5424)
-  # - :6514 TCP — TLS syslog (RFC 5425)
-  # Health check endpoint
-  # - :9429 — HTTP health checks (distinct from vmagent 8429)
-  ports:
-    - name: syslog
-      port: 514
-      targetPort: 514
-      protocol: TCP
-    - name: syslog-udp
-      port: 514
-      targetPort: 514
-      protocol: UDP
-    - name: syslog-tls
-      port: 6514
-      targetPort: 6514
-      protocol: TCP
-    - name: health
-      port: 9429
-      targetPort: 9429
-      protocol: TCP
+      ports:
+        - name: health
+          port: 9429
+          targetPort: 9429
+          protocol: TCP
+        - name: syslog
+          port: 514
+          targetPort: 514
+          protocol: TCP
+        - name: syslog-udp
+          port: 514
+          targetPort: 514
+          protocol: UDP
+        - name: syslog-tls
+          port: 6514
+          targetPort: 6514
+          protocol: TCP
 
   # ========================================
   # Health Probes
