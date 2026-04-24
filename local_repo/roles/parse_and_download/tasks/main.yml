@@ -18,7 +18,6 @@
     project_input_path: "{{ hostvars['localhost']['input_project_dir'] }}"
     update_metadata: false
     show_softwares_status: false
-    sub_final_repo_urls: {}
 
 - name: Include oim metadata vars
   ansible.builtin.include_vars: "{{ omnia_metadata_file }}"
