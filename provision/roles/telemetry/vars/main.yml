@@ -500,7 +500,7 @@ ps_dependency_fail_msg: >-
 # Registered in service_k8s.json
 vector:
   image: "{{ telemetry_images['timberio/vector'] | default('docker.io/timberio/vector:0.54.0-alpine') }}"
-  
+
   # Vector-LDMS configuration
   ldms:
     app_name: "vector-ldms"
@@ -518,7 +518,7 @@ vector:
       limits:
         cpu: "500m"
         memory: "512Mi"
-  
+
   # Vector-OME configuration
   ome:
     app_name: "vector-ome"
@@ -539,7 +539,7 @@ vector:
       limits:
         cpu: "1000m"
         memory: "1Gi"
-  
+
   # vmagent-vector: Write-buffer for Vector → VictoriaMetrics
   # Accepts prometheus_remote_write from Vector pods on port 8429
   vmagent_vector:
@@ -559,7 +559,7 @@ vector:
       limits:
         cpu: "500m"
         memory: "512Mi"
-  
+
   # vlagent-vector: Write-buffer for Vector → VictoriaLogs
   # Accepts JSON Lines from Vector pods on port 9427
   vlagent_vector:
