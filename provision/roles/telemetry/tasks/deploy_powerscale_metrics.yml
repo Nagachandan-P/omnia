@@ -25,12 +25,6 @@
     ps_helm_values_file: "{{ telemetry_config.powerscale_configurations.csm_observability_values_file_path }}"
     csm_observability_namespace: "{{ csm_namespace }}"
 
-- name: Set PowerScale metrics enabled flag for cloud-init template access
-  ansible.builtin.set_fact:
-    powerscale_metrics_enabled_cloudinit: "{{ telemetry_config.telemetry_sources.powerscale.metrics_enabled | default(false) | bool }}"
-  delegate_to: localhost
-  delegate_facts: true
-
 - name: Validate user-provided Helm values file path
   ansible.builtin.assert:
     that:
