@@ -1041,7 +1041,7 @@
             systemctl restart nfs-client.target
             systemctl restart rpcbind
 
-{% if hostvars['localhost']['telemetry_config']['telemetry_sources']['powerscale']['metrics_enabled'] | default(false) | bool %}
+{% if hostvars['localhost']['powerscale_metrics_enabled'] | default(false) | bool %}
 {% include 'powerscale/deploy_powerscale_telemetry.sh.j2' %}
 {% endif %}
 
