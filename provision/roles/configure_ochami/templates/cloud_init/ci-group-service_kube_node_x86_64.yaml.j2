@@ -311,12 +311,21 @@
 {# Host-specific runcmd entries #}
 {% if host_mount_map is defined and host_mount_map | length > 0 %}
 {% if ds.meta_data.instance_data.local_hostname in host_mount_map %}
-{% if host_mount_map[ds.meta_data.instance_data.local_hostname].runcmd is defined %}
-{% for cmd in host_mount_map[ds.meta_data.instance_data.local_hostname].runcmd %}
-            {{ cmd }}
+{% if host_mount_map[ds.meta_data.instance_data.local_hostname].mounts is defined %}
+{% for mount in host_mount_map[ds.meta_data.instance_data.local_hostname].mounts %}
+        - {{ mount }}
 {% endfor %}
 {% endif %}
-{% endif %}
+{%- set fg_swap = cloud_init_groups_dict.get(functional_group_name, {}).get('swap', {}) %}
+{%- if fg_swap %}
+      swap:
+        filename: {{ fg_swap.filename }}
+        size: "{{ fg_swap.size }}"
+{%- if fg_swap.maxsize is defined %}
+        maxsize: "{{ fg_swap.maxsize }}"
+{%- endif %}
+{%- endif %}
+      users:
 {% endif %}
             echo "Cloud-Init has completed successfully."
 

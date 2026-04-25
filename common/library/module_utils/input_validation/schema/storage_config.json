@@ -276,13 +276,6 @@
         "items": {
           "type": "object",
           "properties": {
-            "name": {
-              "type": "string",
-              "description": "Unique identifier for this swap entry",
-              "pattern": "^[a-zA-Z0-9_-]+$",
-              "minLength": 1,
-              "maxLength": 64
-            },
             "filename": {
               "type": "string",
               "description": "Path to the swap file to create",
@@ -317,8 +310,11 @@
               "uniqueItems": true
             }
           },
-          "required": ["name", "filename", "size"],
-          "not": { "required": ["functional_group_prefix", "group"] },
+          "required": ["filename", "size"],
+          "oneOf": [
+            { "required": ["functional_group_prefix"] },
+            { "required": ["group"] }
+          ],
           "additionalProperties": false
         }
       }

@@ -586,6 +586,10 @@ def validate_storage_config(
 
     allowed_options = {"nosuid", "rw", "sync", "hard", "intr"}
 
+    # Validate swap configurations for no overlapping functional groups
+    if "swap" in data and data["swap"]:
+        errors.extend(_validate_swap_no_overlap(data["swap"]))
+
     # for nfs_client_params in data["mounts"]:
     #     client_mount_options = nfs_client_params["mount_point"]
     #     client_mount_options_set = set(client_mount_options.split(","))
@@ -611,6 +615,152 @@ def validate_storage_config(
         #             f"with deployment enabled for NFS '{nfs_strg_name}'."
         #         )
         #     )
+    return errors
+
+
+def _validate_swap_no_overlap(swap_list: list) -> list:
+    """
+    Validates swap entries for overlapping functional groups and size constraints.
+
+    Ensures that:
+    1. No functional group (from either functional_group_prefix or group arrays)
+       appears in more than one swap entry.
+    2. If maxsize is specified, it must be greater than or equal to size.
+
+    Args:
+        swap_list (list): List of swap configuration dictionaries.
+
+    Returns:
+        list: A list of error messages for overlapping functional groups or invalid sizes.
+    """
+    errors = []
+    seen_prefixes = {}
+    seen_groups = {}
+
+    for idx, swap_entry in enumerate(swap_list):
+        swap_name = swap_entry.get("filename", f"swap[{idx}]")
+
+        # Validate maxsize >= size
+        if "maxsize" in swap_entry and "size" in swap_entry:
+            errors.extend(_validate_swap_size_constraint(swap_entry, swap_name))
+
+        # Check functional_group_prefix overlaps
+        if "functional_group_prefix" in swap_entry:
+            for prefix in swap_entry["functional_group_prefix"]:
+                if prefix in seen_prefixes:
+                    errors.append(
+                        create_error_msg(
+                            "swap",
+                            swap_name,
+                            f"Functional group prefix '{prefix}' in swap entry '{swap_name}' "
+                            f"overlaps with swap entry '{seen_prefixes[prefix]}'. "
+                            f"Each functional group must be assigned to only one swap entry."
+                        )
+                    )
+                else:
+                    seen_prefixes[prefix] = swap_name
+
+        # Check group overlaps
+        if "group" in swap_entry:
+            for group in swap_entry["group"]:
+                if group in seen_groups:
+                    errors.append(
+                        create_error_msg(
+                            "swap",
+                            swap_name,
+                            f"Group '{group}' in swap entry '{swap_name}' "
+                            f"overlaps with swap entry '{seen_groups[group]}'. "
+                            f"Each group must be assigned to only one swap entry."
+                        )
+                    )
+                else:
+                    seen_groups[group] = swap_name
+
+    return errors
+
+
+def _parse_size_to_bytes(size_str: str) -> int:
+    """
+    Converts a size string to bytes.
+
+    Supports formats: bytes (e.g., "1073741824"), K/M/G/T suffixes (e.g., "2G", "512M"),
+    or "auto" (returns 0 for comparison purposes).
+
+    Args:
+        size_str (str): Size string to parse.
+
+    Returns:
+        int: Size in bytes. Returns 0 for "auto".
+
+    Raises:
+        ValueError: If size_str format is invalid.
+    """
+    if size_str == "auto":
+        return 0
+
+    multipliers = {"B": 1, "K": 1024, "M": 1024**2, "G": 1024**3, "T": 1024**4}
+
+    # Check if it ends with a multiplier
+    if size_str[-1] in multipliers:
+        suffix = size_str[-1]
+        try:
+            value = int(size_str[:-1])
+            return value * multipliers[suffix]
+        except ValueError as e:
+            raise ValueError(f"Invalid size format: {size_str}") from e
+
+    # Pure bytes
+    try:
+        return int(size_str)
+    except ValueError as e:
+        raise ValueError(f"Invalid size format: {size_str}") from e
+
+
+def _validate_swap_size_constraint(swap_entry: dict, swap_name: str) -> list:
+    """
+    Validates that maxsize >= size for a swap entry.
+
+    Args:
+        swap_entry (dict): Swap configuration entry.
+        swap_name (str): Name/identifier of the swap entry for error messages.
+
+    Returns:
+        list: A list of error messages if validation fails.
+    """
+    errors = []
+    size_str = swap_entry.get("size", "")
+    maxsize_str = swap_entry.get("maxsize", "")
+
+    if not size_str or not maxsize_str:
+        return errors
+
+    try:
+        size_bytes = _parse_size_to_bytes(size_str)
+        maxsize_bytes = _parse_size_to_bytes(maxsize_str)
+
+        # If size is "auto" (0), skip comparison since maxsize is only meaningful with auto
+        if size_bytes == 0:
+            return errors
+
+        # maxsize must be >= size
+        if maxsize_bytes < size_bytes:
+            errors.append(
+                create_error_msg(
+                    "swap",
+                    swap_name,
+                    f"maxsize '{maxsize_str}' must be greater than or equal to size '{size_str}'. "
+                    f"maxsize={maxsize_bytes} bytes, size={size_bytes} bytes."
+                )
+            )
+    except ValueError as e:
+        errors.append(
+            create_error_msg(
+                "swap",
+                swap_name,
+                f"Invalid size format in swap entry: {str(e)}"
+            )
+        )
+
     return errors
 
 

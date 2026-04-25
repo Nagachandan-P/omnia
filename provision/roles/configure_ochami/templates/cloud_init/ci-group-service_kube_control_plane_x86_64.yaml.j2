@@ -499,6 +499,22 @@
 {% endif %}
 {% endif %}
 
+{%- if cloud_init_groups_dict[functional_group_name].mounts is defined %}
+{% for mount in cloud_init_groups_dict[functional_group_name].mounts %}
+        - {{ mount }}
+{% endfor %}
+{% endif %}
+{%- set fg_swap = cloud_init_groups_dict.get(functional_group_name, {}).get('swap', {}) %}
+{%- if fg_swap %}
+      swap:
+        filename: {{ fg_swap.filename }}
+        size: "{{ fg_swap.size }}"
+{%- if fg_swap.maxsize is defined %}
+        maxsize: "{{ fg_swap.maxsize }}"
+{%- endif %}
+{%- endif %}
+      users:
+
             echo "Cloud-Init has completed successfully."
           else
             # SUBSEQUENT BOOT - SKIP JOIN
