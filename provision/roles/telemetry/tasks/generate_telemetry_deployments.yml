@@ -1,4 +1,4 @@
-# Copyright 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,9 +45,14 @@
     dest: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/deployments/{{ item.dest }}"
     mode: "{{ hostvars['localhost']['file_permissions_644'] }}"
   loop: "{{ victorialogs_templates }}"
-  when: victoria_logs_support | default(false) | bool
+  loop_control:
+    label: "{{ item.dest }}"
+  when:
+    - victoria_logs_support | default(false) | bool
+    - item.dest != 'vlagent-syslog-tls-secret.yaml' or powerscale_configurations.syslog_tls_enabled | default(true) | bool
   tags: telemetry_deployment
   # NOTE: victorialogs_templates includes VLCluster CR, VLAgent CR, and VLAgent ConfigMap
+  #       syslog TLS secret template is conditionally included based on syslog_tls_enabled
 
 - name: Kafka configurations
   when: kafka_support

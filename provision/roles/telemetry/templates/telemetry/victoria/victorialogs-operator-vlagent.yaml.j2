@@ -1,4 +1,4 @@
-#  Copyright 2025 Dell Inc. or its subsidiaries. All Rights Reserved.
+#  Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ spec:
   extraArgs:
     syslog.listenAddr.tcp: ":514"
     syslog.listenAddr.udp: ":514"
-{% if hostvars['localhost']['syslog_tls_enabled'] | default(true) | bool %}
+{% if hostvars['localhost']['powerscale_log_enabled'] | default(false) | bool and hostvars['localhost']['syslog_tls_enabled'] | default(false) | bool %}
     syslog.tlsListenAddr.tcp: ":6514"
     syslog.tls.certFile: "/etc/victoria/syslog-certs/server.crt"
     syslog.tls.keyFile: "/etc/victoria/syslog-certs/server.key"

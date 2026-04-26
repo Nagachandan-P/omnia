@@ -16,20 +16,21 @@
 # Configure PowerScale syslog collection via rsyslog relay + shared VLAgent
 # Gated by: telemetry_sources.powerscale.logs_enabled
 #
-# DATA PIPELINE (supports both UDP and TLS modes):
-#   UDP mode: PowerScale (UDP:514) → K8s node rsyslog → VLAgent LB (TCP:514) → VictoriaLogs
-#   TLS mode: PowerScale (TLS:6514) → VLAgent LB (TLS:6514) → VictoriaLogs
+# DATA PIPELINE (UDP mode only):
+#   PowerScale (UDP:514) → K8s node rsyslog → VLAgent LB (TCP:514) → VictoriaLogs
+#
+# NOTE: TLS mode is not supported in current VLAgent version (v1.49.0).
+#       Requires upgrade to v1.50.0+ for syslog TLS support.
 #
 # What Omnia does (all on K8s cluster):
-#   - Uses powerscale_syslog_source_ips from user config (syslog source != CSI endpoint)
+#   - Uses syslog_source_ips from user config (syslog source != CSI endpoint)
 #   - Configures rsyslog on ALL K8s nodes (UDP listener, filter by PS IP, forward to VLAgent)
-#   - Generates TLS certificates for syslog TLS receiver (CA + server cert)
 #   - Opens firewall port 514/udp on all K8s nodes
-#   - VLAgent listens on TCP:514 (rsyslog relay) and TLS:6514 (direct PowerScale TLS)
+#   - VLAgent listens on TCP:514 (rsyslog relay)
 #
 # What Omnia does NOT do:
 #   - Omnia does NOT configure PowerScale directly
-#   - User must configure PowerScale to send syslog (UDP or TLS) to VLAgent LoadBalancer IP
+#   - User must configure PowerScale to send UDP syslog to VLAgent LoadBalancer IP
 
 - name: Set PowerScale log configuration facts
   ansible.builtin.set_fact:
@@ -161,5 +162,5 @@
           During cloud-init, the script will configure rsyslog on all K8s nodes,
           open firewall port 514/udp, and forward PowerScale syslog to VLAgent.
           For complete PowerScale syslog configuration details, including manual
-          PowerScale setup steps for both UDP and TLS modes, refer to Omnia documentation.
+          PowerScale setup steps, refer to Omnia documentation.
         verbosity: 2

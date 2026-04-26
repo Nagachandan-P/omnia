@@ -340,15 +340,16 @@ victoria_templates: >
 # ============================================================================
 # VictoriaLogs operator CR templates (used when 'victoria' in telemetry_collection_type)
 # These are applied alongside VictoriaMetrics templates in the same kustomize deployment.
+# NOTE: TLS mode is conditionally enabled based on syslog_tls_enabled.
+#       When syslog_tls_enabled: true, vlagent-syslog-tls-secret is included.
+#       When syslog_tls_enabled: false, only UDP mode (rsyslog relay) is used.
 victorialogs_templates:
   - src: 'telemetry/victoria/victorialogs-operator-vlcluster.yaml.j2'
     dest: 'victorialogs-operator-vlcluster.yaml'
   - src: 'telemetry/victoria/victorialogs-operator-vlagent.yaml.j2'
     dest: 'victorialogs-operator-vlagent.yaml'
-{% if hostvars['localhost']['telemetry_config'].powerscale_configurations.syslog_tls_enabled | default(true) | bool %}
   - src: 'telemetry/victoria/vlagent-syslog-tls-secret.yaml.j2'
-    dest: 'vlagent-syslog-tls-secret.yaml'
-{% endif %}
+    dest: 'vlagent-syslog-tls-secret'
   - src: 'telemetry/victoria/victorialogs-vlagent-config.yaml.j2'
     dest: 'victorialogs-vlagent-config.yaml'
 
@@ -510,4 +511,4 @@ ps_log_deployed_msg: >-
   During cloud-init, the script will configure rsyslog on all K8s nodes,
   open firewall port 514/udp, and forward PowerScale syslog to VLAgent.
   For complete PowerScale syslog configuration details, including manual
-  PowerScale setup steps for both UDP and TLS modes, refer to Omnia documentation.
+  PowerScale setup steps, refer to Omnia documentation.
