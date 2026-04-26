@@ -331,3 +331,53 @@ powerscale_configurations:
   # Additional victoria_metrics remote_write endpoints (optional)
   # Default: [] (empty — only the primary Omnia victoria_metrics endpoint is used)
   additional_remote_write_endpoints: []
+
+  # --------------------------------------------------------------------------
+  # PowerScale Syslog Log Collection
+  # --------------------------------------------------------------------------
+  # When telemetry_sources.powerscale.logs_enabled is true, Omnia configures
+  # rsyslog on all K8s nodes to receive and relay PowerScale audit syslog.
+  #
+  # DATA PIPELINE:
+  #   PowerScale (UDP:514) → K8s node rsyslog → VLAgent LB (TCP:514) → VictoriaLogs
+  #
+  # IMPORTANT: The syslog source IP is the IP address PowerScale uses to SEND
+  # syslog packets. This is NOT necessarily the CSI driver endpoint (management IP).
+  # Check OneFS Network Configuration → External Network → Pool IPs to find
+  # which pool/interface PowerScale will route syslog traffic from.
+  #
+  # Example: OneFS management IP = 192.168.55.2 (pool0, mgmt-1 interface)
+  #          OneFS data/NFS IP    = 192.168.55.11 (pool1, 40gige-1 interface)
+  #          Syslog may be sent from 192.168.55.11, NOT 192.168.55.2
+  #
+  # WHAT OMNIA DOES:
+  #   - Configures rsyslog on all K8s nodes (UDP listener, filter by source IP)
+  #   - Opens firewall port 514/udp on all K8s nodes
+  #   - Stores local copy at /var/log/powerscale_audit.log
+  #   - Forwards to VLAgent → VictoriaLogs
+  #   - If TLS enabled: Generates TLS certs for syslog TLS receiver (port 6514)
+  #
+  # WHAT YOU MUST DO (after deployment):
+  #   - Configure PowerScale to send syslog (UDP or TLS based on your choice)
+  #   - For TLS mode: Copy CA certificate to PowerScale
+  #   - Refer to Omnia documentation for complete configuration details
+
+  # Enable or disable TLS syslog receiver (port 6514)
+  # When true: VLAgent listens on TLS:6514, generates TLS certificates
+  # When false: Only UDP mode (rsyslog relay) is available
+  # Default: true
+  syslog_tls_enabled: true
+
+  # PowerScale IP address(es) from which syslog packets will arrive at K8s nodes.
+  # This is the source IP in the UDP syslog packets — check your OneFS network
+  # configuration to determine the correct IP (often the data pool IP, not mgmt IP).
+  # Required when telemetry_sources.powerscale.logs_enabled: true
+  # Format: list of IP addresses (one per PowerScale cluster/pool)
+  #
+  # IMPORTANT: For complete PowerScale syslog configuration details, including
+  # manual PowerScale setup steps for both UDP and TLS modes, refer to Omnia documentation.
+  syslog_source_ips: []
+  # Example:
+  #   syslog_source_ips:
+  #     - "192.168.55.11"        # cluster1 data pool IP
+  #     - "192.168.55.20"           # cluster2 data pool IP

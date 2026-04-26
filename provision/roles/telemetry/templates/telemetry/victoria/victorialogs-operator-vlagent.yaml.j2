@@ -50,8 +50,26 @@ spec:
   # ========================================
   # Configuration Management
   # ========================================
-  # ConfigMap containing VLAgent syslog receiver configuration
-  configSecret: vlagent-config
+  # The VictoriaMetrics operator does NOT translate configSecret into
+  # syslog CLI flags. Syslog listeners MUST be enabled via extraArgs.
+  # These map directly to VLAgent CLI flags:
+  #   -syslog.listenAddr.tcp  → plaintext syslog TCP receiver (rsyslog relay forwards here)
+  #   -syslog.listenAddr.udp  → plaintext syslog UDP receiver
+  #   -syslog.tlsListenAddr.tcp → TLS syslog receiver (direct PowerScale TLS)
+  # Pipeline:
+  #   UDP mode: PowerScale → K8s node rsyslog (UDP:514) → VLAgent (TCP:514) → VictoriaLogs
+  #   TLS mode: PowerScale → VLAgent (TLS:6514) → VictoriaLogs
+  extraArgs:
+    syslog.listenAddr.tcp: ":514"
+    syslog.listenAddr.udp: ":514"
+{% if hostvars['localhost']['syslog_tls_enabled'] | default(true) | bool %}
+    syslog.tlsListenAddr.tcp: ":6514"
+    syslog.tls.certFile: "/etc/victoria/syslog-certs/server.crt"
+    syslog.tls.keyFile: "/etc/victoria/syslog-certs/server.key"
+{% endif %}
+{% if hostvars['localhost']['powerscale_log_enabled'] | default(false) | bool %}
+    remoteWrite.label: "source=powerscale,pipeline=powerscale-syslog"
+{% endif %}
 
   # ========================================
   # Remote Write Configuration
@@ -81,6 +99,28 @@ spec:
       cpu: {{ victoria_logs_cluster.vlagent.resources.limits.cpu }}
 
   # ========================================
+  # Init Container: Stale Lock File Cleanup
+  # ========================================
+  # VLAgent uses flock for exclusive access to its persistent queue.
+  # On NFS-backed PVCs (e.g., PowerScale StorageClass), POSIX flock is
+  # not reliably released on pod termination. This causes the new pod
+  # to panic with "resource temporarily unavailable" on the lock file.
+  # The init container removes stale flock.lock files before vlagent starts.
+  initContainers:
+    - name: cleanup-stale-locks
+      image: {{ victoria_logs_cluster.vlagent.image.split(':')[0] }}:{{ victoria_logs_cluster.vlagent.image.split(':')[1] }}
+      command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Cleaning up stale flock files..."
+          find /tmp-data -name "flock.lock" -delete 2>/dev/null || true
+          echo "Lock file cleanup complete"
+      volumeMounts:
+        - name: tmp-data
+          mountPath: /tmp-data
+
+  # ========================================
   # Persistent Storage Configuration
   # ========================================
   # PVC buffer for client-side log persistence and retry during vlinsert unavailability
@@ -98,10 +138,9 @@ spec:
   # ========================================
   # TLS Certificate Configuration
   # ========================================
-  # Shared with VictoriaMetrics cluster
-  # Used for:
-  #   - Syslog TLS receiver (:6514) — server certificate
-  #   - remoteWrite to vlinsert — CA certificate validation
+  # Volume mounts for TLS certificates:
+  #   - victoria-tls-certs: remoteWrite to vlinsert (CA certificate validation)
+  #   - vlagent-syslog-tls-certs: syslog TLS receiver (PowerScale direct TLS)
 {% if victoria_logs_cluster.tls_enabled %}
   volumes:
     - name: victoria-tls-certs
@@ -114,9 +153,28 @@ spec:
             path: server.key
           - key: ca.crt
             path: ca.crt
+{% endif %}
+{% if hostvars['localhost']['powerscale_log_enabled'] | default(false) | bool and hostvars['localhost']['syslog_tls_enabled'] | default(true) | bool %}
+  volumes:
+    - name: vlagent-syslog-tls-certs
+      secret:
+        secretName: vlagent-syslog-tls-certs
+        items:
+          - key: tls.crt
+            path: server.crt
+          - key: tls.key
+            path: server.key
+{% endif %}
+{% if victoria_logs_cluster.tls_enabled %}
   volumeMounts:
     - name: victoria-tls-certs
       mountPath: /etc/victoria/certs
+      readOnly: true
+{% endif %}
+{% if hostvars['localhost']['powerscale_log_enabled'] | default(false) | bool and hostvars['localhost']['syslog_tls_enabled'] | default(true) | bool %}
+  volumeMounts:
+    - name: vlagent-syslog-tls-certs
+      mountPath: /etc/victoria/syslog-certs
       readOnly: true
 {% endif %}
 
@@ -124,7 +182,9 @@ spec:
   # Service Exposure Configuration
   # ========================================
   # Service type: LoadBalancer (MetalLB assigns external IP)
-  # Exposes syslog receivers (:514 TCP+UDP, :6514 TLS) for external log sources
+  # Exposes syslog receivers:
+  #   - TCP:514 / UDP:514 → rsyslog relay (UDP mode)
+  #   - TCP:6514 → direct PowerScale TLS (TLS mode, if enabled)
   serviceSpec:
     useAsDefault: true
     spec:
@@ -138,10 +198,12 @@ spec:
           port: 514
           targetPort: 514
           protocol: UDP
+{% if hostvars['localhost']['powerscale_log_enabled'] | default(false) | bool and hostvars['localhost']['syslog_tls_enabled'] | default(true) | bool %}
         - name: syslog-tls
           port: 6514
           targetPort: 6514
           protocol: TCP
+{% endif %}
 
   # ========================================
   # Health Probes

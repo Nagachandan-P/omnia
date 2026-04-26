@@ -17,6 +17,7 @@ PowerScale telemetry validation module.
 Contains validation logic for PowerScale telemetry configuration in telemetry_config.yml.
 """
 
+import ipaddress
 import json
 import os
 import yaml
@@ -340,6 +341,26 @@ def validate_powerscale_telemetry_config(
                 powerscale_collection_targets,
                 en_us_validation_msg.POWERSCALE_VICTORIA_LOGS_REQUIRED_MSG
             ))
+        # Validate syslog_source_ips when logs_enabled
+        syslog_source_ips = powerscale_config.get(
+            "syslog_source_ips", []
+        )
+        if not syslog_source_ips or len(syslog_source_ips) == 0:
+            errors.append(create_error_msg(
+                "powerscale_configurations.syslog_source_ips",
+                syslog_source_ips,
+                en_us_validation_msg.POWERSCALE_SYSLOG_SOURCE_IPS_REQUIRED_MSG
+            ))
+        else:
+            for idx, ip_str in enumerate(syslog_source_ips):
+                try:
+                    ipaddress.ip_address(str(ip_str).strip())
+                except ValueError:
+                    errors.append(create_error_msg(
+                        f"powerscale_configurations.syslog_source_ips[{idx}]",
+                        ip_str,
+                        en_us_validation_msg.POWERSCALE_SYSLOG_SOURCE_IP_INVALID_MSG
+                    ))
 
     # Validate additional_remote_write_endpoints
     # (applies to metrics deployment)
@@ -370,3 +391,5 @@ def validate_powerscale_telemetry_config(
                     url,
                     en_us_validation_msg.POWERSCALE_ADDITIONAL_ENDPOINTS_URL_INVALID_MSG
                 ))
+
+

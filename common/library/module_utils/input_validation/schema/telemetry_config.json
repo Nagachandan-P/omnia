@@ -374,6 +374,20 @@
             "required": ["url"]
           },
           "description": "Additional victoria_metrics remote_write endpoints."
+        },
+        "syslog_tls_enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable TLS syslog receiver (port 6514). When true, VLAgent listens on TLS:6514 and generates TLS certificates. When false, only UDP mode (rsyslog relay) is available."
+        },
+        "syslog_source_ips": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string",
+            "format": "ipv4"
+          },
+          "description": "PowerScale IP address(es) from which syslog packets arrive. This is the source IP in UDP syslog packets (often the data pool IP, not the CSI management IP)."
         }
       },
       "required": ["otel_collector_storage_size", "csm_observability_values_file_path"]
