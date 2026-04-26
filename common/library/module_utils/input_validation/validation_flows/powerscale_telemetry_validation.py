@@ -391,5 +391,3 @@ def validate_powerscale_telemetry_config(
                     url,
                     en_us_validation_msg.POWERSCALE_ADDITIONAL_ENDPOINTS_URL_INVALID_MSG
                 ))
-
-
