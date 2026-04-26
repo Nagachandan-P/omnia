@@ -1054,7 +1054,7 @@
             echo "===== Configuring PowerScale Syslog Forwarding ====="
             if [ -f "{{ k8s_client_mount_path }}/telemetry/deployments/configure_powerscale_syslog.sh" ]; then
               echo "Running PowerScale syslog configuration script..."
-              bash "{{ k8s_client_mount_path }}/telemetry/deployments/configure_powerscale_syslog.sh" 2>&1 | tee /var/log/omnia/configure_powerscale_syslog.log
+              bash "{{ k8s_client_mount_path }}/telemetry/deployments/configure_powerscale_syslog.sh" 2>&1
               echo "PowerScale syslog configuration completed (exit code: $?)"
             else
               echo "WARNING: PowerScale syslog configuration script not found."

@@ -238,6 +238,46 @@ victoria_tls_cert_days: 3650
 victoria_cert_dir: "{{ telemetry_share_path }}/victoria-certs"
 syslog_tls_cert_dir: "{{ telemetry_share_path }}/syslog-tls-certs"
 
+# NOTE: syslog_tls_enabled is set in derive_sink_support_flags.yml as part of powerscale_configurations
+# Default: true (enables TLS syslog receiver on port 6514)
+# When true: VLAgent listens on TLS:6514, generates TLS certificates
+# When false: Only UDP mode (rsyslog relay) is available
+
+# PowerScale syslog source IPs requirement message
+powerscale_syslog_source_ips_msg: >-
+  powerscale_configurations.syslog_source_ips is required when logs_enabled is true.
+  Provide the IP(s) from which PowerScale sends syslog.
+  This is often the data pool IP (e.g., 40gige-1 interface), NOT the CSI management IP.
+  Check OneFS Network Configuration → External Network → Pool IPs.
+
+# PowerScale syslog source IPs display message
+powerscale_syslog_source_ips_display_msg: >-
+  PowerScale syslog source IP(s): {{ powerscale_management_ips | join(', ') }}.
+  rsyslog $fromhost-ip filter will match these IPs and forward to VLAgent.
+
+# PowerScale syslog TLS mode status message
+powerscale_syslog_tls_mode_msg: >-
+  PowerScale syslog TLS mode: {% if powerscale_configurations.syslog_tls_enabled | default(true) | bool %}enabled{% else %}disabled{% endif %}
+
+# PowerScale syslog TLS certificate generation status message
+powerscale_syslog_tls_cert_status_msg: >-
+  Syslog TLS certificates generated.
+  CA certificate: {{ syslog_tls_cert_dir }}/ca.crt
+  Copy this CA cert to PowerScale clusters for TLS verification.
+
+# PowerScale log configuration status message
+powerscale_log_config_status_msg: >-
+  PowerScale syslog configuration script staged on NFS share.
+  During cloud-init, the script will configure rsyslog on all K8s nodes,
+  open firewall port 514/udp, and forward PowerScale syslog to VLAgent.
+  For complete PowerScale syslog configuration details, including manual
+  PowerScale setup steps, refer to Omnia documentation.
+
+# PowerScale VictoriaLogs validation fail message
+powerscale_victoria_logs_validation_fail_msg: >-
+  PowerScale log collection requires 'victoria_logs' in
+  telemetry_sources.powerscale.collection_targets.
+
 # Usage: vmagent-scrape-config.yaml
 vmagent:
   configmap_name: "vmagent-scrape-config"
@@ -344,12 +384,12 @@ victoria_templates: >
 #       When syslog_tls_enabled: true, vlagent-syslog-tls-secret is included.
 #       When syslog_tls_enabled: false, only UDP mode (rsyslog relay) is used.
 victorialogs_templates:
+  - src: 'telemetry/victoria/vlagent-syslog-tls-secret.yaml.j2'
+    dest: 'vlagent-syslog-tls-secret'
   - src: 'telemetry/victoria/victorialogs-operator-vlcluster.yaml.j2'
     dest: 'victorialogs-operator-vlcluster.yaml'
   - src: 'telemetry/victoria/victorialogs-operator-vlagent.yaml.j2'
     dest: 'victorialogs-operator-vlagent.yaml'
-  - src: 'telemetry/victoria/vlagent-syslog-tls-secret.yaml.j2'
-    dest: 'vlagent-syslog-tls-secret'
   - src: 'telemetry/victoria/victorialogs-vlagent-config.yaml.j2'
     dest: 'victorialogs-vlagent-config.yaml'
 

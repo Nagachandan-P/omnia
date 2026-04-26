@@ -62,13 +62,10 @@ spec:
   extraArgs:
     syslog.listenAddr.tcp: ":514"
     syslog.listenAddr.udp: ":514"
-{% if hostvars['localhost']['powerscale_log_enabled'] | default(false) | bool and hostvars['localhost']['syslog_tls_enabled'] | default(false) | bool %}
+{% if powerscale_log_enabled | default(false) | bool and powerscale_configurations.syslog_tls_enabled | default(false) | bool %}
     syslog.tlsListenAddr.tcp: ":6514"
     syslog.tls.certFile: "/etc/victoria/syslog-certs/server.crt"
     syslog.tls.keyFile: "/etc/victoria/syslog-certs/server.key"
-{% endif %}
-{% if hostvars['localhost']['powerscale_log_enabled'] | default(false) | bool %}
-    remoteWrite.label: "source=powerscale,pipeline=powerscale-syslog"
 {% endif %}
 
   # ========================================
@@ -153,9 +150,7 @@ spec:
             path: server.key
           - key: ca.crt
             path: ca.crt
-{% endif %}
-{% if hostvars['localhost']['powerscale_log_enabled'] | default(false) | bool and hostvars['localhost']['syslog_tls_enabled'] | default(true) | bool %}
-  volumes:
+{% if powerscale_log_enabled | default(false) | bool and powerscale_configurations.syslog_tls_enabled | default(false) | bool %}
     - name: vlagent-syslog-tls-certs
       secret:
         secretName: vlagent-syslog-tls-certs
@@ -165,14 +160,15 @@ spec:
           - key: tls.key
             path: server.key
 {% endif %}
-{% if victoria_logs_cluster.tls_enabled %}
+{% endif %}
+
   volumeMounts:
+{% if victoria_logs_cluster.tls_enabled %}
     - name: victoria-tls-certs
       mountPath: /etc/victoria/certs
       readOnly: true
 {% endif %}
-{% if hostvars['localhost']['powerscale_log_enabled'] | default(false) | bool and hostvars['localhost']['syslog_tls_enabled'] | default(true) | bool %}
-  volumeMounts:
+{% if powerscale_log_enabled | default(false) | bool and powerscale_configurations.syslog_tls_enabled | default(false) | bool %}
     - name: vlagent-syslog-tls-certs
       mountPath: /etc/victoria/syslog-certs
       readOnly: true
@@ -198,7 +194,7 @@ spec:
           port: 514
           targetPort: 514
           protocol: UDP
-{% if hostvars['localhost']['powerscale_log_enabled'] | default(false) | bool and hostvars['localhost']['syslog_tls_enabled'] | default(true) | bool %}
+{% if powerscale_log_enabled | default(false) | bool and powerscale_configurations.syslog_tls_enabled | default(false) | bool %}
         - name: syslog-tls
           port: 6514
           targetPort: 6514

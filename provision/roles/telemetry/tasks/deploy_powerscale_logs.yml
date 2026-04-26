@@ -13,154 +13,70 @@
 # limitations under the License.
 ---
 
-# Configure PowerScale syslog collection via rsyslog relay + shared VLAgent
+# Configure PowerScale syslog collection via VLAgent
 # Gated by: telemetry_sources.powerscale.logs_enabled
 #
-# DATA PIPELINE (UDP mode only):
+# DATA PIPELINE (TLS mode):
+#   PowerScale (TLS:6514) → VLAgent → VictoriaLogs
+#
+# DATA PIPELINE (UDP mode):
 #   PowerScale (UDP:514) → K8s node rsyslog → VLAgent LB (TCP:514) → VictoriaLogs
 #
-# NOTE: TLS mode is not supported in current VLAgent version (v1.49.0).
-#       Requires upgrade to v1.50.0+ for syslog TLS support.
-#
-# What Omnia does (all on K8s cluster):
-#   - Uses syslog_source_ips from user config (syslog source != CSI endpoint)
-#   - Configures rsyslog on ALL K8s nodes (UDP listener, filter by PS IP, forward to VLAgent)
-#   - Opens firewall port 514/udp on all K8s nodes
-#   - VLAgent listens on TCP:514 (rsyslog relay)
+# What Omnia does:
+#   - TLS mode: Generates TLS certificates for VLAgent syslog receiver (port 6514)
+#   - UDP mode: Configures rsyslog on K8s nodes to relay syslog to VLAgent
 #
 # What Omnia does NOT do:
 #   - Omnia does NOT configure PowerScale directly
-#   - User must configure PowerScale to send UDP syslog to VLAgent LoadBalancer IP
+#   - User must configure PowerScale to send syslog to VLAgent
 
-- name: Set PowerScale log configuration facts
-  ansible.builtin.set_fact:
-    ps_log_enabled: "{{ telemetry_config.telemetry_sources.powerscale.logs_enabled | default(false) | bool }}"
-
-- name: Display PowerScale log collection status
-  ansible.builtin.debug:
-    msg: "{% if ps_log_enabled | bool %}{{ ps_log_enabled_msg }}{% else %}{{ ps_log_disabled_msg }}{% endif %}"
-    verbosity: 2
-
-- name: Configure rsyslog relay and VLAgent for PowerScale syslog collection
-  when: ps_log_enabled | bool
+- name: Configure PowerScale syslog collection
+  when: powerscale_log_enabled | default(false) | bool
   block:
     - name: Validate VictoriaLogs is in collection_targets
       ansible.builtin.assert:
         that:
           - "'victoria_logs' in telemetry_config.telemetry_sources.powerscale.collection_targets | default([])"
-        fail_msg: >-
-          PowerScale log collection requires 'victoria_logs' in
-          telemetry_sources.powerscale.collection_targets.
-
-    # --- Get PowerScale syslog source IPs from user configuration ---
-    # These are the IPs PowerScale uses to SEND syslog (often data pool IP, not mgmt IP).
-    # User must configure these in powerscale_configurations.syslog_source_ips
-    - name: Set PowerScale syslog source IPs
-      ansible.builtin.set_fact:
-        powerscale_management_ips: "{{ telemetry_config.powerscale_configurations.syslog_source_ips | default([]) }}"
-
-    - name: Fail if no PowerScale syslog source IPs configured
-      ansible.builtin.fail:
-        msg: >-
-          powerscale_configurations.syslog_source_ips is required when
-          logs_enabled is true. Provide the IP(s) from which PowerScale sends syslog.
-          This is often the data pool IP (e.g., 40gige-1 interface), NOT the CSI
-          management IP. Check OneFS Network Configuration → External Network → Pool IPs.
-      when: powerscale_management_ips | length == 0
-
-    - name: Display PowerScale syslog source IPs for rsyslog filtering
-      ansible.builtin.debug:
-        msg: >-
-          PowerScale syslog source IP(s): {{ powerscale_management_ips | join(', ') }}.
-          rsyslog $fromhost-ip filter will match these IPs and forward to VLAgent.
+        fail_msg: "{{ powerscale_victoria_logs_validation_fail_msg }}"
 
     # --- Generate TLS certificates for syslog TLS receiver (port 6514) ---
-    - name: Set TLS enabled fact
-      ansible.builtin.set_fact:
-        ps_syslog_tls_enabled: "{{ telemetry_config.powerscale_configurations.syslog_tls_enabled | default(true) | bool }}"
-
-    - name: Display TLS mode status
-      ansible.builtin.debug:
-        msg: "PowerScale syslog TLS mode: {% if ps_syslog_tls_enabled | bool %}enabled{% else %}disabled{% endif %}"
-
     - name: Create syslog TLS certificate directory
       ansible.builtin.file:
         path: "{{ syslog_tls_cert_dir }}"
         state: directory
         mode: "{{ hostvars['localhost']['dir_permissions_755'] }}"
-      when: ps_syslog_tls_enabled | bool
+      when: powerscale_configurations.syslog_tls_enabled | bool
 
     - name: Deploy syslog TLS certificate generation script
       ansible.builtin.template:
         src: telemetry/victoria/gen_syslog_tls_certs.sh.j2
         dest: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/deployments/gen_syslog_tls_certs.sh"
         mode: "{{ hostvars['localhost']['file_permissions_755'] }}"
-      when: ps_syslog_tls_enabled | bool
+      when: powerscale_configurations.syslog_tls_enabled | bool
 
     - name: Generate syslog TLS certificates (CA + server cert)
       ansible.builtin.command:
         cmd: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/deployments/gen_syslog_tls_certs.sh"
       changed_when: false
-      when: ps_syslog_tls_enabled | bool
+      when: powerscale_configurations.syslog_tls_enabled | bool
 
     - name: Read syslog TLS server certificate
       ansible.builtin.slurp:
         src: "{{ syslog_tls_cert_dir }}/server.crt"
       register: syslog_server_cert
       no_log: true
-      when: ps_syslog_tls_enabled | bool
+      when: powerscale_configurations.syslog_tls_enabled | bool
 
     - name: Read syslog TLS server key
       ansible.builtin.slurp:
         src: "{{ syslog_tls_cert_dir }}/server.key"
       register: syslog_server_key
       no_log: true
-      when: ps_syslog_tls_enabled | bool
-
-    - name: Read syslog TLS CA certificate
-      ansible.builtin.slurp:
-        src: "{{ syslog_tls_cert_dir }}/ca.crt"
-      register: syslog_ca_cert
-      no_log: true
-      when: ps_syslog_tls_enabled | bool
+      when: powerscale_configurations.syslog_tls_enabled | bool
 
     - name: Set syslog TLS certificate variables for template
       ansible.builtin.set_fact:
         syslog_server_cert_b64: "{{ syslog_server_cert.content }}"
         syslog_server_key_b64: "{{ syslog_server_key.content }}"
-        syslog_ca_cert_b64: "{{ syslog_ca_cert.content }}"
       no_log: true
-      when: ps_syslog_tls_enabled | bool
-
-    - name: Create syslog TLS secret manifest
-      ansible.builtin.template:
-        src: telemetry/victoria/vlagent-syslog-tls-secret.yaml.j2
-        dest: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/deployments/vlagent-syslog-tls-secret.yaml"
-        mode: "{{ hostvars['localhost']['file_permissions_644'] }}"
-      when: ps_syslog_tls_enabled | bool
-
-    - name: Display syslog TLS certificate generation status
-      ansible.builtin.debug:
-        msg: >-
-          Syslog TLS certificates generated.
-          CA certificate: {{ syslog_tls_cert_dir }}/ca.crt
-          Copy this CA cert to PowerScale clusters for TLS verification.
-      when: ps_syslog_tls_enabled | bool
-
-    - name: Populate PowerScale syslog configuration script
-      ansible.builtin.template:
-        src: "{{ configure_ps_syslog_template }}"
-        dest: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/deployments/configure_powerscale_syslog.sh"
-        mode: "{{ hostvars['localhost']['file_permissions_755'] }}"
-      vars:
-        ps_syslog_tls_enabled: "{{ ps_syslog_tls_enabled }}"
-
-    - name: Display PowerScale log configuration status
-      ansible.builtin.debug:
-        msg: >-
-          PowerScale syslog configuration script staged on NFS share.
-          During cloud-init, the script will configure rsyslog on all K8s nodes,
-          open firewall port 514/udp, and forward PowerScale syslog to VLAgent.
-          For complete PowerScale syslog configuration details, including manual
-          PowerScale setup steps, refer to Omnia documentation.
-        verbosity: 2
+      when: powerscale_configurations.syslog_tls_enabled | bool

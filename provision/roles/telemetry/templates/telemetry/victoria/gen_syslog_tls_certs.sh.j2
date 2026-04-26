@@ -26,7 +26,11 @@ CERT_FILE="$CERT_DIR/server.crt"
 CSR_FILE="$CERT_DIR/server.csr"
 SAN_CONFIG="$CERT_DIR/san.cnf"
 
+# K8s share path for certificate copy
+K8S_CERT_DIR="{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/syslog-tls-certs"
+
 mkdir -p "$CERT_DIR"
+mkdir -p "$K8S_CERT_DIR"
 
 # Create SAN configuration for VLAgent syslog TLS receiver
 # Includes service DNS names and wildcard for LoadBalancer IP
@@ -106,5 +110,14 @@ echo "  CA Certificate: $CA_CERT"
 echo "  Server Certificate: $CERT_FILE"
 echo "  Server Key: $CERT_KEY"
 echo ""
+
+# Copy certificates to K8s share path
+echo "Copying certificates to K8s share path: $K8S_CERT_DIR"
+cp "$CA_CERT" "$K8S_CERT_DIR/"
+cp "$CERT_FILE" "$K8S_CERT_DIR/"
+cp "$CERT_KEY" "$K8S_CERT_DIR/"
+echo "Certificates copied successfully to $K8S_CERT_DIR"
+echo ""
+
 echo "IMPORTANT: Copy the CA certificate ($CA_CERT) to PowerScale clusters"
 echo "          for TLS verification when using syslog TLS mode."
