@@ -12,28 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""ValidateImageOnTest command DTO."""
+"""Validate command DTO."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import List
 
 from core.jobs.value_objects import ClientId, CorrelationId, JobId
 
 
 @dataclass(frozen=True)
-class ValidateImageOnTestCommand:
-    """Command to trigger validate-image-on-test stage.
+class ValidateCommand:
+    """Command to trigger the validate stage.
 
     Immutable command object representing the intent to execute
-    the validate-image-on-test stage for a given job.
+    the validate stage (test automation scenarios) for a given job.
 
     Attributes:
         job_id: Job identifier from URL path.
         client_id: Client who owns this job (from auth).
         correlation_id: Request correlation identifier for tracing.
-        image_key: Image key for the build to validate.
+        scenario_names: Molecule scenarios to run (e.g. ['discovery'], ['all']).
+        test_suite: Optional suite filter (e.g. 'smoke', 'sanity', 'regression').
+        timeout_minutes: Max execution time in minutes.
     """
 
     job_id: JobId
     client_id: ClientId
     correlation_id: CorrelationId
-    image_key: str
+    scenario_names: List[str] = field(default_factory=lambda: ["all"])
+    test_suite: str = ""
+    timeout_minutes: int = 120
