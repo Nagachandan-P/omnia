@@ -341,17 +341,13 @@ def validate_powerscale_telemetry_config(
                 powerscale_collection_targets,
                 en_us_validation_msg.POWERSCALE_VICTORIA_LOGS_REQUIRED_MSG
             ))
-        # Validate syslog_source_ips when logs_enabled
+        # Validate syslog_source_ips when logs_enabled (optional field)
+        # If empty, rsyslog will accept from any source IP
         syslog_source_ips = powerscale_config.get(
             "syslog_source_ips", []
         )
-        if not syslog_source_ips or len(syslog_source_ips) == 0:
-            errors.append(create_error_msg(
-                "powerscale_configurations.syslog_source_ips",
-                syslog_source_ips,
-                en_us_validation_msg.POWERSCALE_SYSLOG_SOURCE_IPS_REQUIRED_MSG
-            ))
-        else:
+        # Only validate IP format if provided (not required)
+        if syslog_source_ips and len(syslog_source_ips) > 0:
             for idx, ip_str in enumerate(syslog_source_ips):
                 try:
                     ipaddress.ip_address(str(ip_str).strip())

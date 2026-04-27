@@ -319,12 +319,6 @@ POWERSCALE_VICTORIA_LOGS_REQUIRED_MSG = (
     "'victoria_logs' must be included in collection_targets "
     "(e.g., 'victoria_metrics,victoria_logs')."
 )
-POWERSCALE_SYSLOG_SOURCE_IPS_REQUIRED_MSG = (
-    "powerscale_syslog_source_ips is required when logs_enabled is true. "
-    "Provide the IP address(es) from which PowerScale sends syslog packets. "
-    "This is often the data pool IP (e.g., 40gige-1 interface), NOT the "
-    "management IP used by the CSI driver. Check OneFS Network Configuration "
-)
 POWERSCALE_SYSLOG_SOURCE_IP_INVALID_MSG = (
     "Invalid IP address in powerscale_syslog_source_ips. "
     "Each entry must be a valid IPv4 address (e.g., '192.168.55.11')."
