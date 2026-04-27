@@ -1,4 +1,3 @@
-{% raw %}
 #!/bin/bash
 # Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
 #
@@ -17,37 +16,26 @@
 # PowerScale Syslog Collection — rsyslog relay + VLAgent
 #
 # DATA PIPELINE:
-#   PowerScale (UDP/TCP:514) -> K8s node rsyslog -> VLAgent (TCP:30514) -> VictoriaLogs
-#
-# What this script does:
-#   1. Gets VLAgent NodePort
-#   2. Configures rsyslog on the local node (UDP/TCP listener, forward to VLAgent NodePort)
-#   3. Opens firewall port 514/udp and 514/tcp
-#   4. SSHes to all other K8s nodes and repeats steps 2-3
-#   5. Prints manual PowerScale configuration instructions (isi audit settings)
-#
-# NOTE: Omnia does NOT configure PowerScale directly.
-#   The user must configure PowerScale to send UDP/TCP syslog to kube_vIP on port 514.
+#   PowerScale (UDP/TCP:514) -> K8s node rsyslog -> VLAgent (TCP:NodePort) -> VictoriaLogs
 
 set -euo pipefail
 
-NAMESPACE="{% endraw %}{{ telemetry_namespace }}{% raw %}"
-K8S_MASTER_IP="{% endraw %}{{ kube_vip }}{% raw %}"
+NAMESPACE="{{ telemetry_namespace }}"
+K8S_MASTER_IP="{{ kube_vip }}"
 
-# PowerScale syslog source IPs — from powerscale_configurations.syslog_source_ips
-# These are the IPs from which PowerScale SENDS syslog (often data pool, not mgmt IP).
-# Used for rsyslog $fromhost-ip filtering on K8s nodes.
 POWERSCALE_IPS=(
-{% endraw %}{% for ip in powerscale_management_ips %}{% raw %}
-    "{% endraw %}{{ ip }}{% raw %}"
-{% endraw %}{% endfor %}{% raw %}
+{% for ip in powerscale_management_ips %}
+    "{{ ip }}"
+{% endfor %}
 )
 
 echo "=========================================="
 echo "PowerScale Syslog Collection Setup"
 echo "=========================================="
-echo "Pipeline: PowerScale (UDP/TCP:514) -> rsyslog -> VLAgent (TCP:30514) -> VictoriaLogs"
+echo "Pipeline: PowerScale (UDP/TCP:514) -> rsyslog -> VLAgent (TCP:NodePort) -> VictoriaLogs"
+{% raw %}
 echo "PowerScale Syslog Source IPs: ${POWERSCALE_IPS[*]}"
+{% endraw %}
 echo ""
 
 # ============================================================================
@@ -68,14 +56,18 @@ if [ "$SERVICE_TYPE" == "NodePort" ]; then
     VLAGENT_PORT=$(kubectl get svc vlagent-vlagent -n "$NAMESPACE" \
         -o jsonpath='{.spec.ports[?(@.name=="syslog")].nodePort}')
     VLAGENT_IP="127.0.0.1"
-    VLAGENT_PORT_OVERRIDE="$VLAGENT_PORT"
 else
     echo "ERROR: VLAgent service must be NodePort for syslog relay"
     exit 0
 fi
 
+if [ -z "$VLAGENT_PORT" ]; then
+    echo "ERROR: Could not determine VLAgent NodePort. Ensure 'syslog' port is defined."
+    exit 0
+fi
+
 echo "VLAgent NodePort: $VLAGENT_PORT"
-echo "VLAgent forwarding target: ${VLAGENT_IP}:${VLAGENT_PORT_OVERRIDE}"
+echo "VLAgent forwarding target: ${VLAGENT_IP}:${VLAGENT_PORT}"
 echo ""
 
 # ============================================================================
@@ -83,73 +75,106 @@ echo ""
 # ============================================================================
 echo "===== Phase 2: Generating rsyslog Configuration ====="
 
-RSYSLOG_CONF="/etc/rsyslog.d/omnia-powerscale-syslog.conf"
+RSYSLOG_CONF="/etc/rsyslog.d/60-omnia-powerscale-syslog.conf"
 
-# Build the rsyslog config
+# Detect if imudp/imtcp modules are already loaded elsewhere to avoid
+# duplicate-load errors (rsyslog error 2221).
+# Using legacy $ModLoad which is idempotent (won't error if already loaded)
+LOAD_IMUDP='$ModLoad imudp'
+LOAD_IMTCP='$ModLoad imtcp'
+
 generate_rsyslog_config() {
-    echo "# Omnia PowerScale Syslog Relay Configuration"
-    echo "# Pipeline: PowerScale (UDP/TCP:514) -> rsyslog -> VLAgent (TCP:30514) -> VictoriaLogs"
-    echo ""
-    echo "# Load UDP and TCP syslog receiver modules"
-    echo "# NOTE: imudp and imtcp modules are already loaded in main rsyslog config"
-    echo ""
-    echo "# Audit trail template - preserves full metadata"
-    echo "template(name=\"PowerScaleAudit\" type=\"string\""
-    echo "    string=\"%timereported% %hostname% %syslogtag% %msg%\\n\")"
-    echo ""
-    echo "# JSON template for VLAgent (VictoriaLogs expects JSON Lines)"
-    echo "template(name=\"VLAgentJSON\" type=\"list\") {"
-    echo "  constant(value=\"{\")"
-    echo "  constant(value=\"\\\"_time\\\":\")\""
-    echo "  property(name=\"timereported\" dateFormat=\"rfc3339\")"
-    echo "  constant(value=\",\")"
-    echo "  constant(value=\"\\\"host\\\":\")\""
-    echo "  property(name=\"hostname\" format=\"json\")"
-    echo "  constant(value=\",\")"
-    echo "  constant(value=\"\\\"app\\\":\")\""
-    echo "  property(name=\"programname\" format=\"json\")"
-    echo "  constant(value=\",\")"
-    echo "  constant(value=\"\\\"proc_id\\\":\")\""
-    echo "  property(name=\"procid\")"
-    echo "  constant(value=\",\")"
-    echo "  constant(value=\"\\\"facility\\\":\")\""
-    echo "  property(name=\"syslogfacility\")"
-    echo "  constant(value=\",\")"
-    echo "  constant(value=\"\\\"severity\\\":\")\""
-    echo "  property(name=\"syslogseverity\")"
-    echo "  constant(value=\",\")"
-    echo "  constant(value=\"\\\"msg\\\":\")\""
-    echo "  property(name=\"msg\" format=\"json\")"
-    echo "  constant(value=\"}\\n\")"
-    echo "}"
-    echo ""
-    echo "# Store local copy for audit trail (all syslog)"
-    echo "action(type=\"omfile\""
-    echo "    file=\"/var/log/powerscale_audit.log\""
-    echo "    template=\"PowerScaleAudit\""
-    echo ")"
-    echo ""
-    echo "# Filter: Only forward PowerScale logs (by hostname pattern)"
-    echo "if \$hostname startswith \"bdcdap\" then {"
-    echo "    # Forward to VLAgent via TCP with JSON format"
-    echo "    action(type=\"omfwd\""
-    echo "        target=\"${VLAGENT_IP}\""
-    echo "        port=\"${VLAGENT_PORT_OVERRIDE}\""
-    echo "        protocol=\"tcp\""
-    echo "        template=\"VLAgentJSON\""
-    echo "        queue.type=\"linkedList\""
-    echo "        queue.size=\"10000\""
-    echo "        queue.filename=\"fwd_vlagent_all\""
-    echo "        queue.saveonshutdown=\"on\""
-    echo "        action.resumeRetryCount=\"-1\""
-    echo "        action.resumeInterval=\"10\""
-    echo "    )"
-    echo "}"
+    cat <<RSYSLOG_HEADER
+# Omnia PowerScale Syslog Relay Configuration
+# Auto-generated — DO NOT EDIT manually
+# Pipeline: PowerScale (UDP/TCP:514) -> rsyslog -> VLAgent (TCP:NodePort) -> VictoriaLogs
+
+# === UDP/TCP Listeners on port 514 ===
+# Using legacy $ModLoad which is idempotent (won't error if already loaded)
+${LOAD_IMUDP}
+input(type="imudp" port="514")
+
+${LOAD_IMTCP}
+input(type="imtcp" port="514")
+
+# === Audit trail template ===
+template(name="PowerScaleAudit" type="string"
+    string="%timereported% %hostname% %syslogtag% %msg%\n")
+
+# === JSON template for VLAgent ===
+template(name="VLAgentJSON" type="list") {
+    constant(value="{\"_time\":\"")
+    property(name="timereported" dateFormat="rfc3339")
+    constant(value="\",\"host\":\"")
+    property(name="hostname")
+    constant(value="\",\"app\":\"")
+    property(name="programname")
+    constant(value="\",\"facility\":\"")
+    property(name="syslogfacility")
+    constant(value="\",\"severity\":\"")
+    property(name="syslogseverity")
+    constant(value="\",\"msg\":\"")
+    property(name="msg" format="json")
+    constant(value="\"}\n")
+}
+
+RSYSLOG_HEADER
+
+{% raw %}
+    if [ ${#POWERSCALE_IPS[@]} -eq 0 ]; then
+{% endraw %}
+        cat <<RSYSLOG_NOFILTER
+# No PowerScale IPs configured — accepting all syslog on port 514
+*.* action(type="omfile"
+        file="/var/log/powerscale_audit.log"
+        template="PowerScaleAudit")
+
+*.* action(type="omfwd"
+        target="${VLAGENT_IP}"
+        port="${VLAGENT_PORT}"
+        protocol="tcp"
+        template="VLAgentJSON"
+        queue.type="linkedList"
+        queue.size="10000"
+        queue.filename="fwd_vlagent_all"
+        queue.saveonshutdown="on"
+        action.resumeRetryCount="-1"
+        action.resumeInterval="10")
+RSYSLOG_NOFILTER
+    else
+{% raw %}
+        for PS_IP in "${POWERSCALE_IPS[@]}"; do
+            SAFE_IP="${PS_IP//\./_}"
+{% endraw %}
+            cat <<RSYSLOG_FILTER
+# PowerScale source: ${PS_IP}
+if \$fromhost-ip == "${PS_IP}" then {
+    action(type="omfile"
+        file="/var/log/powerscale_audit.log"
+        template="PowerScaleAudit")
+
+    action(type="omfwd"
+        target="${VLAGENT_IP}"
+        port="${VLAGENT_PORT}"
+        protocol="tcp"
+        template="VLAgentJSON"
+        queue.type="linkedList"
+        queue.size="10000"
+        queue.filename="fwd_vlagent_${SAFE_IP}"
+        queue.saveonshutdown="on"
+        action.resumeRetryCount="-1"
+        action.resumeInterval="10")
+    stop
+}
+
+RSYSLOG_FILTER
+        done
+    fi
 }
 
 RSYSLOG_CONFIG=$(generate_rsyslog_config)
 echo "  rsyslog config generated"
-echo "  Forward target: ${VLAGENT_IP}:${VLAGENT_PORT_OVERRIDE} (TCP)"
+echo "  Forward target: ${VLAGENT_IP}:${VLAGENT_PORT} (TCP)"
 echo ""
 
 # ============================================================================
@@ -164,14 +189,20 @@ configure_rsyslog_on_node() {
     if [ "$IS_LOCAL" == "true" ]; then
         echo "  Configuring local node..."
 
-        # Write rsyslog config
+        # Remove only known Omnia-managed config files (not wildcards)
+        rm -f /etc/rsyslog.d/60-omnia-powerscale-syslog.conf
+        rm -f /etc/rsyslog.d/99-powerscale-vlagent.conf
+        rm -f /etc/rsyslog.d/omnia-powerscale-syslog.conf
+        echo "  Cleaned up old rsyslog config files"
+
+        # Write new config
         echo "$RSYSLOG_CONFIG" > "$RSYSLOG_CONF"
 
-        # Ensure log file exists with correct permissions
+        # Ensure log file exists
         touch /var/log/powerscale_audit.log
         chmod 640 /var/log/powerscale_audit.log
 
-        # Open firewall port 514/udp and 514/tcp (for PowerScale syslog)
+        # Open firewall ports
         if command -v firewall-cmd &>/dev/null; then
             firewall-cmd --add-port=514/udp --permanent 2>/dev/null || true
             firewall-cmd --add-port=514/tcp --permanent 2>/dev/null || true
@@ -179,7 +210,13 @@ configure_rsyslog_on_node() {
             echo "  Firewall: ports 514/udp and 514/tcp opened"
         fi
 
-        # Restart rsyslog
+        # Validate config before restarting
+        rsyslogd -N 1 2>/dev/null || {
+            echo "  ERROR: rsyslog config validation failed!"
+            echo "  Check: rsyslogd -N 1"
+            return 1
+        }
+
         systemctl restart rsyslog 2>/dev/null || {
             echo "  WARNING: Failed to restart rsyslog on local node"
             return 1
@@ -195,7 +232,7 @@ configure_rsyslog_on_node() {
             return 1
         }
 
-        # Ensure log file, open firewall, restart rsyslog
+        # Setup log file, firewall, validate, restart
         ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$NODE_IP" \
             "touch /var/log/powerscale_audit.log && \
              chmod 640 /var/log/powerscale_audit.log && \
@@ -204,6 +241,7 @@ configure_rsyslog_on_node() {
                  firewall-cmd --add-port=514/tcp --permanent 2>/dev/null || true && \
                  firewall-cmd --reload 2>/dev/null || true; \
              fi && \
+             rsyslogd -N 1 2>/dev/null && \
              systemctl restart rsyslog" 2>/dev/null || {
             echo "  WARNING: Failed to configure rsyslog on ${NODE_IP}"
             return 1
@@ -251,29 +289,22 @@ echo "===== Phase 5: Verification ====="
 VLAGENT_PODS=$(kubectl get pods -n "$NAMESPACE" -l app=vlagent --no-headers 2>/dev/null | wc -l)
 echo "VLAgent pods running: $VLAGENT_PODS"
 
-echo "VLAgent service ports:"
-kubectl get svc vlagent-vlagent -n "$NAMESPACE" \
-    -o jsonpath='{range .spec.ports[*]}  {.name}: {.port}/{.protocol}{"\n"}{end}' 2>/dev/null
-
-echo ""
 echo "Checking rsyslog status on local node..."
 systemctl is-active rsyslog && echo "  rsyslog is active" || echo "  WARNING: rsyslog is not active"
 echo "  Config file: $RSYSLOG_CONF"
 echo "  Local audit log: /var/log/powerscale_audit.log"
 
 # ============================================================================
-# Phase 6: Print PowerScale Configuration Instructions
+# Phase 6: PowerScale Configuration Instructions
 # ============================================================================
 echo ""
 echo "=========================================="
 echo "NEXT STEPS: Configure PowerScale OneFS"
 echo "=========================================="
 echo ""
-echo "Omnia has configured rsyslog on all K8s nodes to relay PowerScale"
-echo "audit logs to VLAgent. Configure PowerScale to send UDP/TCP syslog to"
-echo "the Kubernetes kube-vIP on port 514."
+echo "Configure PowerScale to send syslog to: ${kube_vip}:514"
 echo ""
-echo "Kubernetes kube-vIP: ${K8S_MASTER_IP}"
+echo "Kubernetes kube-vIP: ${kube_vip}"
 echo ""
 echo "Steps for each PowerScale cluster:"
 echo ""
@@ -308,4 +339,3 @@ echo "=========================================="
 echo "PowerScale syslog collection setup completed!"
 echo "=========================================="
 exit 0
-{% endraw %}
