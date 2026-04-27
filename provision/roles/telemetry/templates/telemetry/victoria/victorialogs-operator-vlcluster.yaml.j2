@@ -96,6 +96,8 @@ spec:
               path: server.crt
             - key: tls.key
               path: server.key
+            - key: ca.crt
+              path: ca.crt
     volumeMounts:
       - name: victoria-tls-certs
         mountPath: /etc/victoria/certs

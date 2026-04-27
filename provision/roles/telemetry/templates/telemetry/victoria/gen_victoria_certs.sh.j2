@@ -109,11 +109,13 @@ if [ -f "$CERT_FILE" ]; then
   REQUIRED_VMAGENT_SAN="vmagent-vmagent.{{ telemetry_namespace }}.svc.cluster.local"
   REQUIRED_VL_SAN="vlinsert-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.local"
   REQUIRED_VLAGENT_SAN="vlagent-vlagent.{{ telemetry_namespace }}.svc.cluster.local"
+  REQUIRED_VLSTORAGE_POD_SAN="vlstorage-victoria-logs-cluster-0.vlstorage-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.local"
   if ! openssl x509 -in "$CERT_FILE" -text -noout 2>/dev/null | grep -q "$REQUIRED_VM_SAN" || \
      ! openssl x509 -in "$CERT_FILE" -text -noout 2>/dev/null | grep -q "$REQUIRED_VMAGENT_SAN" || \
      ! openssl x509 -in "$CERT_FILE" -text -noout 2>/dev/null | grep -q "$REQUIRED_VL_SAN" || \
-     ! openssl x509 -in "$CERT_FILE" -text -noout 2>/dev/null | grep -q "$REQUIRED_VLAGENT_SAN"; then
-    echo "Existing certificate missing required SANs (VictoriaMetrics/VMAgent/VictoriaLogs/VLAgent)"
+     ! openssl x509 -in "$CERT_FILE" -text -noout 2>/dev/null | grep -q "$REQUIRED_VLAGENT_SAN" || \
+     ! openssl x509 -in "$CERT_FILE" -text -noout 2>/dev/null | grep -q "$REQUIRED_VLSTORAGE_POD_SAN"; then
+    echo "Existing certificate missing required SANs (VictoriaMetrics/VMAgent/VictoriaLogs/VLAgent/VLStorage pods)"
     echo "Removing stale server cert/key/csr to force regeneration..."
     rm -f "$CERT_KEY" "$CSR_FILE" "$CERT_FILE"
   fi
