@@ -45,6 +45,9 @@ from orchestrator.upload.exceptions import InvalidFilenameError, FileSizeExceede
 # This matches the path used by NfsInputRepository and expected by Omnia playbooks
 DEFAULT_PLAYBOOK_INPUT_DIR = "/opt/omnia/input/project_default/"
 
+# Restart state directory where the playbook reads failed_nodes.json for retry logic
+RESTART_STATE_DIR = "/opt/omnia/build_stream_root/restart_state"
+
 # Whitelist of allowed configuration files
 ALLOWED_CONFIG_FILES = {
     "local_repo_config.yml",
@@ -58,6 +61,7 @@ ALLOWED_CONFIG_FILES = {
     "high_availability_config.yml",
     "omnia_config.yml",
     "build_stream_config.yml",
+    "failed_nodes.json",
 }
 
 
@@ -294,7 +298,13 @@ class UploadFilesUseCase:
 
         # Always write to both NFS locations (job-scoped and shared)
         self._write_to_nfs_job_directory(job_id, filename, content)
-        self._write_to_shared_input_directory(filename, content)
+
+        # For failed_nodes.json, only write to restart_state directory
+        # (skip shared input directory to avoid duplication)
+        if filename == "failed_nodes.json":
+            self._write_to_restart_state_directory(filename, content)
+        else:
+            self._write_to_shared_input_directory(filename, content)
 
         return UploadedFileInfo(
             filename=filename,
@@ -382,6 +392,26 @@ class UploadFilesUseCase:
         target_file.write_bytes(content)
 
         log_secure_info('debug', f"Wrote to shared input directory: {target_file}")
+
+    def _write_to_restart_state_directory(self, filename: str, content: bytes):
+        """Write file to restart_state directory for playbook consumption.
+
+        The set_pxe_boot.yml Play 1.5 reads failed_nodes.json from
+        /opt/omnia/build_stream_root/restart_state/ for the retry logic.
+        When the GitLab pipeline uploads failed_nodes.json via PUT /upload,
+        it must also land in this directory.
+
+        Args:
+            filename: Filename.
+            content: File content.
+        """
+        restart_state_path = Path(RESTART_STATE_DIR)
+        restart_state_path.mkdir(parents=True, exist_ok=True)
+
+        target_file = restart_state_path / filename
+        target_file.write_bytes(content)
+
+        log_secure_info('debug', f"Wrote {filename} to restart_state directory: {target_file}")
 
     def _generate_id(self) -> str:
         """Generate unique identifier for artifact record.

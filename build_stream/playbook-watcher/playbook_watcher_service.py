@@ -84,6 +84,10 @@ NFS_SHARE_PATH = Path(os.getenv("NFS_SHARE_PATH", ""))
 HOST_LOG_BASE_DIR = NFS_SHARE_PATH / "omnia" / "log" / "build_stream"
 CONTAINER_LOG_BASE_DIR = Path("/opt/omnia/log/build_stream")
 
+# Build Stream artifacts directory (configurable via environment variable)
+BUILD_STREAM_ROOT = Path(os.getenv("BUILD_STREAM_ROOT", "/opt/omnia/build_stream_root"))
+ARTIFACTS_DIR = BUILD_STREAM_ROOT / "artifacts"
+
 POLL_INTERVAL_SECONDS = int(os.getenv("POLL_INTERVAL_SECONDS", "2"))
 MAX_CONCURRENT_JOBS = int(os.getenv("MAX_CONCURRENT_JOBS", "1"))
 DEFAULT_TIMEOUT_MINUTES = int(os.getenv("DEFAULT_TIMEOUT_MINUTES", "30"))
@@ -729,22 +733,24 @@ def execute_playbook(request_data: Dict[str, Any]) -> Dict[str, Any]:
             inventory_file_path[:8]
         )
 
-    # Add extra_vars if present for build_image playbooks
-    if "extra_vars" in request_data:
-        import json
-        extra_vars = request_data["extra_vars"]
+    # Build extra_vars: always inject job_id so playbooks can reference it
+    import json
+    extra_vars = request_data.get("extra_vars", {})
+    if not isinstance(extra_vars, dict):
+        extra_vars = {}
 
-        # Convert extra_vars to a JSON string
-        extra_vars_json = json.dumps(extra_vars)
+    # Always inject job_id into extra_vars (playbook requires it for artifact paths)
+    extra_vars["job_id"] = job_id
 
-        # Add as a single --extra-vars parameter
-        cmd.extend(["--extra-vars", extra_vars_json])
+    # Pass extra_vars to ansible-playbook
+    extra_vars_json = json.dumps(extra_vars)
+    cmd.extend(["--extra-vars", extra_vars_json])
 
-        log_secure_info(
-            "info",
-            "Added extra_vars as JSON for build_image playbook",
-            job_id
-        )
+    log_secure_info(
+        "info",
+        "Added extra_vars with job_id for playbook",
+        job_id
+    )
 
     # Add verbosity flag
     cmd.append("-v")
@@ -854,6 +860,18 @@ def execute_playbook(request_data: Dict[str, Any]) -> Dict[str, Any]:
         if status == "failed":
             result_data["error_code"] = "PLAYBOOK_EXECUTION_FAILED"
             result_data["error_summary"] = f"Playbook exited with code {result.returncode}"
+
+        # For restart stage, include path to per-node results JSON if it exists
+        # Per spec 12.4: node_results.json is at BUILD_STREAM_ROOT/artifacts/<job_id>/
+        if stage_name == "restart":
+            node_results_path = ARTIFACTS_DIR / job_id / "node_results.json"
+            if node_results_path.exists():
+                result_data["node_results_file_path"] = str(node_results_path)
+                log_secure_info(
+                    "info",
+                    "Node results file found for restart stage",
+                    job_id
+                )
 
         return result_data
 
