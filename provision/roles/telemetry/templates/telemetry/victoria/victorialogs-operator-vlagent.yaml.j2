@@ -60,6 +60,9 @@ spec:
   extraArgs:
     syslog.listenAddr.tcp: ":514"
     syslog.listenAddr.udp: ":514"
+{% if victoria_logs_cluster.tls_enabled %}
+    remoteWrite.tlsCAFile: "/etc/victoria/certs/ca.crt"
+{% endif %}
 
   # ========================================
   # Remote Write Configuration
@@ -69,8 +72,6 @@ spec:
   remoteWrite:
 {% if victoria_logs_cluster.tls_enabled %}
     - url: https://vlinsert-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.local:9481/insert/jsonline
-      tlsConfig:
-        ca: /etc/victoria/certs/ca.crt
 {% else %}
     - url: http://vlinsert-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.local:9481/insert/jsonline
 {% endif %}
@@ -152,22 +153,24 @@ spec:
   # ========================================
   # Service Exposure Configuration
   # ========================================
-  # Service type: ClusterIP (internal cluster access only)
-  # rsyslog on K8s nodes forwards to VLAgent internally
-  # PowerScale syslog flows: PowerScale → K8s node rsyslog → VLAgent (ClusterIP) → VictoriaLogs
+  # Service type: NodePort (stable port on all K8s nodes)
+  # rsyslog on K8s nodes forwards to VLAgent via NodePort
+  # PowerScale syslog flows: PowerScale → K8s node rsyslog → VLAgent (NodePort) → VictoriaLogs
   serviceSpec:
     useAsDefault: true
     spec:
-      type: ClusterIP
+      type: NodePort
       ports:
         - name: syslog
           port: 514
           targetPort: 514
           protocol: TCP
+          nodePort: 30514
         - name: syslog-udp
           port: 514
           targetPort: 514
           protocol: UDP
+          nodePort: 30514
 
   # ========================================
   # Health Probes

@@ -78,11 +78,19 @@ if [ "$SERVICE_TYPE" == "LoadBalancer" ]; then
         echo "WARNING: LoadBalancer IP not assigned. Using kube_vip: $K8S_MASTER_IP"
         VLAGENT_IP="$K8S_MASTER_IP"
     fi
+elif [ "$SERVICE_TYPE" == "NodePort" ]; then
+    # For NodePort, use localhost with the nodePort
+    VLAGENT_PORT=$(kubectl get svc vlagent-vlagent -n "$NAMESPACE" \
+        -o jsonpath='{.spec.ports[?(@.name=="syslog")].nodePort}')
+    VLAGENT_IP="127.0.0.1"
+    VLAGENT_PORT_OVERRIDE="$VLAGENT_PORT"
 else
-    VLAGENT_IP="$K8S_MASTER_IP"
+    # For ClusterIP, use the ClusterIP for internal cluster access
+    VLAGENT_IP=$(kubectl get svc vlagent-vlagent -n "$NAMESPACE" \
+        -o jsonpath='{.spec.clusterIP}')
 fi
 
-echo "VLAgent TCP endpoint: ${VLAGENT_IP}:514"
+echo "VLAgent TCP endpoint: ${VLAGENT_IP}:${VLAGENT_PORT_OVERRIDE:-514}"
 echo ""
 
 # ============================================================================
@@ -107,17 +115,11 @@ generate_rsyslog_config() {
     echo "module(load=\"imtcp\")"
     echo "input(type=\"imtcp\" port=\"514\")"
     echo ""
-    echo "# Template for PowerScale audit logs"
-    echo "template(name=\"PowerScaleFormat\" type=\"list\") {"
-    echo "    property(name=\"timegenerated\" dateFormat=\"rfc3339\")"
-    echo "    constant(value=\" \")"
-    echo "    property(name=\"hostname\")"
-    echo "    constant(value=\" \")"
-    echo "    property(name=\"programname\")"
-    echo "    constant(value=\" \")"
-    echo "    property(name=\"msg\")"
-    echo "    constant(value=\"\\n\")"
-    echo "}"
+    echo "# Load JSON parsing module for VictoriaLogs compatibility"
+    echo "module(load=\"mmjsonparse\")"
+    echo ""
+    echo "# Template for PowerScale audit logs (JSON Lines format for VictoriaLogs)"
+    echo "template(name=\"PowerScaleJSON\" type=\"string\" string='{\"timestamp\":\"%timereported:::date-rfc3339%\",\"hostname\":\"%hostname%\",\"program\":\"%programname%\",\"pid\":\"%procid%\",\"message\":\"%msg:::json%\"}\n')"
 
     # If no PowerScale IPs configured, accept from all IPs
     if [ ${#POWERSCALE_IPS[@]} -eq 0 ]; then
@@ -126,7 +128,7 @@ generate_rsyslog_config() {
         echo "# Store local copy for audit trail"
         echo "action(type=\"omfile\""
         echo "    file=\"/var/log/powerscale_audit.log\""
-        echo "    template=\"PowerScaleFormat\""
+        echo "    template=\"PowerScaleJSON\""
         echo ")"
         echo ""
         echo "# Forward to VLAgent via TCP"
@@ -150,13 +152,13 @@ generate_rsyslog_config() {
             echo "    # Store local copy for audit trail"
             echo "    action(type=\"omfile\""
             echo "        file=\"/var/log/powerscale_audit.log\""
-            echo "        template=\"PowerScaleFormat\""
+            echo "        template=\"PowerScaleJSON\""
             echo "    )"
             echo ""
             echo "    # Forward to VLAgent via TCP"
             echo "    action(type=\"omfwd\""
             echo "        target=\"${VLAGENT_IP}\""
-            echo "        port=\"514\""
+            echo "        port=\"${VLAGENT_PORT_OVERRIDE:-514}\""
             echo "        protocol=\"tcp\""
             echo "        queue.type=\"linkedList\""
             echo "        queue.size=\"10000\""
