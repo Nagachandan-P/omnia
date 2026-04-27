@@ -1,0 +1,240 @@
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# BuildStream API Client -- GitLab CI/CD CleanUp Pipeline
+#
+# Manual / API-triggered pipeline that hard-deletes a Job's S3 images
+# and NFS artifacts via DELETE /api/v1/jobs/{job_id}.
+#
+# Two trigger modes:
+#   1. Direct cleanup of a specific Job ID
+#      (set CLEANUP_JOB_ID via API trigger or pipeline variable).
+#   2. List + select: when CLEANUP_JOB_ID is empty, the list-images
+#      stage prints all non-CLEANED Image Groups and the cleanup stage
+#      runs as a manual, gated job that requires the operator to set
+#      CLEANUP_JOB_ID before launching.
+#
+# Prerequisites:
+#   - GITLAB_API_TOKEN, BSM_API_USERNAME, BSM_API_PASSWORD,
+#     BSM_API_CERT, BSM_CLIENT_ID, BSM_CLIENT_SECRET as CI/CD vars.
+# ---------------------------------------------------------------------------
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "trigger" && $PIPELINE_TYPE == "cleanup"'
+    - if: '$CI_PIPELINE_SOURCE == "api" && $PIPELINE_TYPE == "cleanup"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+
+variables:
+  BSM_CERT_FILE: "/tmp/bsm_api_ca.crt"
+  CURL_CONNECT_TIMEOUT: "15"
+  CURL_MAX_TIME: "45"
+  CLEANUP_JOB_ID: ""
+
+stages:
+  - auth
+  - list-images
+  - cleanup
+
+default:
+  before_script:
+    - apk add --no-cache curl jq coreutils openssl
+    - |
+      if [ -z "${BSM_API_CERT:-}" ]; then
+        echo "ERROR: BSM_API_CERT variable is not set"
+        exit 1
+      fi
+      if [ -f "${BSM_API_CERT}" ]; then
+        cp "${BSM_API_CERT}" "${BSM_CERT_FILE}"
+      else
+        printf '%s\n' "${BSM_API_CERT}" | sed 's/\\n/\n/g' > "${BSM_CERT_FILE}"
+      fi
+      chmod 600 "${BSM_CERT_FILE}"
+      sed -i 's/\r//g' "${BSM_CERT_FILE}"
+
+      if ! grep -q "BEGIN CERTIFICATE" "${BSM_CERT_FILE}" \
+           || ! grep -q "END CERTIFICATE" "${BSM_CERT_FILE}"; then
+        echo "ERROR: BSM_API_CERT not a valid PEM certificate"
+        exit 1
+      fi
+
+      if ! openssl x509 -in "${BSM_CERT_FILE}" -noout 2>/dev/null; then
+        echo "ERROR: BSM_API_CERT is not a valid X.509 certificate"
+        exit 1
+      fi
+
+# ============================= STAGE 1 ====================================
+# Auth -- obtain access token using stored client credentials.
+# ==========================================================================
+auth:
+  stage: auth
+  script:
+    - |
+      echo "============================================================"
+      echo "  STAGE 1: Authentication"
+      echo "============================================================"
+
+      if [ -z "${BSM_CLIENT_ID:-}" ] || [ -z "${BSM_CLIENT_SECRET:-}" ]; then
+        echo "ERROR: BSM_CLIENT_ID / BSM_CLIENT_SECRET not set."
+        echo "       Run the build pipeline first to register a client,"
+        echo "       or define these CI/CD variables manually."
+        exit 1
+      fi
+
+      HTTP_CODE=$(curl -s -o token_response.json -w "%{http_code}" \
+        --connect-timeout "${CURL_CONNECT_TIMEOUT}" \
+        --max-time "${CURL_MAX_TIME}" \
+        -X POST "${BSM_API_URL}/api/v1/auth/token" \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "grant_type=client_credentials&client_id=${BSM_CLIENT_ID}&client_secret=${BSM_CLIENT_SECRET}" \
+        --retry 3 --retry-delay 2 --cacert "${BSM_CERT_FILE}")
+
+      if [ "$HTTP_CODE" != "200" ]; then
+        echo "ERROR: token request failed (HTTP ${HTTP_CODE})"
+        cat token_response.json
+        exit 1
+      fi
+
+      ACCESS_TOKEN=$(jq -r '.access_token' token_response.json)
+      echo "ACCESS_TOKEN=${ACCESS_TOKEN}" > auth.env
+      echo "  [OK] Access token obtained: ${ACCESS_TOKEN:0:20}..."
+  artifacts:
+    reports:
+      dotenv: auth.env
+
+# ============================= STAGE 2 ====================================
+# List Images -- show every non-CLEANED Image Group so the operator can
+# pick a Job ID to clean up. Also acts as a sanity check before deletion.
+# ==========================================================================
+list-images:
+  stage: list-images
+  needs: [auth]
+  script:
+    - |
+      echo "============================================================"
+      echo "  STAGE 2: List Image Groups"
+      echo "============================================================"
+
+      HTTP_CODE=$(curl -s -o images_response.json -w "%{http_code}" \
+        --connect-timeout "${CURL_CONNECT_TIMEOUT}" \
+        --max-time "${CURL_MAX_TIME}" \
+        -X GET "${BSM_API_URL}/api/v1/images?include_all=true" \
+        -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+        --retry 3 --retry-delay 2 --cacert "${BSM_CERT_FILE}")
+
+      echo "  HTTP ${HTTP_CODE}"
+
+      if [ "$HTTP_CODE" != "200" ]; then
+        echo "  ERROR: list images failed"
+        jq '.' images_response.json 2>/dev/null || cat images_response.json
+        exit 1
+      fi
+
+      echo ""
+      echo "  Image Groups eligible for cleanup:"
+      echo "  ----------------------------------"
+      jq -r '
+        .image_groups // []
+        | map(select(.status != "CLEANED"))
+        | .[]
+        | "  - job_id=\(.job_id // "?")  image_group_id=\(.image_group_id // "?")  status=\(.status // "?")"
+      ' images_response.json || true
+      echo ""
+
+      if [ -n "${CLEANUP_JOB_ID:-}" ]; then
+        echo "  CLEANUP_JOB_ID is preset to: ${CLEANUP_JOB_ID}"
+      else
+        echo "  CLEANUP_JOB_ID is empty -- set it via:"
+        echo "    1) Pipeline variable when running this pipeline manually"
+        echo "    2) Trigger payload when invoking via API"
+      fi
+  artifacts:
+    paths:
+      - images_response.json
+
+# ============================= STAGE 3 ====================================
+# Cleanup -- DELETE /api/v1/jobs/{job_id}. Manual gate so the operator
+# explicitly approves deletion. Uses ACCESS_TOKEN from the auth stage.
+# ==========================================================================
+cleanup:
+  stage: cleanup
+  needs: [auth, list-images]
+  when: manual
+  allow_failure: false
+  script:
+    - |
+      echo "============================================================"
+      echo "  STAGE 3: CleanUp Job"
+      echo "============================================================"
+
+      if [ -z "${CLEANUP_JOB_ID:-}" ]; then
+        echo "ERROR: CLEANUP_JOB_ID is not set."
+        echo "       Re-run this pipeline with CLEANUP_JOB_ID=<uuid>."
+        exit 1
+      fi
+
+      echo "  Target Job ID: ${CLEANUP_JOB_ID}"
+      echo "  Endpoint: DELETE ${BSM_API_URL}/api/v1/jobs/${CLEANUP_JOB_ID}"
+      echo ""
+
+      CORRELATION_ID=$(cat /proc/sys/kernel/random/uuid)
+
+      HTTP_CODE=$(curl -s -o cleanup_response.json -w "%{http_code}" \
+        --connect-timeout "${CURL_CONNECT_TIMEOUT}" \
+        --max-time "${CURL_MAX_TIME}" \
+        -X DELETE "${BSM_API_URL}/api/v1/jobs/${CLEANUP_JOB_ID}" \
+        -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+        -H "X-Correlation-ID: ${CORRELATION_ID}" \
+        --retry 1 --cacert "${BSM_CERT_FILE}")
+
+      echo "  HTTP ${HTTP_CODE}"
+      echo ""
+
+      case "${HTTP_CODE}" in
+        204)
+          echo "  +-----------------------------------------------------------+"
+          echo "  |              CLEANUP COMPLETED SUCCESSFULLY               |"
+          echo "  +-----------------------------------------------------------+"
+          echo "  |  Job ID         : ${CLEANUP_JOB_ID}"
+          echo "  |  Correlation ID : ${CORRELATION_ID}"
+          echo "  |  S3 images and NFS artifacts removed.                     |"
+          echo "  |  Image Group + Job transitioned to CLEANED.               |"
+          echo "  +-----------------------------------------------------------+"
+          ;;
+        404)
+          echo "  ERROR: Job ${CLEANUP_JOB_ID} not found"
+          jq '.' cleanup_response.json 2>/dev/null || cat cleanup_response.json
+          exit 1
+          ;;
+        409)
+          echo "  ERROR: Image Group is in an active state (DEPLOYING/RESTARTING/VALIDATING)"
+          jq '.' cleanup_response.json 2>/dev/null || cat cleanup_response.json
+          exit 1
+          ;;
+        412)
+          echo "  ERROR: Job ${CLEANUP_JOB_ID} has already been cleaned"
+          jq '.' cleanup_response.json 2>/dev/null || cat cleanup_response.json
+          exit 1
+          ;;
+        500)
+          echo "  ERROR: server-side cleanup failure (S3 or NFS)"
+          jq '.' cleanup_response.json 2>/dev/null || cat cleanup_response.json
+          exit 1
+          ;;
+        *)
+          echo "  ERROR: unexpected HTTP code ${HTTP_CODE}"
+          jq '.' cleanup_response.json 2>/dev/null || cat cleanup_response.json
+          exit 1
+          ;;
+      esac

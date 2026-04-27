@@ -24,8 +24,11 @@ and Image records from catalog metadata persisted during parse-catalog.
 
 import json
 import asyncio
+import os
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Dict, Optional
 
 from sqlalchemy.exc import IntegrityError
 
@@ -48,6 +51,56 @@ from core.jobs.services import JobStateHelper
 from core.jobs.value_objects import JobId, StageName
 from core.localrepo.entities import PlaybookResult
 from core.localrepo.services import PlaybookQueueResultService
+
+
+# S3 bucket URI used to construct complete image paths stored in
+# ``images.image_name``. The CleanUp API reads this column verbatim
+# and passes it directly to ``s3cmd del --recursive --force``.
+DEFAULT_S3_BUCKET_URI = "s3://boot-images"
+DEFAULT_CLUSTER_OS = "rhel"
+DEFAULT_CLUSTER_OS_VERSION = "10.0"
+DEFAULT_NFS_ARTIFACT_BASE = "/opt/omnia/build_stream_root"
+
+
+def _build_s3_image_path(
+    bucket_uri: str,
+    role: str,
+    job_id: str,
+    image_key: str,
+) -> str:
+    """Construct the complete S3 directory prefix for an image.
+
+    Mirrors the path pattern produced by the build-image playbook
+    (``provision/roles/configure_ochami/templates/bss/bss.yaml.j2``):
+
+        s3://boot-images/<role>/rhel-<role>_<job_id>-<image_key>/
+
+    The CleanUp API stores this complete path in ``images.image_name``
+    and uses it verbatim with ``s3cmd del --recursive --force``.
+    """
+    bucket = (bucket_uri or DEFAULT_S3_BUCKET_URI).rstrip("/")
+    bs_suffix = f"_{job_id}-{image_key}" if image_key else f"_{job_id}"
+    return f"{bucket}/{role}/{DEFAULT_CLUSTER_OS}-{role}{bs_suffix}/"
+
+
+def _load_build_image_meta(job_id: str) -> Dict[str, str]:
+    """Read ``build_image_meta.json`` persisted by the build-image stage.
+
+    Returns an empty dict if the file does not exist or cannot be read.
+    """
+    base = os.environ.get("NFS_ARTIFACT_BASE", DEFAULT_NFS_ARTIFACT_BASE)
+    meta_path = Path(base) / str(job_id) / "build_image_meta.json"
+    try:
+        if not meta_path.exists():
+            return {}
+        raw = meta_path.read_text(encoding="utf-8")
+        decoder = json.JSONDecoder()
+        data, _ = decoder.raw_decode(raw)
+        if isinstance(data, dict):
+            return data
+        return {}
+    except (OSError, ValueError):
+        return {}
 
 
 class ResultPoller:
@@ -344,14 +397,30 @@ class ResultPoller:
                 updated_at=now,
             )
 
-            # Create Image entities for each role
+            # Resolve build-image metadata persisted at submission time
+            # so we can construct the complete S3 path stored in
+            # ``images.image_name``. The CleanUp API uses this column
+            # verbatim with ``s3cmd del --recursive --force``.
+            build_meta = _load_build_image_meta(str(result.job_id))
+            image_key = build_meta.get("image_key", "")
+            bucket_uri = os.environ.get(
+                "CLEANUP_S3_BUCKET", DEFAULT_S3_BUCKET_URI
+            )
+
+            # Create Image entities for each role with complete S3 paths.
             images = []
-            for role_name, image_name in role_images.items():
+            for role_name, _legacy_image_name in role_images.items():
+                full_s3_path = _build_s3_image_path(
+                    bucket_uri=bucket_uri,
+                    role=role_name,
+                    job_id=str(result.job_id),
+                    image_key=image_key,
+                )
                 image = Image(
                     id=str(uuid.uuid4()),
                     image_group_id=image_group_id,
                     role=role_name,
-                    image_name=image_name,
+                    image_name=full_s3_path,
                     created_at=now,
                 )
                 images.append(image)
