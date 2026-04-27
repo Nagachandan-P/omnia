@@ -36,6 +36,8 @@
 
     - name: Determine target functional groups
       ansible.builtin.include_tasks: determine_target_groups.yml
+      vars:
+        config_item: "{{ mount_item }}"
 
     - name: Add mount to each target functional group
       ansible.builtin.set_fact:

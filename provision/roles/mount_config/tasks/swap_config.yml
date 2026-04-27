@@ -42,4 +42,3 @@
     - name: Debug cloud_init_groups_dict swap entries
       ansible.builtin.debug:
         msg: "Swap configuration added to cloud_init_groups_dict"
-      # debugger: always

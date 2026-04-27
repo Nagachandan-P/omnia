@@ -1,0 +1,11 @@
+{# Swap configuration snippet for cloud-init templates #}
+{# Include this in functional group templates to render swap configuration #}
+{%- set fg_swap = cloud_init_groups_dict.get(functional_group_name, {}).get('swap', {}) %}
+{%- if fg_swap %}
+swap:
+  filename: {{ fg_swap.filename }}
+  size: "{{ fg_swap.size }}"
+{%- if fg_swap.maxsize is defined %}
+  maxsize: "{{ fg_swap.maxsize }}"
+{%- endif %}
+{%- endif %}

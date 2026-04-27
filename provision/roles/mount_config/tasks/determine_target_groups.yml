@@ -12,8 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 ---
-# Determine which functional groups should receive this mount
+# Determine which functional groups should receive this mount or swap entry
 # Based on functional_group_prefix, or apply to all
+# Expected input: config_item (either mount_item or swap_item)
 
 - name: Initialize target_functional_groups
   ansible.builtin.set_fact:
@@ -21,14 +22,14 @@
 
 # Case A: functional_group_prefix specified
 - name: Match functional groups by prefix
-  when: mount_item.functional_group_prefix is defined and mount_item.functional_group_prefix | length > 0
+  when: config_item.functional_group_prefix is defined and config_item.functional_group_prefix | length > 0
   block:
     - name: Find all functional groups matching any prefix
       ansible.builtin.set_fact:
         target_functional_groups: >-
           {{
             cloud_init_groups_dict.keys() | list |
-            select('match', '^(' + (mount_item.functional_group_prefix | join('|')) + ')') |
+            select('match', '^(' + (config_item.functional_group_prefix | join('|')) + ')') |
             list
           }}
 

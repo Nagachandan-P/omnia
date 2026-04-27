@@ -18,14 +18,14 @@
 {% endfor %}
 {% endif %}
 {%- set fg_swap = cloud_init_groups_dict.get(functional_group_name, {}).get('swap', {}) %}
-{%- if fg_swap %}
+{% if fg_swap %}
       swap:
         filename: {{ fg_swap.filename }}
         size: "{{ fg_swap.size }}"
-{%- if fg_swap.maxsize is defined %}
+{% if fg_swap.maxsize is defined %}
         maxsize: "{{ fg_swap.maxsize }}"
-{%- endif %}
-{%- endif %}
+{% endif %}
+{% endif %}
       users:
         - name: root
           ssh_authorized_keys: "{{ read_ssh_key.stdout }}"
