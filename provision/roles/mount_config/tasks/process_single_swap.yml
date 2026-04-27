@@ -41,7 +41,6 @@
       ansible.builtin.set_fact:
         swap_config_entry: "{{ swap_config_entry | combine({'maxsize': swap_item.maxsize}) }}"
       when: swap_item.maxsize is defined
-      # debugger: always
 
     - name: Add swap entry to each target functional group
       ansible.builtin.set_fact:

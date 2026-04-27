@@ -19,12 +19,21 @@
       vars:
         config_item: "{{ pv_item }}"
 
-    - name: Add PowerVault entry to each target functional group
+    - name: Render iSCSI setup script content for this PowerVault entry
+      ansible.builtin.set_fact:
+        pv_rendered_script: "{{ lookup('template', pv_script_template_path) }}"
+      vars:
+        pv_entry: "{{ pv_item }}"
+
+    - name: Add PowerVault rendered script to each target functional group
       ansible.builtin.set_fact:
         cloud_init_groups_dict: >-
           {{ cloud_init_groups_dict | combine({
             item: (cloud_init_groups_dict[item] | default({}) | combine({
-              'powervault_scripts': (cloud_init_groups_dict[item].powervault_scripts | default([])) + [pv_item]
+              'powervault_scripts': (cloud_init_groups_dict[item].powervault_scripts | default([])) + [{
+                'name': pv_item.name,
+                'content': pv_rendered_script
+              }]
             }, recursive=true))
           }, recursive=true) }}
       loop: "{{ target_functional_groups }}"

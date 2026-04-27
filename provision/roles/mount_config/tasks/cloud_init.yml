@@ -32,6 +32,8 @@
   loop_control:
     loop_var: pv_item
     label: "{{ pv_item.name | default('unnamed') }}"
+  vars:
+    pv_script_template_path: "setup_iscsi_storage.sh.j2"
 
 - debug:
     var: cloud_init_groups_dict

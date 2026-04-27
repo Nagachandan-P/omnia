@@ -47,6 +47,28 @@
               "description": "Where the discovered device gets mounted",
               "pattern": "^/[a-zA-Z0-9/_.-]*$"
             },
+             "fs_type": {
+              "type": "string",
+              "description": "Filesystem type. Overrides mount_params profile when specified.",
+              "enum": ["auto", "ext2", "ext3", "ext4", "xfs", "btrfs", "nfs", "nfs4", "cifs", "tmpfs", "cephfs", "vfat", "ntfs", "none", "beegfs", "fuse.s3fs"]
+            },
+            "mnt_opts": {
+              "type": "string",
+              "description": "Mount options. Overrides mount_params profile when specified.",
+              "pattern": "^[a-zA-Z0-9,=._@/-]+$"
+            },
+            "dump_freq": {
+              "type": "string",
+              "description": "Dump frequency (usually 0). Overrides mount_params profile when specified.",
+              "pattern": "^[0-2]$",
+              "default": "0"
+            },
+            "fsck_pass": {
+              "type": "string",
+              "description": "Fsck pass number (usually 0 or 2). Overrides mount_params profile when specified.",
+              "pattern": "^[0-9]$",
+              "default": "0"
+            },
             "mount_params": {
               "type": "string",
               "description": "Named profile for fs_type/mnt_opts (read by the runcmd script)",

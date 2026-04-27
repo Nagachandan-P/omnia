@@ -11,7 +11,10 @@ PORT="{{ pv_entry.port | default(3260) }}"
 INITIATOR_IQN="{{ pv_entry.iscsi_initiator | default('') }}"
 VOLUME_ID="{{ pv_entry.volume_id | default('') }}"
 MOUNT_POINT="{{ pv_entry.mount_point }}"
-{% if pv_entry.mount_params is defined and mount_params[pv_entry.mount_params] is defined %}
+{% if pv_entry.fs_type is defined %}
+FS_TYPE="{{ pv_entry.fs_type }}"
+MOUNT_OPTS="{{ pv_entry.mnt_opts | default('defaults,_netdev,noatime') }}"
+{% elif pv_entry.mount_params is defined and mount_params[pv_entry.mount_params] is defined %}
 FS_TYPE="{{ mount_params[pv_entry.mount_params].fs_type | default('xfs') }}"
 MOUNT_OPTS="{{ mount_params[pv_entry.mount_params].mnt_opts | default('defaults,_netdev,noatime') }}"
 {% else %}
