@@ -32,16 +32,16 @@ POWERSCALE_IPS=(
 echo "=========================================="
 echo "PowerScale Syslog Collection Setup"
 echo "=========================================="
-echo "Pipeline: PowerScale (UDP/TCP:514) -> rsyslog (KUBE_VIP:514) -> VLAgent (LoadBalancer IP:514) -> VictoriaLogs"
+echo "Pipeline: PowerScale (UDP/TCP:514) -> rsyslog (KUBE_VIP:514) -> VLAgent (localhost:NodePort) -> VictoriaLogs"
 {% raw %}
 echo "PowerScale Syslog Source IPs: ${POWERSCALE_IPS[*]}"
 {% endraw %}
 echo ""
 
 # ============================================================================
-# Phase 1: Get VLAgent LoadBalancer IP
+# Phase 1: Get VLAgent NodePort for localhost forwarding
 # ============================================================================
-echo "===== Phase 1: Getting VLAgent LoadBalancer IP ====="
+echo "===== Phase 1: Getting VLAgent NodePort ====="
 
 VLAGENT_SERVICE=$(kubectl get svc vlagent-vlagent -n "$NAMESPACE" -o json 2>/dev/null) || {
     echo "ERROR: VLAgent service not found in namespace $NAMESPACE"
@@ -51,26 +51,19 @@ VLAGENT_SERVICE=$(kubectl get svc vlagent-vlagent -n "$NAMESPACE" -o json 2>/dev
 SERVICE_TYPE=$(echo "$VLAGENT_SERVICE" | jq -r '.spec.type')
 echo "VLAgent service type: $SERVICE_TYPE"
 
-if [ "$SERVICE_TYPE" == "LoadBalancer" ]; then
-    VLAGENT_IP=$(kubectl get svc vlagent-vlagent -n "$NAMESPACE" \
-        -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-    VLAGENT_PORT=514
-elif [ "$SERVICE_TYPE" == "NodePort" ]; then
-    # Fallback to NodePort if LoadBalancer not available
-    echo "WARNING: VLAgent service is NodePort, not LoadBalancer. Using kube_vIP."
-    VLAGENT_IP="$KUBE_VIP"
-    VLAGENT_PORT=$(kubectl get svc vlagent-vlagent -n "$NAMESPACE" \
-        -o jsonpath='{.spec.ports[?(@.name=="syslog")].nodePort}')
-else
-    echo "ERROR: VLAgent service must be LoadBalancer or NodePort for syslog relay"
+# rsyslog runs in host network - use localhost + NodePort (always accessible)
+# Both LoadBalancer and NodePort services have NodePorts assigned by Kubernetes
+VLAGENT_NODEPORT=$(echo "$VLAGENT_SERVICE" | jq -r '.spec.ports[] | select(.name=="syslog" and .protocol=="TCP") | .nodePort')
+
+if [ -z "$VLAGENT_NODEPORT" ] || [ "$VLAGENT_NODEPORT" == "null" ]; then
+    echo "ERROR: Could not determine VLAgent NodePort for syslog TCP."
+    echo "Ensure VLAgent service has a NodePort assigned for syslog (TCP 514)."
     exit 0
 fi
 
-if [ -z "$VLAGENT_IP" ]; then
-    echo "ERROR: Could not determine VLAgent IP. Falling back to kube_vIP: $KUBE_VIP"
-    VLAGENT_IP="$KUBE_VIP"
-    VLAGENT_PORT=514
-fi
+# Use localhost for rsyslog forwarding (host network always reaches NodePort)
+VLAGENT_IP="127.0.0.1"
+VLAGENT_PORT="$VLAGENT_NODEPORT"
 
 echo "VLAgent forwarding target: ${VLAGENT_IP}:${VLAGENT_PORT}"
 echo ""
@@ -87,7 +80,7 @@ generate_rsyslog_config() {
     cat <<'RSYSLOG_STATIC'
 # Omnia PowerScale Syslog Relay Configuration
 # Auto-generated — DO NOT EDIT manually
-# Pipeline: PowerScale (UDP/TCP:514) -> rsyslog -> VLAgent (LoadBalancer IP:514) -> VictoriaLogs
+# Pipeline: PowerScale (UDP/TCP:514) -> rsyslog (KUBE_VIP:514) -> VLAgent (localhost:NodePort) -> VictoriaLogs
 
 # === UDP/TCP Listeners on port 514 ===
 $ModLoad imudp
