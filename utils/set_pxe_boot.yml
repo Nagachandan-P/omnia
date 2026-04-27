@@ -28,16 +28,21 @@
 #    is set to PXE mode.
 # -------------------------------------------------------------------------
 
+# Play 1: Validate and setup BMC inventory from CSV
 - name: Validate and setup BMC inventory
   hosts: localhost
   connection: local
   gather_facts: false
   tasks:
+    - name: Clear stale bmc group from previous run
+      ansible.builtin.meta: refresh_inventory
+
     - name: Include pre-checks for BMC inventory validation
       ansible.builtin.include_role:
         name: idrac_pxe_boot
         tasks_from: pre_checks
 
+# Play 2: Fetch credentials (loads enable_build_stream from build_stream_config.yml)
 - name: Set_fact for fetch omnia config credentials
   hosts: localhost
   connection: local
@@ -52,6 +57,20 @@
 - name: Invoke get_config_credentials.yml
   ansible.builtin.import_playbook: credential_utility/get_config_credentials.yml
 
+# Play 1.5: [BSM] Compute effective restart inventory (diff + failed retry)
+# NOTE: Must be AFTER credential fetch so enable_build_stream is available
+- name: "[BSM] Compute effective restart inventory (diff + failed retry)"
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  tasks:
+    - name: Compute effective restart inventory
+      ansible.builtin.include_role:
+        name: pxe_buildstream_manager
+        tasks_from: compute_effective_inventory
+      when: enable_build_stream | default(false) | bool
+
+# Play 3-4: PXE Boot execution
 # This configures Dell iDRAC BMCs to boot a host from PXE (network) and optionally reboots the server.
 # This will set the boot mode to pxe
 - name: Reboot Host via PXE
@@ -65,6 +84,7 @@
       #   restart_host: false # By default restart will be true, set to false not to restart
       #   force_restart: true # By default graceful_restart will happen, set to true to force restart
 
+# Play 5: Synchronized Reporting
 - name: Synchronized Reporting
   hosts: bmc
   connection: local
@@ -78,3 +98,25 @@
     - name: Show passed iDRACs
       ansible.builtin.debug:
         msg: "{{ inventory_hostname }}: {{ reboot_status }}"
+
+# Play 6: [BSM] Write per-node results, update persistent state, and upload to GitLab
+- name: "[BSM] Write per-node results, update persistent state, and upload to GitLab"
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  tasks:
+    - name: Execute BuildStream Manager post-processing
+      ansible.builtin.include_role:
+        name: pxe_buildstream_manager
+      when: enable_build_stream | default(false) | bool
+
+- name: Upload failed_nodes to gitlab
+  hosts: gitlab_server
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Upload failed_nodes to gitlab
+      ansible.builtin.include_role:
+        name: pxe_buildstream_manager
+        tasks_from: upload_to_gitlab
+      when: hostvars['localhost']['enable_build_stream'] | default(false) | bool

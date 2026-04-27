@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import JSONResponse
 
 from core.jobs.exceptions import (
     IdempotencyConflictError,
@@ -35,7 +36,6 @@ from core.jobs.value_objects import (
 from orchestrator.jobs.commands import CreateJobCommand
 from orchestrator.jobs.use_cases import CreateJobUseCase
 
-from api.logging_utils import create_job_log_file, log_secure_info, remove_job_logger
 from api.dependencies import verify_token
 from api.logging_utils import create_job_log_file, log_secure_info, remove_job_logger
 from api.jobs.dependencies import (
@@ -132,11 +132,6 @@ async def create_job(
             f"Create job executing: client_id={client_id.value}, "
             f"client_name={request.client_name}, idempotency_key={idempotency_key}",
         )
-        log_secure_info(
-            "debug",
-            f"Create job executing: client_id={client_id.value}, "
-            f"client_name={request.client_name}, idempotency_key={idempotency_key}",
-        )
         result = use_case.execute(command)
 
         if result.is_new:
@@ -149,24 +144,8 @@ async def create_job(
                 identifier=correlation_id.value,
                 job_id=result.job_id,
             )
-            log_path = create_job_log_file(result.job_id)
-            log_secure_info(
-                "info",
-                f"Job created: job_id={result.job_id}, "
-                f"client_name={request.client_name}, log_file={log_path}",
-                identifier=correlation_id.value,
-                job_id=result.job_id,
-            )
         else:
             response.status_code = status.HTTP_200_OK
-            log_secure_info(
-                "info",
-                f"Idempotent replay: job_id={result.job_id}, "
-                f"job_state={result.job_state}",
-                identifier=correlation_id.value,
-                job_id=result.job_id,
-            )
-
             log_secure_info(
                 "info",
                 f"Idempotent replay: job_id={result.job_id}, "
@@ -187,13 +166,6 @@ async def create_job(
             )
             for s in stages_entities
         ]
-        log_secure_info(
-            "info",
-            f"Create job response: job_id={result.job_id}, "
-            f"job_state={result.job_state}, status=201",
-            job_id=result.job_id,
-            end_section=True,
-        )
         log_secure_info(
             "info",
             f"Create job response: job_id={result.job_id}, "
@@ -286,11 +258,6 @@ async def get_job(
         ) from e
 
     try:
-        log_secure_info(
-            "debug",
-            f"Get job lookup: job_id={job_id}, client_id={client_id.value}",
-            job_id=job_id,
-        )
         log_secure_info(
             "debug",
             f"Get job lookup: job_id={job_id}, client_id={client_id.value}",
@@ -496,11 +463,6 @@ async def delete_job(
             f"Delete job lookup: job_id={job_id}, client_id={client_id.value}",
             job_id=job_id,
         )
-        log_secure_info(
-            "debug",
-            f"Delete job lookup: job_id={job_id}, client_id={client_id.value}",
-            job_id=job_id,
-        )
         job = job_repo.find_by_id(validated_job_id)  # pylint: disable=no-member
         if job is None:
             raise JobNotFoundError(job_id, correlation_id.value)
@@ -518,16 +480,6 @@ async def delete_job(
                 stage.cancel()
                 stage_repo.save(stage)  # pylint: disable=no-member
                 cancelled_count += 1
-
-        log_secure_info(
-            "info",
-            f"Delete job success: job_id={job_id}, "
-            f"stages_cancelled={cancelled_count}, status=204",
-            job_id=job_id,
-            end_section=True,
-        )
-        remove_job_logger(job_id)
-        cancelled_count += 1
 
         log_secure_info(
             "info",
@@ -580,6 +532,181 @@ async def delete_job(
             job_id=job_id,
             exc_info=True,
             end_section=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=_build_error_response(
+                "INTERNAL_ERROR",
+                "An unexpected error occurred",
+                correlation_id.value,
+            ).model_dump(),
+        ) from e
+
+# Whitelisted artifact labels that can be downloaded
+_DOWNLOADABLE_ARTIFACT_LABELS = {"node-results", "failed-nodes", "catalog-metadata"}
+
+
+@router.get(
+    "/{job_id}/artifacts/{label}",
+    summary="Download a job artifact by label",
+    description=(
+        "Retrieve a stored artifact for the given job and label. "
+        "Currently supports 'node-results' (restart stage per-node results)."
+    ),
+    responses={
+        200: {"description": "Artifact content (JSON)"},
+        400: {"description": "Invalid job_id or label", "model": ErrorResponse},
+        401: {"description": "Unauthorized", "model": ErrorResponse},
+        404: {"description": "Artifact not found", "model": ErrorResponse},
+        500: {"description": "Internal error", "model": ErrorResponse},
+    },
+)
+async def get_artifact(
+    job_id: str,
+    label: str,
+    token_data: Annotated[dict, Depends(verify_token)],
+    correlation_id: CorrelationId = Depends(get_correlation_id),
+    job_repo=Depends(get_job_repo),
+) -> Response:
+    """Download an artifact by job_id and label.
+
+    The caller must own the job (client_id check). Only whitelisted
+    labels are downloadable.
+    """
+    # Lazy-load artifact dependencies to avoid import-time errors
+    import os  # pylint: disable=import-outside-toplevel
+    from api.dependencies import get_db_session  # pylint: disable=import-outside-toplevel
+    from container import get_container_class  # pylint: disable=import-outside-toplevel
+    from core.artifacts.value_objects import ArtifactKind  # pylint: disable=import-outside-toplevel
+
+    # Local dependency providers
+    _ENV = os.getenv("ENV", "prod")
+
+    def _get_container():
+        """Get the appropriate container instance based on ENV."""
+        return get_container_class()()
+
+    def get_artifact_store():
+        """Provide artifact store instance."""
+        return _get_container().artifact_store()
+
+    def get_artifact_metadata_repo(db_session):
+        """Provide artifact metadata repository with shared session in prod."""
+        if _ENV == "prod":
+            from infra.db.repositories import SqlArtifactMetadataRepository  # pylint: disable=import-outside-toplevel
+            return SqlArtifactMetadataRepository(session=db_session)
+        return _get_container().artifact_metadata_repository()
+
+    # Get artifact dependencies
+    db_session = get_db_session()
+    artifact_store = get_artifact_store()
+    artifact_metadata_repo = get_artifact_metadata_repo(db_session)
+
+    client_id = ClientId(token_data["client_id"])
+
+    # Validate label whitelist
+    if label not in _DOWNLOADABLE_ARTIFACT_LABELS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_build_error_response(
+                "INVALID_LABEL",
+                f"Artifact label '{label}' is not downloadable",
+                correlation_id.value,
+            ).model_dump(),
+        )
+
+    # Validate job_id
+    try:
+        validated_job_id = JobId(job_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_build_error_response(
+                "INVALID_JOB_ID",
+                f"Invalid job_id format: {job_id}",
+                correlation_id.value,
+            ).model_dump(),
+        ) from e
+
+    # Ownership check
+    try:
+        job = job_repo.find_by_id(validated_job_id)
+        if job is None or job.tombstoned:
+            raise JobNotFoundError(job_id, correlation_id.value)
+        if job.client_id != client_id:
+            raise JobNotFoundError(job_id, correlation_id.value)
+    except JobNotFoundError:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=_build_error_response(
+                "INTERNAL_ERROR",
+                "An unexpected error occurred",
+                correlation_id.value,
+            ).model_dump(),
+        ) from e
+
+    # Label -> stage mapping
+    _LABEL_TO_STAGE = {
+        "node-results": "restart",
+        "failed-nodes": "restart",
+        "catalog-metadata": "parse-catalog",
+    }
+    stage_name = _LABEL_TO_STAGE.get(label)
+    if stage_name is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_build_error_response(
+                "INVALID_LABEL",
+                f"No stage mapping for label '{label}'",
+                correlation_id.value,
+            ).model_dump(),
+        )
+
+    try:
+        from core.jobs.value_objects import StageName  # pylint: disable=import-outside-toplevel
+        record = artifact_metadata_repo.find_by_job_stage_and_label(
+            job_id=validated_job_id,
+            stage_name=StageName(stage_name),
+            label=label,
+        )
+        if record is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=_build_error_response(
+                    "ARTIFACT_NOT_FOUND",
+                    f"No '{label}' artifact found for job {job_id}",
+                    correlation_id.value,
+                ).model_dump(),
+            )
+
+        raw = artifact_store.retrieve(record.artifact_ref.key, ArtifactKind.FILE)
+
+        log_secure_info(
+            "info",
+            f"Artifact downloaded: job_id={job_id}, label={label}, "
+            f"size={len(raw)} bytes",
+            job_id=job_id,
+        )
+
+        return Response(
+            content=raw,
+            media_type=record.content_type or "application/json",
+            headers={
+                "Content-Disposition": f'attachment; filename="{label}.json"',
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_secure_info(
+            "error",
+            f"Artifact download failed: job_id={job_id}, label={label}, "
+            f"error={e}",
+            job_id=job_id,
+            exc_info=True,
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
