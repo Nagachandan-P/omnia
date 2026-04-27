@@ -152,13 +152,13 @@ spec:
   # ========================================
   # Service Exposure Configuration
   # ========================================
-  # Service type: LoadBalancer (MetalLB assigns external IP)
-  # Exposes syslog receivers:
-  #   - TCP:514 / UDP:514 → rsyslog relay (UDP mode)
+  # Service type: ClusterIP (internal cluster access only)
+  # rsyslog on K8s nodes forwards to VLAgent internally
+  # PowerScale syslog flows: PowerScale → K8s node rsyslog → VLAgent (ClusterIP) → VictoriaLogs
   serviceSpec:
     useAsDefault: true
     spec:
-      type: LoadBalancer
+      type: ClusterIP
       ports:
         - name: syslog
           port: 514

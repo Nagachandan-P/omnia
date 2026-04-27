@@ -363,7 +363,8 @@ powerscale_configurations:
   # PowerScale IP address(es) from which syslog packets will arrive at K8s nodes.
   # This is the source IP in the UDP syslog packets — check your OneFS network
   # configuration to determine the correct IP (often the data pool IP, not mgmt IP).
-  # Required when telemetry_sources.powerscale.logs_enabled: true
+  # Optional: If empty, rsyslog will accept syslog from any source IP.
+  # If provided, rsyslog will filter by these IPs for security (recommended for production).
   # Format: list of IP addresses (one per PowerScale cluster/pool)
   #
   # IMPORTANT: For complete PowerScale syslog configuration details, including

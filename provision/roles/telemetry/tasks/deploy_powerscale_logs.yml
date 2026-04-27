@@ -42,11 +42,6 @@
       ansible.builtin.set_fact:
         powerscale_management_ips: "{{ telemetry_config.powerscale_configurations.syslog_source_ips | default([]) }}"
 
-    - name: Fail if no PowerScale syslog source IPs configured
-      ansible.builtin.fail:
-        msg: "{{ powerscale_syslog_source_ips_msg }}"
-      when: powerscale_management_ips | length == 0
-
     - name: Populate PowerScale syslog configuration script
       ansible.builtin.template:
         src: "{{ configure_ps_syslog_template }}"
