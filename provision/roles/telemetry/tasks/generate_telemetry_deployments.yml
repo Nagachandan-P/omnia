@@ -46,7 +46,6 @@
     label: "{{ item.dest }}"
   when: victoria_logs_support | default(false) | bool
   tags: telemetry_deployment
- 
 - name: Kafka configurations
   when: kafka_support
   block:
