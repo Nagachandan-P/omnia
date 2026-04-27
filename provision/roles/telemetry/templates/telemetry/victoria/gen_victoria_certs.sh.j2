@@ -116,8 +116,8 @@ if [ -f "$CERT_FILE" ]; then
      ! openssl x509 -in "$CERT_FILE" -text -noout 2>/dev/null | grep -q "$REQUIRED_VLAGENT_SAN" || \
      ! openssl x509 -in "$CERT_FILE" -text -noout 2>/dev/null | grep -q "$REQUIRED_VLSTORAGE_POD_SAN"; then
     echo "Existing certificate missing required SANs (VictoriaMetrics/VMAgent/VictoriaLogs/VLAgent/VLStorage pods)"
-    echo "Removing stale server cert/key/csr to force regeneration..."
-    rm -f "$CERT_KEY" "$CSR_FILE" "$CERT_FILE"
+    echo "Removing stale server cert/key/csr/serial file to force regeneration..."
+    rm -f "$CERT_KEY" "$CSR_FILE" "$CERT_FILE" "$CERT_DIR/ca.srl"
   fi
 fi
 
@@ -177,3 +177,29 @@ echo ""
 echo "Certificate details:"
 openssl x509 -in "$CERT_FILE" -text -noout | grep -A1 "Subject:"
 openssl x509 -in "$CERT_FILE" -text -noout | grep -A10 "Subject Alternative Name"
+
+# Update Kubernetes secret with new certificates
+echo ""
+echo "Updating Kubernetes secret victoria-tls-certs..."
+kubectl create secret generic victoria-tls-certs \
+  --from-file=ca.crt="$CA_CERT" \
+  --from-file=tls.crt="$CERT_FILE" \
+  --from-file=tls.key="$CERT_KEY" \
+  -n {{ telemetry_namespace }} \
+  --dry-run=client -o yaml | kubectl apply -f -
+echo "Secret updated successfully"
+
+# Restart affected pods to pick up new certificates
+echo ""
+echo "Restarting affected pods to pick up new certificates..."
+# Restart VictoriaLogs pods
+kubectl rollout restart statefulset/vlstorage-victoria-logs-cluster -n {{ telemetry_namespace }} 2>/dev/null || true
+kubectl rollout restart deployment/vlselect-victoria-logs-cluster -n {{ telemetry_namespace }} 2>/dev/null || true
+kubectl rollout restart deployment/vlinsert-victoria-logs-cluster -n {{ telemetry_namespace }} 2>/dev/null || true
+# Restart VictoriaMetrics pods (if present)
+kubectl rollout restart statefulset/vmstorage-victoria-cluster -n {{ telemetry_namespace }} 2>/dev/null || true
+kubectl rollout restart deployment/vmselect-victoria-cluster -n {{ telemetry_namespace }} 2>/dev/null || true
+kubectl rollout restart deployment/vminsert-victoria-cluster -n {{ telemetry_namespace }} 2>/dev/null || true
+# Restart VLAgent
+kubectl delete pod vlagent-vlagent-0 -n {{ telemetry_namespace }} 2>/dev/null || true
+echo "Pod restart initiated"
