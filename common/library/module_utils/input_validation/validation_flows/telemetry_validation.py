@@ -555,6 +555,31 @@ def validate_telemetry_config(
             ))
 
     # =========================================================================
+    # L2 Validation: Vector Bridge Prerequisites
+    # =========================================================================
+    # Vector-LDMS bridge can only be enabled when LDMS source is enabled
+    vector_ldms_enabled = vector_ldms.get("metrics_enabled", False)
+    ldms_source_enabled = ldms_source.get("metrics_enabled", False)
+    
+    if vector_ldms_enabled and not ldms_source_enabled:
+        errors.append(create_error_msg(
+            "telemetry_bridges.vector_ldms.metrics_enabled",
+            "true",
+            en_us_validation_msg.VECTOR_LDMS_SOURCE_DISABLED_MSG
+        ))
+        logger.error(
+            "Vector-LDMS bridge prerequisite validation FAILED: "
+            f"vector_ldms.metrics_enabled={vector_ldms_enabled}, "
+            f"ldms_source.metrics_enabled={ldms_source_enabled}"
+        )
+    elif vector_ldms_enabled and ldms_source_enabled:
+        logger.info(
+            "Vector-LDMS bridge prerequisite validation PASSED: "
+            f"vector_ldms.metrics_enabled={vector_ldms_enabled}, "
+            f"ldms_source.metrics_enabled={ldms_source_enabled}"
+        )
+    
+    # =========================================================================
     # Validate PowerScale telemetry configuration
     # =========================================================================
     powerscale_enabled = powerscale_source.get("metrics_enabled", False)
