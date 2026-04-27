@@ -35,9 +35,6 @@
   loop: "{{ victoria_templates }}"
   when: victoria_metrics_support | default(false) | bool
   tags: telemetry_deployment
-  # NOTE: victoria_templates is automatically set based on victoria_deployment_mode in vars/main.yml
-  #       - cluster mode: includes vmstorage, vminsert, vmselect templates
-  #       - single-node mode: includes victoria-statefulset template
 
 - name: Populate victoria_logs deployment configs
   ansible.builtin.template:
@@ -47,13 +44,9 @@
   loop: "{{ victorialogs_templates }}"
   loop_control:
     label: "{{ item.dest }}"
-  when:
-    - victoria_logs_support | default(false) | bool
-    - item.dest != 'vlagent-syslog-tls-secret.yaml' or powerscale_configurations.syslog_tls_enabled | default(true) | bool
+  when: victoria_logs_support | default(false) | bool
   tags: telemetry_deployment
-  # NOTE: victorialogs_templates includes VLCluster CR, VLAgent CR, and VLAgent ConfigMap
-  #       syslog TLS secret template is conditionally included based on syslog_tls_enabled
-
+ 
 - name: Kafka configurations
   when: kafka_support
   block:

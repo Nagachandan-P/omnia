@@ -16,12 +16,8 @@
 
 # PowerScale Syslog Collection — rsyslog relay + VLAgent
 #
-# DATA PIPELINE (supports both UDP and TLS modes):
-#   UDP mode: PowerScale (UDP:514) → K8s node rsyslog → VLAgent LB (TCP:514) → VictoriaLogs
-#   TLS mode: PowerScale (TLS:6514) → VLAgent LB (TLS:6514) → VictoriaLogs
-#
-# TLS mode is {% endraw %}{% if syslog_tls_enabled | default(true) | bool %}enabled{% else %}disabled{% endif %}{% raw %}
-# (VLAgent v1.50.0+ supports syslog TLS)
+# DATA PIPELINE (UDP mode only):
+#   PowerScale (UDP:514) → K8s node rsyslog → VLAgent LB (TCP:514) → VictoriaLogs
 #
 # What this script does:
 #   1. Gets VLAgent LoadBalancer external IP
@@ -206,9 +202,6 @@ configure_rsyslog_on_node() {
              if command -v firewall-cmd &>/dev/null; then \
                  firewall-cmd --add-port=514/udp --permanent 2>/dev/null || true && \
                  firewall-cmd --add-port=514/tcp --permanent 2>/dev/null || true && \
-{% endraw %}{% if syslog_tls_enabled | default(true) | bool %}{% raw %}
-                 firewall-cmd --add-port=6514/tcp --permanent 2>/dev/null || true && \
-{% endraw %}{% endif %}{% raw %}
                  firewall-cmd --reload 2>/dev/null || true; \
              fi && \
              systemctl restart rsyslog" 2>/dev/null || {
@@ -281,21 +274,12 @@ echo "NEXT STEPS: Configure PowerScale OneFS"
 echo "=========================================="
 echo ""
 echo "For complete PowerScale syslog configuration details, including"
-echo "manual setup steps for both UDP and TLS modes, refer to Omnia documentation."
+echo "manual setup steps for UDP mode, refer to Omnia documentation."
 echo ""
 
-{% endraw %}{% if syslog_tls_enabled | default(true) | bool %}{% raw %}
-echo "Omnia supports both UDP and TLS syslog modes. Choose based on your"
-echo "security requirements:"
-echo ""
-echo "  UDP Mode:  Simple, no certificates required (rsyslog relay)"
-echo "  TLS Mode:  Secure, requires CA certificate copy (direct to VLAgent)"
-echo ""
-{% endraw %}{% else %}{% raw %}
+{% endraw %}{% raw %}
 echo "Omnia is configured for UDP mode only (rsyslog relay)."
-echo "TLS mode is disabled via syslog_tls_enabled: false."
 echo ""
-{% endraw %}{% endif %}{% raw %}
 echo "--- UDP Mode Configuration (rsyslog relay) ---"
 echo ""
 echo "Omnia has configured rsyslog on all K8s nodes to relay PowerScale"
@@ -333,59 +317,10 @@ echo "     --system-syslog-enabled=1 \\"
 echo "     --system-syslog-servers=<NODE_IP>:514 \\"
 echo "     --system-syslog-tls-enabled=0"
 echo ""
-echo "3. Verify configuration:"
-echo "   isi audit settings global view"
-echo ""
-
-{% endraw %}{% if syslog_tls_enabled | default(true) | bool %}{% raw %}
-echo "--- TLS Mode Configuration (direct to VLAgent) ---"
-echo ""
-echo "For secure syslog, configure PowerScale to send TLS syslog directly"
-echo "to the VLAgent LoadBalancer IP on port 6514."
-echo ""
-if [ -n "$EXTERNAL_IP" ]; then
-    echo "VLAgent LoadBalancer IP: ${EXTERNAL_IP}"
-else
-    echo "WARNING: LoadBalancer IP not available. Check MetalLB configuration."
-fi
-echo ""
-echo "Steps for each PowerScale cluster:"
-echo ""
-echo "1. Copy CA certificate from NFS share to PowerScale:"
-echo "   scp <oim_shared_path>/omnia/telemetry/syslog-tls-certs/ca.crt \\"
-echo "       <admin_user>@<powerscale_mgmt_ip>:/tmp/vlagent-ca.crt"
-echo ""
-echo "2. SSH to PowerScale:"
-echo "   ssh <admin_user>@<powerscale_mgmt_ip>"
-echo ""
-echo "3. Import CA certificate:"
-echo "   isi certificate import /tmp/vlagent-ca.crt --type=ca"
-echo ""
-echo "4. Enable TLS syslog forwarding for desired event types."
-echo "   Replace <VLAGENT_LB_IP> with the LoadBalancer IP listed above."
-echo ""
-echo "   # For protocol events (file access):"
-echo "   isi audit settings global modify \\"
-echo "     --protocol-syslog-enabled=1 \\"
-echo "     --protocol-syslog-servers=<VLAGENT_LB_IP>:6514 \\"
-echo "     --protocol-syslog-tls-enabled=1"
-echo ""
-echo "   # For config events (configuration changes):"
-echo "   isi audit settings global modify \\"
-echo "     --config-syslog-enabled=1 \\"
-echo "     --config-syslog-servers=<VLAGENT_LB_IP>:6514 \\"
-echo "     --config-syslog-tls-enabled=1"
-echo ""
-echo "   # For system events (all other events):"
-echo "   isi audit settings global modify \\"
-echo "     --system-syslog-enabled=1 \\"
-echo "     --system-syslog-servers=<VLAGENT_LB_IP>:6514 \\"
-echo "     --system-syslog-tls-enabled=1"
-echo ""
 echo "5. Verify configuration:"
 echo "   isi audit settings global view"
 echo ""
-{% endraw %}{% endif %}{% raw %}
+
 echo "For detailed instructions, refer to Omnia documentation."
 echo ""
 echo "=========================================="

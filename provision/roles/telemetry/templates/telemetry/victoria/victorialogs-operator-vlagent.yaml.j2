@@ -55,18 +55,11 @@ spec:
   # These map directly to VLAgent CLI flags:
   #   -syslog.listenAddr.tcp  → plaintext syslog TCP receiver (rsyslog relay forwards here)
   #   -syslog.listenAddr.udp  → plaintext syslog UDP receiver
-  #   -syslog.tlsListenAddr.tcp → TLS syslog receiver (direct PowerScale TLS)
   # Pipeline:
   #   UDP mode: PowerScale → K8s node rsyslog (UDP:514) → VLAgent (TCP:514) → VictoriaLogs
-  #   TLS mode: PowerScale → VLAgent (TLS:6514) → VictoriaLogs
   extraArgs:
     syslog.listenAddr.tcp: ":514"
     syslog.listenAddr.udp: ":514"
-{% if powerscale_log_enabled | default(false) | bool and powerscale_configurations.syslog_tls_enabled | default(false) | bool %}
-    syslog.tlsListenAddr.tcp: ":6514"
-    syslog.tls.certFile: "/etc/victoria/syslog-certs/server.crt"
-    syslog.tls.keyFile: "/etc/victoria/syslog-certs/server.key"
-{% endif %}
 
   # ========================================
   # Remote Write Configuration
@@ -137,7 +130,6 @@ spec:
   # ========================================
   # Volume mounts for TLS certificates:
   #   - victoria-tls-certs: remoteWrite to vlinsert (CA certificate validation)
-  #   - vlagent-syslog-tls-certs: syslog TLS receiver (PowerScale direct TLS)
 {% if victoria_logs_cluster.tls_enabled %}
   volumes:
     - name: victoria-tls-certs
@@ -150,27 +142,10 @@ spec:
             path: server.key
           - key: ca.crt
             path: ca.crt
-{% if powerscale_log_enabled | default(false) | bool and powerscale_configurations.syslog_tls_enabled | default(false) | bool %}
-    - name: vlagent-syslog-tls-certs
-      secret:
-        secretName: vlagent-syslog-tls-certs
-        items:
-          - key: tls.crt
-            path: server.crt
-          - key: tls.key
-            path: server.key
-{% endif %}
-{% endif %}
 
   volumeMounts:
-{% if victoria_logs_cluster.tls_enabled %}
     - name: victoria-tls-certs
       mountPath: /etc/victoria/certs
-      readOnly: true
-{% endif %}
-{% if powerscale_log_enabled | default(false) | bool and powerscale_configurations.syslog_tls_enabled | default(false) | bool %}
-    - name: vlagent-syslog-tls-certs
-      mountPath: /etc/victoria/syslog-certs
       readOnly: true
 {% endif %}
 
@@ -180,7 +155,6 @@ spec:
   # Service type: LoadBalancer (MetalLB assigns external IP)
   # Exposes syslog receivers:
   #   - TCP:514 / UDP:514 → rsyslog relay (UDP mode)
-  #   - TCP:6514 → direct PowerScale TLS (TLS mode, if enabled)
   serviceSpec:
     useAsDefault: true
     spec:
@@ -194,12 +168,6 @@ spec:
           port: 514
           targetPort: 514
           protocol: UDP
-{% if powerscale_log_enabled | default(false) | bool and powerscale_configurations.syslog_tls_enabled | default(false) | bool %}
-        - name: syslog-tls
-          port: 6514
-          targetPort: 6514
-          protocol: TCP
-{% endif %}
 
   # ========================================
   # Health Probes

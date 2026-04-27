@@ -13,22 +13,21 @@
 # limitations under the License.
 ---
 
-# Configure PowerScale syslog collection via VLAgent
+# Configure PowerScale syslog collection via rsyslog relay + shared VLAgent
 # Gated by: telemetry_sources.powerscale.logs_enabled
 #
-# DATA PIPELINE (TLS mode):
-#   PowerScale (TLS:6514) → VLAgent → VictoriaLogs
-#
-# DATA PIPELINE (UDP mode):
+# DATA PIPELINE (UDP mode only):
 #   PowerScale (UDP:514) → K8s node rsyslog → VLAgent LB (TCP:514) → VictoriaLogs
 #
 # What Omnia does:
-#   - TLS mode: Generates TLS certificates for VLAgent syslog receiver (port 6514)
-#   - UDP mode: Configures rsyslog on K8s nodes to relay syslog to VLAgent
+#   - Uses syslog_source_ips from user config (syslog source != CSI endpoint)
+#   - Configures rsyslog on ALL K8s nodes (UDP listener, filter by PS IP, forward to VLAgent)
+#   - Opens firewall ports 514/udp and 514/tcp on all K8s nodes
+#   - VLAgent listens on TCP:514 (rsyslog relay)
 #
 # What Omnia does NOT do:
 #   - Omnia does NOT configure PowerScale directly
-#   - User must configure PowerScale to send syslog to VLAgent
+#   - User must configure PowerScale to send UDP syslog to K8s node IPs
 
 - name: Configure PowerScale syslog collection
   when: powerscale_log_enabled | default(false) | bool
@@ -39,44 +38,17 @@
           - "'victoria_logs' in telemetry_config.telemetry_sources.powerscale.collection_targets | default([])"
         fail_msg: "{{ powerscale_victoria_logs_validation_fail_msg }}"
 
-    # --- Generate TLS certificates for syslog TLS receiver (port 6514) ---
-    - name: Create syslog TLS certificate directory
-      ansible.builtin.file:
-        path: "{{ syslog_tls_cert_dir }}"
-        state: directory
-        mode: "{{ hostvars['localhost']['dir_permissions_755'] }}"
-      when: powerscale_configurations.syslog_tls_enabled | bool
-
-    - name: Deploy syslog TLS certificate generation script
-      ansible.builtin.template:
-        src: telemetry/victoria/gen_syslog_tls_certs.sh.j2
-        dest: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/deployments/gen_syslog_tls_certs.sh"
-        mode: "{{ hostvars['localhost']['file_permissions_755'] }}"
-      when: powerscale_configurations.syslog_tls_enabled | bool
-
-    - name: Generate syslog TLS certificates (CA + server cert)
-      ansible.builtin.command:
-        cmd: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/deployments/gen_syslog_tls_certs.sh"
-      changed_when: false
-      when: powerscale_configurations.syslog_tls_enabled | bool
-
-    - name: Read syslog TLS server certificate
-      ansible.builtin.slurp:
-        src: "{{ syslog_tls_cert_dir }}/server.crt"
-      register: syslog_server_cert
-      no_log: true
-      when: powerscale_configurations.syslog_tls_enabled | bool
-
-    - name: Read syslog TLS server key
-      ansible.builtin.slurp:
-        src: "{{ syslog_tls_cert_dir }}/server.key"
-      register: syslog_server_key
-      no_log: true
-      when: powerscale_configurations.syslog_tls_enabled | bool
-
-    - name: Set syslog TLS certificate variables for template
+    - name: Set PowerScale syslog source IPs
       ansible.builtin.set_fact:
-        syslog_server_cert_b64: "{{ syslog_server_cert.content }}"
-        syslog_server_key_b64: "{{ syslog_server_key.content }}"
-      no_log: true
-      when: powerscale_configurations.syslog_tls_enabled | bool
+        powerscale_management_ips: "{{ telemetry_config.powerscale_configurations.syslog_source_ips | default([]) }}"
+
+    - name: Fail if no PowerScale syslog source IPs configured
+      ansible.builtin.fail:
+        msg: "{{ powerscale_syslog_source_ips_msg }}"
+      when: powerscale_management_ips | length == 0
+
+    - name: Populate PowerScale syslog configuration script
+      ansible.builtin.template:
+        src: "{{ configure_ps_syslog_template }}"
+        dest: "{{ hostvars['localhost']['k8s_client_share_path'] }}/telemetry/deployments/configure_powerscale_syslog.sh"
+        mode: "{{ hostvars['localhost']['file_permissions_755'] }}"

@@ -355,18 +355,10 @@ powerscale_configurations:
   #   - Opens firewall port 514/udp on all K8s nodes
   #   - Stores local copy at /var/log/powerscale_audit.log
   #   - Forwards to VLAgent → VictoriaLogs
-  #   - If TLS enabled: Generates TLS certs for syslog TLS receiver (port 6514)
   #
   # WHAT YOU MUST DO (after deployment):
-  #   - Configure PowerScale to send syslog (UDP or TLS based on your choice)
-  #   - For TLS mode: Copy CA certificate to PowerScale
+  #   - Configure PowerScale to send syslog to any K8s node IP on UDP:514
   #   - Refer to Omnia documentation for complete configuration details
-
-  # Enable or disable TLS syslog receiver (port 6514)
-  # When true: VLAgent listens on TLS:6514, generates TLS certificates
-  # When false: Only UDP mode (rsyslog relay) is available
-  # Default: true
-  syslog_tls_enabled: true
 
   # PowerScale IP address(es) from which syslog packets will arrive at K8s nodes.
   # This is the source IP in the UDP syslog packets — check your OneFS network
@@ -375,7 +367,7 @@ powerscale_configurations:
   # Format: list of IP addresses (one per PowerScale cluster/pool)
   #
   # IMPORTANT: For complete PowerScale syslog configuration details, including
-  # manual PowerScale setup steps for both UDP and TLS modes, refer to Omnia documentation.
+  # manual PowerScale setup steps, refer to Omnia documentation.
   syslog_source_ips: []
   # Example:
   #   syslog_source_ips:
