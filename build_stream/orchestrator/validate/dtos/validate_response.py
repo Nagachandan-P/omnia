@@ -12,21 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""ValidateImageOnTest response DTO."""
+"""Validate response DTO."""
 
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class ValidateImageOnTestResponse:
-    """Response DTO for validate-image-on-test stage acceptance.
+class ValidateResponse:
+    """Response DTO for validate stage acceptance (202 Accepted).
 
     Attributes:
         job_id: Job identifier.
-        stage_name: Stage identifier.
-        status: Acceptance status.
+        stage_name: Stage identifier ('validate').
+        status: Acceptance status ('QUEUED').
         submitted_at: Submission timestamp (ISO 8601).
         correlation_id: Correlation identifier.
+        attempt: Attempt number for this validate run.
     """
 
     job_id: str
@@ -34,3 +35,4 @@ class ValidateImageOnTestResponse:
     status: str
     submitted_at: str
     correlation_id: str
+    attempt: int = 1
