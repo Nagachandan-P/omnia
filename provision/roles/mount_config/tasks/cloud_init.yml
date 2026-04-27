@@ -26,6 +26,13 @@
     loop_var: mount_item
     label: "{{ mount_item.name | default('unnamed') }}"
 
+- name: Process PowerVault iSCSI entries and add to cloud_init_groups_dict
+  ansible.builtin.include_tasks: process_single_powervault.yml
+  loop: "{{ powervault_config | default([]) }}"
+  loop_control:
+    loop_var: pv_item
+    label: "{{ pv_item.name | default('unnamed') }}"
+
 - debug:
     var: cloud_init_groups_dict
   # debugger: always

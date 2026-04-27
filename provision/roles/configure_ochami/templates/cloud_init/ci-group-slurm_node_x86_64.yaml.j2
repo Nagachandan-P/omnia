@@ -567,6 +567,13 @@
           content: |
             {{ lookup('template', 'templates/hpc_tools/export_nvhpc_env.sh.j2') | indent(12) }}
 
+{% for pv_entry in cloud_init_groups_dict[functional_group_name].powervault_scripts | default([]) %}
+        - path: /usr/local/bin/setup_iscsi_storage_{{ pv_entry.name }}.sh
+          permissions: '{{ file_mode_755 }}'
+          content: |
+            {{ lookup('template', 'templates/hpc_tools/setup_iscsi_storage.sh.j2') | indent(12) }}
+{% endfor %}
+
       runcmd:
 {# Mount-specific runcmd entries #}
 {% if cloud_init_groups_dict[functional_group_name].b64_runcmd is defined %}
@@ -583,6 +590,9 @@
         - cp /cert/pulp_webserver.crt /etc/pki/ca-trust/source/anchors && update-ca-trust
         - sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/dnf/dnf.conf
         - bash /usr/local/bin/doca-install.sh && bash /usr/local/bin/configure-ib-network.sh
+{% for pv_entry in cloud_init_groups_dict[functional_group_name].powervault_scripts | default([]) %}
+        - /usr/local/bin/setup_iscsi_storage_{{ pv_entry.name }}.sh
+{% endfor %}
         - /usr/local/bin/configure_slurmd_setup.sh
         - /usr/local/bin/configure_munge_and_pam.sh
         - setenforce 0
