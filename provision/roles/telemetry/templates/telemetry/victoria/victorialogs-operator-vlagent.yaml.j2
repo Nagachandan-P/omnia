@@ -153,24 +153,22 @@ spec:
   # ========================================
   # Service Exposure Configuration
   # ========================================
-  # Service type: NodePort (stable port on all K8s nodes)
-  # rsyslog on K8s nodes forwards to VLAgent via NodePort
-  # PowerScale syslog flows: PowerScale → K8s node rsyslog → VLAgent (NodePort) → VictoriaLogs
+  # Service type: LoadBalancer (MetalLB for external access)
+  # Provides single external IP for all log sources (OME, SFM, PowerScale)
+  # PowerScale syslog flows: PowerScale → VLAgent (LoadBalancer IP:514) → VictoriaLogs
   serviceSpec:
     useAsDefault: true
     spec:
-      type: NodePort
+      type: LoadBalancer
       ports:
         - name: syslog
           port: 514
           targetPort: 514
           protocol: TCP
-          nodePort: 30514
         - name: syslog-udp
           port: 514
           targetPort: 514
           protocol: UDP
-          nodePort: 30514
 
   # ========================================
   # Health Probes
