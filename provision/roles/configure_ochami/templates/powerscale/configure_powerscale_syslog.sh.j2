@@ -32,7 +32,7 @@ POWERSCALE_IPS=(
 echo "=========================================="
 echo "PowerScale Syslog Collection Setup"
 echo "=========================================="
-echo "Pipeline: PowerScale (UDP/TCP:514) -> rsyslog (KUBE_VIP:514) -> VLAgent (localhost:NodePort) -> VictoriaLogs"
+echo "Pipeline: PowerScale (UDP/TCP:514) -> rsyslog (KUBE_VIP:514) -> VLAgent (ClusterIP:514) -> VictoriaLogs"
 {% raw %}
 echo "PowerScale Syslog Source IPs: ${POWERSCALE_IPS[*]}"
 {% endraw %}
@@ -51,19 +51,18 @@ VLAGENT_SERVICE=$(kubectl get svc vlagent-vlagent -n "$NAMESPACE" -o json 2>/dev
 SERVICE_TYPE=$(echo "$VLAGENT_SERVICE" | jq -r '.spec.type')
 echo "VLAgent service type: $SERVICE_TYPE"
 
-# rsyslog runs in host network - use localhost + NodePort (always accessible)
-# Both LoadBalancer and NodePort services have NodePorts assigned by Kubernetes
-VLAGENT_NODEPORT=$(echo "$VLAGENT_SERVICE" | jq -r '.spec.ports[] | select(.name=="syslog" and .protocol=="TCP") | .nodePort')
+# rsyslog runs in host network - use ClusterIP for internal access
+VLAGENT_CLUSTERIP=$(echo "$VLAGENT_SERVICE" | jq -r '.spec.clusterIP')
 
-if [ -z "$VLAGENT_NODEPORT" ] || [ "$VLAGENT_NODEPORT" == "null" ]; then
-    echo "ERROR: Could not determine VLAgent NodePort for syslog TCP."
-    echo "Ensure VLAgent service has a NodePort assigned for syslog (TCP 514)."
+if [ -z "$VLAGENT_CLUSTERIP" ] || [ "$VLAGENT_CLUSTERIP" == "null" ]; then
+    echo "ERROR: Could not determine VLAgent ClusterIP."
+    echo "Ensure VLAgent service has a ClusterIP assigned."
     exit 0
 fi
 
-# Use localhost for rsyslog forwarding (host network always reaches NodePort)
-VLAGENT_IP="127.0.0.1"
-VLAGENT_PORT="$VLAGENT_NODEPORT"
+# Use ClusterIP for rsyslog forwarding
+VLAGENT_IP="$VLAGENT_CLUSTERIP"
+VLAGENT_PORT=514
 
 echo "VLAgent forwarding target: ${VLAGENT_IP}:${VLAGENT_PORT}"
 echo ""
