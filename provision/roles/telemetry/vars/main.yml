@@ -533,3 +533,94 @@ ps_log_deployed_msg: >-
   open firewall port 514/udp, and forward PowerScale syslog to VLAgent.
   For complete PowerScale syslog configuration details, including manual
   PowerScale setup steps, refer to Omnia documentation.
+# Vector Kafka-to-Victoria Ingestion Pipeline Configuration
+# ============================================================================
+# Usage: deploy_vector_ldms.yml, deploy_vector_ome.yml
+# Vector pods consume from Kafka topics and route to VictoriaMetrics/VictoriaLogs
+# via dedicated write-buffer agents (vmagent-vector, vlagent-vector).
+#
+# Architecture:
+#   Kafka topics → Vector pods → vmagent-vector/vlagent-vector → Victoria sinks
+# Vector image (shared by all Vector pods: vector-ldms, vector-ome)
+# Registered in service_k8s.json
+vector:
+  image: "{{ telemetry_images['timberio/vector'] | default('docker.io/timberio/vector:0.54.0-alpine') }}"
+
+  # Vector-LDMS configuration
+  ldms:
+    app_name: "vector-ldms"
+    service_name: "vector-ldms"
+    kafka_topic: "ldms"
+    consumer_group: "vector-ldms-group"
+    kafka_user: "kafkapump"  # Shared with LDMS store_avro_kafka
+    health_port: 8687
+    metrics_port: 9599
+    replicas: 1
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+
+  # Vector-OME configuration
+  ome:
+    app_name: "vector-ome"
+    service_name: "vector-ome"
+    # Dynamic pattern based on ome_identifier from telemetry_config.yml
+    # Example: if ome_identifier="ome", pattern="^ome\\..*$" (matches ome.events, ome.alerts, etc.)
+    # Example: if ome_identifier="dell_ome", pattern="^dell_ome\\..*$" (matches dell_ome.events, etc.)
+    kafka_topics_pattern: "^{{ telemetry_bridges.vector_ome.ome_identifier | default('ome') | regex_escape }}\\..*$"
+    consumer_group: "vector-ome-group"
+    kafka_user: "vector-ome-user"  # Dedicated KafkaUser for OME
+    health_port: 8688
+    metrics_port: 9600
+    replicas: 1
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "512Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+
+  # vmagent-vector: Write-buffer for Vector → VictoriaMetrics
+  # Accepts prometheus_remote_write from Vector pods on port 8429
+  vmagent_vector:
+    app_name: "vmagent-vector"
+    service_name: "vmagent-vector"
+    port: 8429  # prometheus_remote_write receiver
+    metrics_port: 8429  # vmagent self-metrics
+    image: "{{ telemetry_images['victoriametrics/vmagent'] | default('docker.io/victoriametrics/vmagent:v1.128.0') }}"
+    replicas: 1
+    pvc_size: "5Gi"  # Disk WAL buffer
+    remote_write_url: "http://vminsert-victoria-cluster.{{ telemetry_namespace }}.svc.cluster.local:8480/insert/0/prometheus/api/v1/write"
+    tmp_data_path: "/vmagent-buffer"
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+
+  # vlagent-vector: Write-buffer for Vector → VictoriaLogs
+  # Accepts JSON Lines from Vector pods on port 9427
+  vlagent_vector:
+    app_name: "vlagent-vector"
+    service_name: "vlagent-vector"
+    port: 9427  # JSON Lines receiver
+    metrics_port: 9427  # vlagent self-metrics
+    image: "{{ telemetry_images['victoriametrics/vlagent'] | default('docker.io/victoriametrics/vlagent:v1.49.0') }}"
+    replicas: 1
+    pvc_size: "5Gi"  # Disk buffer
+    remote_write_url: "http://vlinsert-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.local:9428/insert/jsonline"
+    tmp_data_path: "/vlagent-buffer"
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"

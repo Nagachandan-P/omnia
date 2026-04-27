@@ -720,3 +720,15 @@ def get_logic_failed(input_file_path):
 def get_logic_success(input_file_path):
     """Returns a formatted message indicating logic validation success for a file."""
     return f"{'#' * 10} Logic validation successful for {input_file_path} {'#' * 10}"
+
+# ============================================================================
+# Vector Bridge Validation Messages
+# ============================================================================
+
+# Vector-LDMS validation messages
+VECTOR_LDMS_SOURCE_DISABLED_MSG = (
+    "Vector-LDMS bridge cannot be enabled when telemetry_sources.ldms.metrics_enabled is 'false'. "
+    "Vector-LDMS consumes LDMS metrics from Kafka topic 'ldms'. "
+    "To fix: Either set telemetry_sources.ldms.metrics_enabled=true to enable LDMS data collection, "
+    "or set telemetry_bridges.vector_ldms.metrics_enabled=false to disable the Vector-LDMS bridge."
+)
