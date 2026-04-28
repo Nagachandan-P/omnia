@@ -39,9 +39,9 @@ echo "PowerScale Syslog Source IPs: ${POWERSCALE_IPS[*]}"
 echo ""
 
 # ============================================================================
-# Phase 1: Get VLAgent NodePort for localhost forwarding
+# Phase 1: Get VLAgent ClusterIP for internal forwarding
 # ============================================================================
-echo "===== Phase 1: Getting VLAgent NodePort ====="
+echo "===== Phase 1: Getting VLAgent ClusterIP ====="
 
 VLAGENT_SERVICE=$(kubectl get svc vlagent-vlagent -n "$NAMESPACE" -o json 2>/dev/null) || {
     echo "ERROR: VLAgent service not found in namespace $NAMESPACE"
@@ -79,7 +79,7 @@ generate_rsyslog_config() {
     cat <<'RSYSLOG_STATIC'
 # Omnia PowerScale Syslog Relay Configuration
 # Auto-generated — DO NOT EDIT manually
-# Pipeline: PowerScale (UDP/TCP:514) -> rsyslog (KUBE_VIP:514) -> VLAgent (localhost:NodePort) -> VictoriaLogs
+# Pipeline: PowerScale (UDP/TCP:514) -> rsyslog on K8s nodes -> VLAgent (ClusterIP:514) -> VictoriaLogs
 
 # === UDP/TCP Listeners on port 514 ===
 $ModLoad imudp
