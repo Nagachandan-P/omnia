@@ -44,14 +44,14 @@
     - name: Display usage information when no discovery_mechanism is specified
       when: discovery_mechanism == ""
       block:
-        - name: Show usage prompt
-          ansible.builtin.debug:
+        - name: Fail when no discovery_mechanism specified
+          ansible.builtin.fail:
             msg:
               - "============================================================"
+              - "ERROR: discovery_mechanism is required but not provided."
+              - ""
               - "Usage: ansible-playbook discovery.yml"
               - "       -e discovery_mechanism=<mechanism>"
-              - ""
-              - "Please specify a discovery_mechanism parameter."
               - ""
               - "Supported discovery mechanisms:"
               - "  - ome      : Dell OpenManage Enterprise (OME)"
@@ -61,9 +61,6 @@
               - "  ansible-playbook discovery.yml -e discovery_mechanism=ome"
               - "  ansible-playbook discovery.yml -e discovery_mechanism=magellan"
               - "============================================================"
-
-        - name: End play when no discovery_mechanism specified
-          ansible.builtin.meta: end_play
 
     - name: Validate discovery_mechanism parameter
       ansible.builtin.fail:
