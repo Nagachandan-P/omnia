@@ -319,6 +319,10 @@ POWERSCALE_VICTORIA_LOGS_REQUIRED_MSG = (
     "'victoria_logs' must be included in collection_targets "
     "(e.g., 'victoria_metrics,victoria_logs')."
 )
+POWERSCALE_SYSLOG_SOURCE_IP_INVALID_MSG = (
+    "Invalid IP address in powerscale_syslog_source_ips. "
+    "Each entry must be a valid IPv4 address (e.g., '192.168.55.11')."
+)
 POWERSCALE_CSI_DRIVER_MISSING_MSG = (
     "csi_driver_powerscale is not configured in software_config.json. "
     "PowerScale telemetry requires the CSI driver for PowerScale to be configured."
@@ -426,6 +430,7 @@ POWERSCALE_AUTH_CSI_JSON_NOT_FOUND_MSG = (
     "image versions. Please ensure the file exists at "
     "input/config/x86_64/rhel/10.0/csi_driver_powerscale.json."
 )
+
 def boolean_fail_msg(value):
     """Returns a formatted message indicating boolean_fail_msg."""
     return f"{value} must be set to either true or false."
