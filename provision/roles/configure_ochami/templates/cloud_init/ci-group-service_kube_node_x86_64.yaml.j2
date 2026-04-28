@@ -242,7 +242,7 @@
         - sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/dnf/dnf.conf
         - bash /usr/local/bin/doca-install.sh && bash /usr/local/bin/configure-ib-network.sh
 {% for pv_entry in cloud_init_groups_dict[functional_group_name].powervault_scripts | default([]) %}
-        - /usr/local/bin/setup_iscsi_storage_{{ pv_entry.name }}.sh
+        - bash /usr/local/bin/setup_iscsi_storage_{{ pv_entry.name }}.sh
 {% endfor %}
         - mkdir -p /etc/containers/registries.conf.d
         - mv /tmp/crio.conf /etc/containers/registries.conf.d/crio.conf
