@@ -1,0 +1,8 @@
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+---
+
+# Architectures will be dynamically determined from software_config.json
+# upgrade_active_architectures: []  # Set dynamically in create_staging.yml
+
+# Cleanup staging directory after sync
+upgrade_cleanup_staging: true
