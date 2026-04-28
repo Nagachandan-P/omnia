@@ -28,7 +28,13 @@ EOF
 /usr/local/bin/generate_install_uuid.sh
 
 # Fast-path: already done
-[ -f "$DONE_FILE" ] && { echo "[INFO] .done_cuda present, skipping."; exit 0; }
+[ -f "$DONE_FILE" ] && {
+    echo "[INFO] CUDA toolkit already installed on shared storage by another node."
+    echo "[INFO] This node will use the existing CUDA installation."
+    setup_cuda_env
+    echo "[INFO] CUDA environment configured successfully."
+    exit 0
+}
 
 # Check if running in manual mode (not cloud-init)
 MANUAL_MODE="${CUDA_INSTALL_MANUAL:-false}"
