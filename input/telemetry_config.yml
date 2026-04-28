@@ -338,9 +338,6 @@ powerscale_configurations:
   # When telemetry_sources.powerscale.logs_enabled is true, Omnia configures
   # rsyslog on all K8s nodes to receive and relay PowerScale audit syslog.
   #
-  # DATA PIPELINE:
-  #   PowerScale (UDP:514) → K8s node rsyslog → VLAgent LB (TCP:514) → VictoriaLogs
-  #
   # IMPORTANT: The syslog source IP is the IP address PowerScale uses to SEND
   # syslog packets. This is NOT necessarily the CSI driver endpoint (management IP).
   # Check OneFS Network Configuration → External Network → Pool IPs to find
@@ -350,27 +347,8 @@ powerscale_configurations:
   #          OneFS data/NFS IP    = 192.168.55.11 (pool1, 40gige-1 interface)
   #          Syslog may be sent from 192.168.55.11, NOT 192.168.55.2
   #
-  # WHAT OMNIA DOES:
-  #   - Configures rsyslog on all K8s nodes (UDP listener, filter by source IP)
-  #   - Opens firewall port 514/udp on all K8s nodes
-  #   - Stores local copy at /var/log/powerscale_audit.log
-  #   - Forwards to VLAgent → VictoriaLogs
-  #
-  # WHAT YOU MUST DO (after deployment):
-  #   - Configure PowerScale to send syslog to any K8s node IP on UDP:514
-  #   - Refer to Omnia documentation for complete configuration details
-
-  # PowerScale IP address(es) from which syslog packets will arrive at K8s nodes.
-  # This is the source IP in the UDP syslog packets — check your OneFS network
-  # configuration to determine the correct IP (often the data pool IP, not mgmt IP).
-  # Optional: If empty, rsyslog will accept syslog from any source IP.
-  # If provided, rsyslog will filter by these IPs for security (recommended for production).
-  # Format: list of IP addresses (one per PowerScale cluster/pool)
-  #
-  # IMPORTANT: For complete PowerScale syslog configuration details, including
-  # manual PowerScale setup steps, refer to Omnia documentation.
-  syslog_source_ips: []
   # Example:
   #   syslog_source_ips:
   #     - "192.168.55.11"        # cluster1 data pool IP
   #     - "192.168.55.20"           # cluster2 data pool IP
+  syslog_source_ips: []

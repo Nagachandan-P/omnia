@@ -72,20 +72,10 @@ fi
 echo ""
 
 # ============================================================================
-# Test 5: PowerScale Logs Received by rsyslog
-# ============================================================================
-echo "Test 5: PowerScale Logs Received by rsyslog (last 5 entries)"
-if [ -f /var/log/powerscale_audit.log ]; then
-    LOG_COUNT=$(wc -l < /var/log/powerscale_audit.log)
-    echo "✓ Audit log file exists with $LOG_COUNT entries"
-    tail -5 /var/log/powerscale_audit.log
-else
-    echo "✗ Audit log file missing"
-fi
 echo ""
 
 # ============================================================================
-# Test 6: VLAgent Binary Format Errors (should be 0 after rsyslog restart)
+# Test 5: VLAgent Binary Format Errors (should be 0 after rsyslog restart)
 # ============================================================================
 echo "Test 6: VLAgent Binary Format Errors (last 2 minutes)"
 ERROR_COUNT=$(kubectl logs -n telemetry vlagent-vlagent-0 --since=2m 2>&1 | grep -c "cannot parse JSON" 2>/dev/null || echo "0")
@@ -99,7 +89,7 @@ fi
 echo ""
 
 # ============================================================================
-# Test 7: kube-proxy iptables Rules for VLAgent ClusterIP
+# Test 6: kube-proxy iptables Rules for VLAgent ClusterIP
 # ============================================================================
 echo "Test 7: kube-proxy iptables Rules for VLAgent ClusterIP"
 if iptables -t nat -L KUBE-SERVICES -n 2>/dev/null | grep -q "$VLAGENT_CLUSTERIP"; then
@@ -111,7 +101,7 @@ fi
 echo ""
 
 # ============================================================================
-# Test 8: Port 514 Firewall Rules
+# Test 7: Port 514 Firewall Rules
 # ============================================================================
 echo "Test 8: Port 514 Firewall Rules"
 if command -v firewall-cmd &>/dev/null; then

@@ -88,10 +88,6 @@ input(type="imudp" port="514")
 $ModLoad imtcp
 input(type="imtcp" port="514")
 
-# === Audit trail template ===
-template(name="PowerScaleAudit" type="string"
-    string="%timereported% %hostname% %syslogtag% %msg%\n")
-
 # === JSON template for VLAgent ===
 template(name="VLAgentJSON" type="list") {
     constant(value="{\"_time\":\"")
@@ -117,10 +113,6 @@ RSYSLOG_STATIC
         cat <<RSYSLOG_NOFILTER
 
 # No PowerScale IPs configured — accepting all syslog on port 514
-*.* action(type="omfile"
-        file="/var/log/powerscale_audit.log"
-        template="PowerScaleAudit")
-
 *.* action(type="omfwd"
         target="${VLAGENT_IP}"
         port="${VLAGENT_PORT}"
@@ -142,10 +134,6 @@ RSYSLOG_NOFILTER
 
 # PowerScale source: ${PS_IP}
 if \$fromhost-ip == "${PS_IP}" then {
-    action(type="omfile"
-        file="/var/log/powerscale_audit.log"
-        template="PowerScaleAudit")
-
     action(type="omfwd"
         target="${VLAGENT_IP}"
         port="${VLAGENT_PORT}"
@@ -184,10 +172,6 @@ configure_rsyslog_on_node() {
         # Write new config
         echo "$RSYSLOG_CONFIG" > "$RSYSLOG_CONF"
 
-        # Ensure log file exists
-        touch /var/log/powerscale_audit.log
-        chmod 640 /var/log/powerscale_audit.log
-
         # Open firewall ports
         if command -v firewall-cmd &>/dev/null; then
             firewall-cmd --add-port=514/udp --permanent 2>/dev/null || true
@@ -222,8 +206,6 @@ configure_rsyslog_on_node() {
 
         # Setup log file, firewall, validate, restart
         ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$NODE_IP" \
-            "touch /var/log/powerscale_audit.log && \
-             chmod 640 /var/log/powerscale_audit.log && \
              if command -v firewall-cmd &>/dev/null; then \
                  firewall-cmd --add-port=514/udp --permanent 2>/dev/null || true && \
                  firewall-cmd --add-port=514/tcp --permanent 2>/dev/null || true && \
@@ -279,7 +261,6 @@ echo "VLAgent pods running: $VLAGENT_PODS"
 echo "Checking rsyslog status on local node..."
 systemctl is-active rsyslog && echo "  rsyslog is active" || echo "  WARNING: rsyslog is not active"
 echo "  Config file: $RSYSLOG_CONF"
-echo "  Local audit log: /var/log/powerscale_audit.log"
 
 # ============================================================================
 # Phase 6: PowerScale Configuration Instructions
