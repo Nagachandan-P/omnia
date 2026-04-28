@@ -272,8 +272,20 @@ class CleanupJobUseCase:
                         self._stage_repo.save(stage)
                     except Exception:  # pylint: disable=broad-except
                         # Best-effort; never block cleanup on stage save.
+                        # Rollback immediately to reset session state
+                        if hasattr(self._image_group_repo, "session"):
+                            try:
+                                self._image_group_repo.session.rollback()
+                            except Exception:  # pylint: disable=broad-except
+                                pass
                         pass
         except Exception:  # pylint: disable=broad-except
+            # Rollback the session to reset state after any stage cancellation error
+            if hasattr(self._image_group_repo, "session"):
+                try:
+                    self._image_group_repo.session.rollback()
+                except Exception:  # pylint: disable=broad-except
+                    pass
             pass
 
         # 4. Status transitions: ImageGroup -> CLEANED, Job -> CLEANED.
@@ -392,7 +404,7 @@ class CleanupJobUseCase:
 
         Returns the number of files deleted (best-effort count).
         """
-        artifact_dir = os.path.join(self._nfs_artifact_base, str(job_id))
+        artifact_dir = os.path.join(self._nfs_artifact_base, "artifacts", str(job_id))
         if not os.path.exists(artifact_dir):
             log_secure_info(
                 "info",

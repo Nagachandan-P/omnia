@@ -28,7 +28,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 from sqlalchemy.exc import IntegrityError
 
@@ -58,30 +58,98 @@ from core.localrepo.services import PlaybookQueueResultService
 # ``images.image_name``. The CleanUp API reads this column verbatim
 # and passes it directly to ``s3cmd del --recursive --force``.
 DEFAULT_S3_BUCKET_URI = "s3://boot-images"
-DEFAULT_CLUSTER_OS = "rhel"
-DEFAULT_CLUSTER_OS_VERSION = "10.0"
 DEFAULT_NFS_ARTIFACT_BASE = "/opt/omnia/build_stream_root"
 
 
-def _build_s3_image_path(
+def _discover_s3_image_paths(
     bucket_uri: str,
-    role: str,
-    job_id: str,
-    image_key: str,
-) -> str:
-    """Construct the complete S3 directory prefix for an image.
+    image_group_id: str,
+    role_names: list,
+) -> dict:
+    """Query S3 using s3cmd ls to discover actual image paths.
 
-    Mirrors the path pattern produced by the build-image playbook
-    (``provision/roles/configure_ochami/templates/bss/bss.yaml.j2``):
+    Instead of constructing paths based on conventions, this queries
+    S3 directly and greps for the ImageGroupID to find actual paths.
 
-        s3://boot-images/<role>/rhel-<role>_<job_id>-<image_key>/
+    Args:
+        bucket_uri: S3 bucket URI (e.g., s3://boot-images)
+        image_group_id: ImageGroup ID to search for
+        role_names: List of role names to discover paths for
 
-    The CleanUp API stores this complete path in ``images.image_name``
-    and uses it verbatim with ``s3cmd del --recursive --force``.
+    Returns:
+        Dict mapping role_name -> list of S3 directory paths
+        Example: {"slurm_node": ["s3://boot-images/efi-images/slurm_node/...", 
+                                  "s3://boot-images/slurm_node/..."]}
     """
+    import subprocess  # pylint: disable=import-outside-toplevel
+
     bucket = (bucket_uri or DEFAULT_S3_BUCKET_URI).rstrip("/")
-    bs_suffix = f"_{job_id}-{image_key}" if image_key else f"_{job_id}"
-    return f"{bucket}/{role}/{DEFAULT_CLUSTER_OS}-{role}{bs_suffix}/"
+    role_to_paths = {role: [] for role in role_names}
+
+    try:
+        # Run s3cmd ls -Hr and grep for ImageGroupID in one command
+        # This filters at subprocess level instead of in Python
+        cmd = f"s3cmd ls -Hr {bucket} | grep {image_group_id}"
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+
+        if result.returncode not in [0, 1]:  # 0=found, 1=not found (grep exit code)
+            log_secure_info(
+                "warning",
+                f"s3cmd ls failed for bucket {bucket}: {result.stderr}",
+            )
+            return role_to_paths
+
+        # Parse grep output
+        # s3cmd ls output format: "DATE SIZE s3://bucket/role/path/file.img"
+        # Extract directory paths from file paths
+        discovered_paths = set()
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+
+            # Extract S3 file path from line (last column)
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+
+            s3_file_path = parts[-1]  # Last part is the S3 file path
+
+            # Extract directory path from file path
+            # s3://boot-images/role/path/file.img -> s3://boot-images/role/path/
+            s3_dir_path = s3_file_path.rsplit("/", 1)[0] + "/"
+
+            # Determine which role this path belongs to
+            for role in role_names:
+                if f"/{role}/" in s3_dir_path:
+                    # Store all unique directory paths per role
+                    if s3_dir_path not in discovered_paths:
+                        discovered_paths.add(s3_dir_path)
+                        role_to_paths[role].append(s3_dir_path)
+                    break
+
+        return role_to_paths
+
+    except subprocess.TimeoutExpired:
+        log_secure_info(
+            "error",
+            f"s3cmd ls timed out for bucket {bucket}",
+        )
+        return role_to_paths
+    except Exception as exc:  # pylint: disable=broad-except
+        log_secure_info(
+            "error",
+            f"Failed to discover S3 paths for {image_group_id}: {exc}",
+            exc_info=True,
+        )
+        return role_to_paths
 
 
 def _load_build_image_meta(job_id: str) -> Dict[str, str]:
@@ -90,7 +158,7 @@ def _load_build_image_meta(job_id: str) -> Dict[str, str]:
     Returns an empty dict if the file does not exist or cannot be read.
     """
     base = os.environ.get("NFS_ARTIFACT_BASE", DEFAULT_NFS_ARTIFACT_BASE)
-    meta_path = Path(base) / str(job_id) / "build_image_meta.json"
+    meta_path = Path(base) / "artifacts" / str(job_id) / "build_image_meta.json"
     try:
         if not meta_path.exists():
             return {}
@@ -406,33 +474,61 @@ class ResultPoller:
                 updated_at=now,
             )
 
-            # Resolve build-image metadata persisted at submission time
-            # so we can construct the complete S3 path stored in
-            # ``images.image_name``. The CleanUp API uses this column
-            # verbatim with ``s3cmd del --recursive --force``.
-            build_meta = _load_build_image_meta(str(result.job_id))
-            image_key = build_meta.get("image_key", "")
+            # Query S3 directly to discover actual image paths instead of
+            # constructing them based on conventions. This is more robust
+            # and doesn't rely on path naming conventions.
             bucket_uri = os.environ.get(
                 "CLEANUP_S3_BUCKET", DEFAULT_S3_BUCKET_URI
             )
+            role_names = list(role_images.keys())
 
-            # Create Image entities for each role with complete S3 paths.
+            log_secure_info(
+                "info",
+                f"Discovering S3 paths for ImageGroup {image_group_id} "
+                f"with roles: {role_names}",
+                job_id=str(result.job_id),
+            )
+
+            # Discover actual S3 paths by querying S3 and grepping for ImageGroupID
+            role_to_s3_paths = _discover_s3_image_paths(
+                bucket_uri=bucket_uri,
+                image_group_id=image_group_id,
+                role_names=role_names,
+            )
+
+            # Create Image entities for each role with discovered S3 paths.
+            # Note: Each role may have multiple S3 paths (e.g., EFI images + full disk images)
             images = []
-            for role_name, _legacy_image_name in role_images.items():
-                full_s3_path = _build_s3_image_path(
-                    bucket_uri=bucket_uri,
-                    role=role_name,
+            for role_name in role_names:
+                s3_paths = role_to_s3_paths.get(role_name, [])
+                if not s3_paths:
+                    log_secure_info(
+                        "warning",
+                        f"No S3 paths discovered for role {role_name} in "
+                        f"ImageGroup {image_group_id}; skipping image records",
+                        job_id=str(result.job_id),
+                    )
+                    continue
+
+                # Create an Image record for each discovered S3 path
+                for s3_path in s3_paths:
+                    image = Image(
+                        id=str(uuid.uuid4()),
+                        image_group_id=image_group_id,
+                        role=role_name,
+                        image_name=s3_path,
+                        created_at=now,
+                    )
+                    images.append(image)
+
+            if not images:
+                log_secure_info(
+                    "error",
+                    f"No S3 paths discovered for any role in ImageGroup "
+                    f"{image_group_id}; ImageGroup will be created but with no images",
                     job_id=str(result.job_id),
-                    image_key=image_key,
                 )
-                image = Image(
-                    id=str(uuid.uuid4()),
-                    image_group_id=image_group_id,
-                    role=role_name,
-                    image_name=full_s3_path,
-                    created_at=now,
-                )
-                images.append(image)
+
             image_group.images = images
 
             # Persist: ImageGroup first, then Images.
@@ -694,7 +790,7 @@ class ResultPoller:
                     f"job={result.job_id}; playbook may not have written it",
                     job_id=str(result.job_id),
                 )
-                
+
         except json.JSONDecodeError as jde:
             log_secure_info(
                 "error",

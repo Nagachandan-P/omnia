@@ -249,7 +249,7 @@ class CreateBuildImageUseCase:
     ) -> None:
         """Persist build-image metadata to NFS for the result poller.
 
-        The metadata is written to ``<artifact_base>/<job_id>/build_image_meta.json``
+        The metadata is written to ``<artifact_base>/artifacts/<job_id>/build_image_meta.json``
         so the result poller can reconstruct complete S3 image paths
         once the build completes.
         """
@@ -257,7 +257,7 @@ class CreateBuildImageUseCase:
             base = os.environ.get(
                 "NFS_ARTIFACT_BASE", "/opt/omnia/build_stream_root"
             )
-            job_dir = Path(base) / job_id
+            job_dir = Path(base) / "artifacts" / job_id
             job_dir.mkdir(parents=True, exist_ok=True)
             meta_path = job_dir / "build_image_meta.json"
             payload = {

@@ -178,7 +178,7 @@ class TestCleanupJobSuccess:
         s3 = FakeS3CleanupService(per_call_deleted=3)
 
         # NFS artifact dir with one fake file
-        artifact_dir = tmp_path / str(jid)
+        artifact_dir = tmp_path / "artifacts" / str(jid)
         artifact_dir.mkdir(parents=True, exist_ok=True)
         (artifact_dir / "config.yml").write_text("hello", encoding="utf-8")
 
