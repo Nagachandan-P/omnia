@@ -71,9 +71,9 @@ spec:
   # Supports JSON Lines format with optional TLS
   remoteWrite:
 {% if victoria_logs_cluster.tls_enabled %}
-    - url: https://vlinsert-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.local:9481/insert/jsonline
+    - url: https://vlinsert-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.local:9481/internal/insert
 {% else %}
-    - url: http://vlinsert-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.local:9481/insert/jsonline
+    - url: http://vlinsert-victoria-logs-cluster.{{ telemetry_namespace }}.svc.cluster.local:9481/internal/insert
 {% endif %}
 
   # ========================================
