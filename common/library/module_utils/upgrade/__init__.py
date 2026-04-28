@@ -11,14 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
----
 
-- name: Upgrade OIM tasks
-  hosts: localhost
-  connection: local
-  gather_facts: true
-  vars:
-    input_project_dir: "/opt/omnia/input/project_default"
-  roles:
-    - role: ../utils/roles/include_input_dir
-    - role: upgrade_oim
+"""
+Upgrade Module Utilities
+
+This package contains utilities for managing upgrade operations:
+- Hop chain calculations
+- Software configuration updates
+- Component JSON repository updates
+"""
