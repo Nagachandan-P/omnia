@@ -111,7 +111,7 @@ def extract_su_from_hostname(bmc_hostname):
       idrac-SUA99R999OU30C2  ->  SUA99
       SU1R2OU1C5             ->  SU1
       idrac-JCGT033          ->  '' (service tag pattern, not an SU hostname)
-    The lookahead (?=R\d+) ensures only genuine SU hostnames match;
+    The lookahead (?=R\\d+) ensures only genuine SU hostnames match;
     service-tag-only hostnames like idrac-JCGT033 are ignored.
     Returns empty string when no SU pattern is found; caller defaults to grp0.
     """
