@@ -107,7 +107,6 @@ SERVICE_CONTROL_PLANE_GROUP = "service_kube_control_plane_x86_64"
 # Only servers whose OME static group matches one of these will be
 # included in the PXE mapping file.
 SUPPORTED_FUNCTIONAL_GROUPS = {
-    "service_kube_control_plane_first_x86_64",
     "service_kube_control_plane_x86_64",
     "service_kube_node_x86_64",
     "login_node_x86_64",
