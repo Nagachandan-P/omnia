@@ -7,7 +7,7 @@ if ! lspci | grep -i 'mellanox'; then
     exit 0
 fi
 
-# Ensure IPoIB + Mellanox IB kernel modules are loaded before interface detection.
+# Ensure IPoIB + Mellanox IB kernel modules are loaded before interface detection...
 # This avoids boot-time races where the IB device exists (lspci) but no ib* link is present yet.
 modprobe mlx5_ib || true
 modprobe ib_ipoib || true
