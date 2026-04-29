@@ -106,6 +106,13 @@ else
     exit 1
 fi
 
+# Ensure base NVIDIA modules are loaded first
+    echo "Loading base NVIDIA modules..."
+    modprobe nvidia 2>/dev/null || echo "nvidia module not available or failed to load"
+    modprobe nvidia-uvm 2>/dev/null || echo "nvidia-uvm module not available or failed to load"
+    modprobe nvidia-modeset 2>/dev/null || echo "nvidia-modeset module not available or failed to load"
+    modprobe nvidia-drm 2>/dev/null || echo "nvidia-drm module not available or failed to load"
+
 # Load the nvidia-peermem module
 echo "[INFO] Loading nvidia-peermem module..."
 if modprobe nvidia-peermem; then
