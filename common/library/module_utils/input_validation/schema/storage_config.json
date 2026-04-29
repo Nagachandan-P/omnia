@@ -342,11 +342,6 @@
           ],
           "additionalProperties": false
         }
-      },
-      "vast_enabled": {
-        "type": "boolean",
-        "description": "Enable VAST NFS client installation. When true, installs and configures VAST NFS client for high-performance NFS mounts.",
-        "default": false
       }
     },
     "required": [],

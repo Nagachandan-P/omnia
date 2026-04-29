@@ -50,10 +50,6 @@
   ansible.builtin.set_fact:
     service_k8s_support: "{{ software_config.softwares | selectattr('name', 'in', ['service_k8s']) | list | length > 0 }}"
 
-- name: Set vast_enabled fact from storage_config
-  ansible.builtin.set_fact:
-    vast_enabled: "{{ vast_enabled | default(false) }}"
-
 - name: Block for filtering slurm mounts
   when: ('slurm' in omnia_run_tags) and (slurm_support)
   block:
