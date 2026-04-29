@@ -103,6 +103,24 @@ server_count:
 DEFAULT_FUNCTIONAL_GROUP = "slurm_node_aarch64"
 SERVICE_CONTROL_PLANE_GROUP = "service_kube_control_plane_x86_64"
 
+# Omnia-supported functional group names.
+# Only servers whose OME static group matches one of these will be
+# included in the PXE mapping file.
+SUPPORTED_FUNCTIONAL_GROUPS = {
+    "service_kube_control_plane_first_x86_64",
+    "service_kube_control_plane_x86_64",
+    "service_kube_node_x86_64",
+    "login_node_x86_64",
+    "login_node_aarch64",
+    "login_compiler_node_x86_64",
+    "login_compiler_node_aarch64",
+    "slurm_control_node_x86_64",
+    "slurm_node_x86_64",
+    "slurm_node_aarch64",
+    "os_x86_64",
+    "os_aarch64",
+}
+
 # Roles that have a parent-child relationship with the control plane.
 # Only these roles should receive PARENT_SERVICE_TAG.
 CHILD_ROLES_OF_CONTROL_PLANE = {
@@ -233,6 +251,17 @@ def main():
 
             # Use group_name from OME if available, else fall back to module param default
             server_group = server.get('group_name', '').strip()
+
+            # Skip servers whose OME group is not a supported Omnia functional group
+            if server_group and server_group not in SUPPORTED_FUNCTIONAL_GROUPS:
+                svc_tag = server.get('service_tag', 'unknown')
+                module.warn(
+                    f"Skipping device {svc_tag}: OME static group '{server_group}' "
+                    f"is not a supported Omnia functional group. "
+                    f"Supported groups: {', '.join(sorted(SUPPORTED_FUNCTIONAL_GROUPS))}"
+                )
+                continue
+
             resolved_functional_group = server_group if server_group else functional_group
 
             # Derive GROUP_NAME: try SU from BMC hostname first,
