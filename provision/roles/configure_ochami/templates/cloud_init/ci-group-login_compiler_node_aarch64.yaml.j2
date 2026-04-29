@@ -77,95 +77,25 @@
                 IdentityFile {{ client_mount_path }}/slurm/ssh/oim_rsa
                 IdentitiesOnly yes
 
-        - path: /usr/local/bin/install_cuda_toolkit.sh
-          permissions: '0755'
+{% if login_compiler_node_present %}
+        - path: /usr/local/bin/generate_install_uuid.sh
+          owner: root:root
+          permissions: '{{ file_mode_755 }}'
           content: |
-            #!/bin/bash
-            LOGFILE="/var/log/cuda_toolkit_install.log"
-            exec > >(tee -a "$LOGFILE") 2>&1
+            {{ lookup('template', 'templates/hpc_tools/generate_install_uuid.sh.j2') | indent(12) }}
 
-            echo "===== Starting CUDA Toolkit installation ====="
+        - path: /usr/local/bin/cuda_lock_manager.sh
+          owner: root:root
+          permissions: '{{ file_mode_755 }}'
+          content: |
+            {{ lookup('template', 'templates/hpc_tools/cuda_lock_manager.sh.j2') | indent(12) }}
 
-            # Check if CUDA toolkit is already installed
-            if command -v nvcc &>/dev/null; then
-                CUDA_VERSION=$(nvcc --version | grep "release" | awk '{print $6}' | sed 's/,//')
-                echo "[INFO] CUDA toolkit already installed (version: ${CUDA_VERSION}). Exiting."
-                exit 0
-            fi
-
-            # Mount NFS cuda directory
-            echo "[INFO] Mounting NFS cuda directory..."
-            mkdir -p /shared-cuda-toolkit
-            mount -t nfs {{ cloud_init_nfs_path }}/hpc_tools/cuda/ /shared-cuda-toolkit
-
-            if [ $? -ne 0 ]; then
-                echo "[ERROR] Failed to mount NFS cuda share. Exiting."
-                exit 1
-            fi
-
-            # Check if CUDA toolkit is already installed on NFS
-            if [ -f "/shared-cuda-toolkit/bin/nvcc" ]; then
-                CUDA_VERSION=$(/shared-cuda-toolkit/bin/nvcc --version | grep "release" | awk '{print $6}' | sed 's/,//')
-                echo "[INFO] CUDA toolkit already installed (version: ${CUDA_VERSION}). Exiting."
-                umount /shared-cuda-toolkit 2>/dev/null
-                exit 0
-            fi
-
-            echo "[INFO] Installing CUDA toolkit to local location using dnf..."
-            mkdir -p /cuda
-            dnf install -y --installroot=/cuda --releasever=10 --setopt=install_weak_deps=False cuda-toolkit
-
-            if [ $? -eq 0 ]; then
-                echo "[SUCCESS] CUDA toolkit installed successfully."
-            else
-                echo "[ERROR] CUDA toolkit installation failed."
-                umount /shared-cuda-toolkit 2>/dev/null
-                exit 1
-            fi
-
-            echo "[INFO] Copying CUDA toolkit to shared location..."
-            # Find the CUDA installation directory in /cuda/usr/local/
-            CUDA_SRC_DIR=$(find /cuda/usr/local/ -maxdepth 1 -type d -name "cuda-*" | head -n1)
-            if [ -z "$CUDA_SRC_DIR" ]; then
-                echo "[ERROR] Could not find CUDA installation directory in /cuda/usr/local/"
-                umount /shared-cuda-toolkit 2>/dev/null
-                exit 1
-            fi
-            
-            echo "[INFO] Found CUDA at: $CUDA_SRC_DIR"
-            echo "[INFO] Copying contents directly to /shared-cuda-toolkit..."
-            # Copy only the contents of cuda-13.2 directly to /shared-cuda-toolkit
-            cp -r "$CUDA_SRC_DIR"/* /shared-cuda-toolkit/ 2>/dev/null || true
-
-            echo "[INFO] Verifying CUDA toolkit installation..."
-            if [ -f "/shared-cuda-toolkit/bin/nvcc" ]; then
-                CUDA_VERSION=$(/shared-cuda-toolkit/bin/nvcc --version | grep "release" | awk '{print $6}' | sed 's/,//')
-                echo "[SUCCESS] CUDA toolkit verified: version $CUDA_VERSION"
-                echo "[INFO] CUDA installation path: /shared-cuda-toolkit"
-            else
-                echo "[ERROR] CUDA toolkit (nvcc) not found after installation."
-                umount /shared-cuda-toolkit 2>/dev/null
-                exit 1
-            fi
-
-            # Set up environment variables pointing to shared location
-            cat > /etc/profile.d/cuda.sh << 'ENDOFFILE'
-            export PATH=/shared-cuda-toolkit/bin:$PATH
-            export LD_LIBRARY_PATH=/shared-cuda-toolkit/lib64:$LD_LIBRARY_PATH
-            export CUDA_HOME=/shared-cuda-toolkit
-            ENDOFFILE
-
-            # Apply environment variables for current session
-            export PATH=/shared-cuda-toolkit/bin:$PATH
-            export LD_LIBRARY_PATH=/shared-cuda-toolkit/lib64:$LD_LIBRARY_PATH
-            export CUDA_HOME=/shared-cuda-toolkit
-
-            echo "[INFO] CUDA environment configured"
-
-            echo "[INFO] Cleaning up temporary mount..."
-            umount /shared-cuda-toolkit 2>/dev/null
-
-            echo "===== CUDA Toolkit installation completed ====="
+        - path: /usr/local/bin/install_cuda_toolkit.sh
+          owner: root:root
+          permissions: '{{ file_mode_755 }}'
+          content: |
+            {{ lookup('template', 'templates/hpc_tools/install_cuda_toolkit.sh.j2') | indent(12) }}
+{% endif %}
 
 {% if hostvars['localhost']['openldap_support'] %}
         - path: /etc/sssd/sssd.conf
@@ -255,8 +185,11 @@
         - mount -a
         - cp /cert/pulp_webserver.crt /etc/pki/ca-trust/source/anchors && update-ca-trust
         - sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/dnf/dnf.conf
-        
+
+{% if login_compiler_node_present %}
+        - /usr/local/bin/generate_install_uuid.sh
         - /usr/local/bin/install_cuda_toolkit.sh
+{% endif %}
 
 {% if hostvars['localhost']['ucx_support'] or hostvars['localhost']['openmpi_support'] or hostvars['localhost']['ldms_support'] %}
         # Add NFS entry and mount

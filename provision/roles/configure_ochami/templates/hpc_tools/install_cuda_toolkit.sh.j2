@@ -1,7 +1,6 @@
 #!/bin/bash
 # Lock-aware CUDA toolkit installer. Publishes to /hpc_tools/cuda on NFS.
 # Exits 0 if toolkit is already present (.done_cuda), if this node installed it,
-# or if another node installed it while we were waiting.
 set -euo pipefail
 
 LOGFILE="/var/log/cuda_toolkit_install.log"
@@ -80,8 +79,18 @@ case $rc in
         # Install CUDA toolkit to local location using dnf
         echo "[INFO] Installing CUDA toolkit to local location using dnf..."
         mkdir -p /cuda
+        # Copy host repository configuration to installroot (only for manual mode)
+        if [ "$MANUAL_MODE" = "true" ]; then
+            mkdir -p /cuda/etc/yum.repos.d
+            cp -r /etc/yum.repos.d/* /cuda/etc/yum.repos.d/ 2>/dev/null || true
+        fi
         if timeout "${INSTALL_TIMEOUT:-1800}" dnf install -y --installroot=/cuda --releasever=10 --setopt=install_weak_deps=False cuda-toolkit; then
             echo "[SUCCESS] CUDA toolkit installed successfully."
+
+            # Clean up repository configuration from installroot (if copied for manual mode)
+            if [ "$MANUAL_MODE" = "true" ]; then
+                rm -rf /cuda/etc/yum.repos.d
+            fi
 
             # Copy CUDA toolkit to shared location
             echo "[INFO] Copying CUDA toolkit to shared location..."
