@@ -235,6 +235,12 @@
           content: |
             {{ lookup('template', 'templates/slurm/check_slurm_controller_status.sh.j2') | indent(12) }}
 
+        - path: /usr/local/bin/configure_vast_installation.sh
+          owner: root:root
+          permissions: '{{ file_mode_755 }}'
+          content: |
+            {{ lookup('template', 'templates/vast/configure_vast_installation.sh.j2') | indent(12) }}
+
         - path: /tmp/apptainer_mirror.conf
           permissions: '0644'
           content: |
@@ -282,9 +288,10 @@
         - echo "{{ cloud_init_nfs_path }}/packages  /var/lib/packages   nfs defaults,_netdev 0 0" >> /etc/fstab
 
         - chmod {{ file_mode }} /etc/fstab
-        - mount -a
         - cp /cert/pulp_webserver.crt /etc/pki/ca-trust/source/anchors && update-ca-trust
         - sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/dnf/dnf.conf
+        - /usr/local/bin/configure_vast_installation.sh
+        - mount -a
 
 {% if hostvars['localhost']['ucx_support'] or hostvars['localhost']['openmpi_support'] or hostvars['localhost']['ldms_support'] %}
         # Add NFS entry and mount
@@ -317,7 +324,8 @@
         - /root/ldms_sampler.sh
 {% endif %}
 
-        - bash /usr/local/bin/doca-install.sh && bash /usr/local/bin/configure-ib-network.sh
+        - bash /usr/local/bin/doca-install.sh || true
+        - bash /usr/local/bin/configure-ib-network.sh
 {% for pv_entry in cloud_init_groups_dict[functional_group_name].powervault_scripts | default([]) %}
         - bash /usr/local/bin/setup_iscsi_storage_{{ pv_entry.name }}.sh
 {% endfor %}
