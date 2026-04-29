@@ -156,6 +156,12 @@
             location = "{{ pulp_mirror }}"
 {% endfor %}
 {% endif %}
+{% for pv_entry in cloud_init_groups_dict[functional_group_name].powervault_scripts | default([]) %}
+        - path: /usr/local/bin/setup_iscsi_storage_{{ pv_entry.name }}.sh
+          permissions: '{{ file_mode_755 }}'
+          content: |
+            {{ pv_entry.content | indent(12) }}
+{% endfor %}
       runcmd:
         - /usr/local/bin/set-ssh.sh
         - "systemctl enable chronyd"
@@ -236,6 +242,9 @@
         - sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/dnf/dnf.conf
         - bash /usr/local/bin/doca-install.sh || true
         - bash /usr/local/bin/configure-ib-network.sh
+{% for pv_entry in cloud_init_groups_dict[functional_group_name].powervault_scripts | default([]) %}
+        - bash /usr/local/bin/setup_iscsi_storage_{{ pv_entry.name }}.sh
+{% endfor %}
         - mkdir -p /etc/containers/registries.conf.d
         - mv /tmp/crio.conf /etc/containers/registries.conf.d/crio.conf
         - systemctl start crio.service
@@ -309,6 +318,25 @@
             systemctl restart kubelet
             # Mark initialization complete so all of above is skipped on reboot!
             touch "$MARKER"
+{# Host-specific runcmd entries #}
+{% if host_mount_map is defined and host_mount_map | length > 0 %}
+{% if ds.meta_data.instance_data.local_hostname in host_mount_map %}
+{% if host_mount_map[ds.meta_data.instance_data.local_hostname].mounts is defined %}
+{% for mount in host_mount_map[ds.meta_data.instance_data.local_hostname].mounts %}
+        - {{ mount }}
+{% endfor %}
+{% endif %}
+{%- set fg_swap = cloud_init_groups_dict.get(functional_group_name, {}).get('swap', {}) %}
+{%- if fg_swap %}
+      swap:
+        filename: {{ fg_swap.filename }}
+        size: "{{ fg_swap.size }}"
+{%- if fg_swap.maxsize is defined %}
+        maxsize: "{{ fg_swap.maxsize }}"
+{%- endif %}
+{%- endif %}
+      users:
+{% endif %}
             echo "Cloud-Init has completed successfully."
 
           else

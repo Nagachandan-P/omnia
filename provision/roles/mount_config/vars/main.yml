@@ -24,3 +24,8 @@ slurm_nfs_fail_msg: "Failed to mount NFS share. Please check if the NFS server i
 
 omnia_config_vars: "{{ hostvars['localhost']['input_project_dir'] }}/omnia_config.yml"
 omnia_run_tags: "{{ hostvars['localhost']['omnia_run_tags'] }}"
+
+# Usage: build_host_mount_map.yml
+pxe_mapping_file_path: "{{ hostvars['localhost']['pxe_mapping_file_path'] | default('') }}"
+group_host_map: {}
+host_mount_map: {}

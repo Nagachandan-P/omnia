@@ -1,0 +1,15 @@
+{# Host-specific mount rendering for cloud-init #}
+{# This template is included in functional group templates to add host-specific mounts/runcmd #}
+{# Usage: {% include 'cloud_init/host_specific_mounts.j2' %} #}
+
+{% if host_mount_map is defined and host_mount_map | length > 0 %}
+{% set current_hostname = ds.meta_data.instance_data.local_hostname %}
+{% if current_hostname in host_mount_map %}
+{# Host-specific mounts for {{ current_hostname }} #}
+{% if host_mount_map[current_hostname].mounts is defined %}
+{% for mount in host_mount_map[current_hostname].mounts %}
+      - {{ mount | to_nice_yaml | indent(8) }}
+{% endfor %}
+{% endif %}
+{% endif %}
+{% endif %}
