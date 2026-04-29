@@ -37,11 +37,6 @@
 - name: Generate cloud-init swap module compatible format from swap
   ansible.builtin.include_tasks: swap_config.yml
 
-- name: Read mounts
-  debug:
-    var: mounts
-  # debugger: always
-
 - name: Check if slurm support is true
   ansible.builtin.set_fact:
     slurm_support: "{{ software_config.softwares | selectattr('name', 'in', ['slurm', 'slurm_custom']) | list | length > 0 }}"
@@ -104,4 +99,3 @@
   loop_control:
     loop_var: item
     label: "{{ item.name | default(item.mount_point | default('unnamed')) }}"
-

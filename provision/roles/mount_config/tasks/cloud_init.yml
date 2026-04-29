@@ -35,13 +35,7 @@
   vars:
     pv_script_template_path: "setup_iscsi_storage.sh.j2"
 
-- debug:
-    var: cloud_init_groups_dict
-  # debugger: always
-
 - name: Debug host_mount_map
   ansible.builtin.debug:
     var: host_mount_map
-  # debugger: always
   when: host_mount_map | length > 0
-

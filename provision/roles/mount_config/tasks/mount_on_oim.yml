@@ -53,7 +53,8 @@
 
     - name: Mount current share explicitly for immediate availability # noqa: command-instead-of-module
       ansible.builtin.command: >
-        mount -t {{ (item.fs_type | default(omit)) | default('nfs') }} -o {{ (item.mnt_opts | default(omit)) | default(item.client_mount_options | default(default_oim_mount_options)) }}
+        mount -t {{ (item.fs_type | default(omit)) | default('nfs') }}
+        -o {{ (item.mnt_opts | default(omit)) | default(item.client_mount_options | default(default_oim_mount_options)) }}
         {{ nfs_src }} {{ client_mount_path }}
       register: oim_mount_result
       changed_when: oim_mount_result.rc == 0

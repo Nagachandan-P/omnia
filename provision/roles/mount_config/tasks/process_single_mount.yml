@@ -86,10 +86,6 @@
           ansible.builtin.set_fact:
             ci_data_var: "{{ '{% raw %}{{ ' + mount_item.node_key + ' }}{% endraw %}' }}"
 
-        - debug:
-            var: ci_data_var
-          # debugger: always
-
         - name: Normalize node_mount_point to list
           ansible.builtin.set_fact:
             node_bind_mount_points: >-
@@ -111,11 +107,6 @@
                 ])
               }}
           loop: "{{ node_bind_mount_points }}"
-
-        - debug:
-            var: (item | b64decode)
-          loop: "{{ bind_fstab_runcmds }}"
-          # debugger: always
 
         - name: Add bind fstab commands to each target functional group (runcmd)
           ansible.builtin.set_fact:
