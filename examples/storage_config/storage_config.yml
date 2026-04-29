@@ -33,6 +33,56 @@ mount_params:
     fsck_pass: "0"
     vast_nfs_ip: "192.168.1.100"
 
+  # VAST NFS storage - high-performance with large buffers
+  vast_nfs_performance:
+    fs_type: "nfs"
+    mnt_opts: "nfsvers=3,hard,intr,noatime,nodiratime,nconnect=16,rsize=1048576,wsize=1048576"
+    dump_freq: "0"
+    fsck_pass: "0"
+
+  # PowerVault iSCSI storage - block device with XFS
+  powervault_iscsi:
+    fs_type: "xfs"
+    mnt_opts: "defaults,_netdev,noatime,x-systemd.requires=iscsi.service"
+    dump_freq: "0"
+    fsck_pass: "0"
+
+  # Network storage defaults (generic NFS, CIFS, etc.)
+  network_storage:
+    fs_type: "auto"
+    mnt_opts: "defaults,nofail,_netdev,x-systemd.after=cloud-init-network.service"
+    dump_freq: "0"
+    fsck_pass: "0"
+
+  # Local storage defaults (ext4, xfs, etc.)
+  local_storage:
+    fs_type: "auto"
+    mnt_opts: "defaults,nofail,noatime"
+    dump_freq: "0"
+    fsck_pass: "2"
+
+  # Bind mount defaults
+  bind_mounts:
+    fs_type: "none"
+    mnt_opts: "bind"
+    dump_freq: "0"
+    fsck_pass: "0"
+
+  # High-performance scratch storage
+  scratch_storage:
+    fs_type: "xfs"
+    mnt_opts: "defaults,nofail,noatime,nodiratime,largeio,inode64"
+    dump_freq: "0"
+    fsck_pass: "2"
+
+  # Global fallback defaults
+  global:
+    fs_type: "auto"
+    mnt_opts: "defaults,nofail,x-systemd.after=cloud-init-network.service"
+    dump_freq: "0"
+    fsck_pass: "2"
+
+
 # -------------------------------------- Mounts------------------------------------------------
 # mounts
 # Configure mount points compatible with cloud-init mounts module.
@@ -64,9 +114,9 @@ mount_params:
 #       - e.g., ["slurm"] matches slurm_control_node, slurm_node, etc.
 #       - If omitted (and no group), mount applies to all nodes
 #       - Mutually exclusive with group
-#   - groups: List of GROUP_NAME values from pxe_mapping_file.csv. Optional
+#   - group: List of GROUP_NAME values from pxe_mapping_file.csv. Optional
 #       - Mutually exclusive with functional_group_prefix
-#       - e.g., groups: ["grp1", "grp2"] targets only nodes in those groups
+#       - e.g., group: ["grp1", "grp2"] targets only nodes in those groups
 #   - permissions: Directory ownership and mode for the mount point. Optional
 #       - owner: User owner (name or numeric UID, e.g., "root", "slurm", "1001"). Default: "root"
 #       - group: Group owner (name or numeric GID, e.g., "root", "slurm", "1001"). Default: "root"
@@ -76,6 +126,15 @@ mount_params:
 
 # Example: static mount with all explicit params (no profile)
 # mounts:
+
+#   - name: "atomic_mount"
+#     source: "192.168.1.100:/export"
+#     mount_point: "/mnt/data"
+#     fs_type: "nfs4"
+#     mnt_opts: "nfsvers=4.1,hard,intr,noatime,nconnect=16,rsize=1048576,wsize=1048576"
+#     dump_freq: "0"
+#     fsck_pass: "0"
+#
 # Example: static mount using profile
 #   - name: "vast_home"
 #     source: "192.168.1.100:/home"
@@ -105,22 +164,73 @@ mount_params:
 # /mnt/scratch /mnted/sctratch nfs4 defaults,nofail,_netdev,x-systemd.after=cloud-init-network.service 0 0
 
 # /mnted/scratch/node001/var/loig/state  /var/loig/state  none  bind  0  0
+vast_enabled: true
 mounts:
-  - name: "nfs_slurm"
-    source: "172.16.0.254:/mnt/share/omnia"
-    mount_point: "/opt/omnia/slurm_mount"
-    fs_type: "nfs"
-    mnt_opts: "nosuid,rw,sync,hard,intr"
-    mount_on_oim: true
+  # VAST NFS: shared export for home directories
+  - name: "vast_home"
+    source: "{{ vast_nfs_ip }}:/home"
+    mount_point: "/home"
+    mount_params: "vast_nfs"
+    # Where
+    functional_group_prefix: ["slurm"]
+
+  # VAST NFS: shared export for applications
+  - name: "vast_apps"
+    source: "{{ vast_nfs_ip }}:/apps"
+    mount_point: "/apps"
+    mount_params: "vast_nfs"
     functional_group_prefix: ["slurm", "login"]
 
-  - name: "nfs_k8s"
-    source: "172.16.0.254:/mnt/share/omnia_k8s"
-    mount_point: "/opt/omnia/k8s_mount"
+  # VAST NFS: shared export for slurm state (controller)
+  - name: "vast_slurm_state"
+    source: "{{ vast_nfs_ip }}:/slurm"
+    mount_point: "/var/slurm"
+    mount_params: "vast_nfs"
+    functional_group_prefix: ["slurm_control_node_x86_64"]
+    permissions:
+      owner: "slurm"
+      group: "slurm"
+      mode: "0755"
+
+  # VAST NFS: shared scratch export
+  - name: "vast_scratch_shared"
+    source: "192.168.1.100:/scratch"
+    mount_point: "/mnt/scratch"
+    mount_params: "vast_nfs_performance"
+    functional_group_prefix: ["slurm", "login"]
+    permissions:
+      owner: "root"
+      group: "root"
+      mode: "1777"
+
+  # Per-node bind mount from shared scratch (node_key triggers bind behavior)
+  - name: "scratch_isolation"
+    source: "/mnt/scratch"
+    mount_point: "/mounted/scratch"
+    node_key: "local_hostname"
+    node_mount_point:
+      - "/scratch"
+      - "/tmp"
+    groups: ["grp1"]
+
+  # Powervault: shared export for slurm state (controller)
+  - name: "powervault_slurm_state"
+    source: "powervault:powervault2"
+    mount_point: "/mnt/slurmd-persist"
+    mount_params: "powervault_iscsi"
+    functional_group_prefix: ["slurm_node"]
+
+  # Static mount: all explicit params, no profile, applies to all nodes
+  - name: "vast_1"
+    # mount
+    source: "UUID=<uuid-from-blkid>"
+    mount_point: "/mnt/atomic"
+    # fstab entries
     fs_type: "nfs"
-    mnt_opts: "nosuid,rw,sync,hard,intr"
-    mount_on_oim: true
-    functional_group_prefix: ["service_kube"]
+    mnt_opts: "proto=rdma,defaults,nofail,_netdev,x-systemd.after=cloud-init-network.service"
+    dump_freq: "0"
+    fsck_pass: "0"
+    functional_group_prefix: ["all"]
 
 # -----------------------------Powervault-------------------------------------------
 # powervault_config
@@ -153,38 +263,57 @@ mounts:
 #       - group: Group owner (name or GID). Default: "root"
 #       - mode: Octal permission string (e.g., "0755"). Default: "0755"
 
+# Example:
 # powervault_config:
-#   # This mounts the whole powervault volume with <volume_id> to /mnt/slurm
-#   # followed by bind creation of dir <node_key> under /mnt/slurm
-#   # node_key is the key in ds.meta_data so that its unique per host
 #   - name: powervault1
-#     ip:
-#       - 172.1.2.3
+#     ip: [172.1.2.3]
 #     port: 3260
 #     iscsi_initiator: iqn.2025-01.com.dell:scontrol-node
 #     volume_id: 00c0ff4343f1f1f1001c8c4e6901000000
-#     # mount params
-#     mount_point: "/mnt/slurm"
+#     mount_point: "/mnt/slurm-persist"
 #     mount_params: "powervault_iscsi"
-#     node_key: "local_hostname" # per_node_id,node_subdir_key
-#     node_mount_point: # bind_paths, sub_mounts
-#       - "/var/lib/mysql" # /mnt/slurm/<local_hostname>/var/lib/mysql
-#       - "/var/spool/slurm" # /mnt/slurm/<local_hostname>/var/spool/slurm
+#     node_key: "local_ipv4"
+#     node_mount_point:
+#       - "/var/lib/mysql"
+#       - "/var/spool/slurm"
 #     functional_group_prefix: ["slurm_control_node"]
 #     permissions:
 #       owner: "slurm"
 #       group: "slurm"
 #       mode: "0750"
 
-  # - name: powervault2
-  #   ip:
-  #     - 172.1.2.4
-  #   port: 3260
-  #   iscsi_initiator: iqn.2025-01.com.dell:slurmd-node
-  #   volume_id: 00c0ff4343f1f1f1001c8c4e6901000001
-  #   mount_point: "/mnt/slurmd-persist"
-  #   mount_params: "powervault_iscsi"
-  #   groups: ["grp1", "grp2"]
+powervault_config:
+  # This mounts the whole powervault volume with <volume_id> to /mnt/slurm
+  # followed by bind creation of dir <node_key> under /mnt/slurm
+  # node_key is the key in ds.meta_data so that its unique per host
+  - name: powervault1
+    ip:
+      - 172.1.2.3
+    port: 3260
+    iscsi_initiator: iqn.2025-01.com.dell:scontrol-node
+    volume_id: 00c0ff4343f1f1f1001c8c4e6901000000
+    # mount params
+    mount_point: "/mnt/slurm"
+    mount_params: "powervault_iscsi"
+    node_key: "local_hostname" # per_node_id,node_subdir_key
+    node_mount_point: # bind_paths, sub_mounts
+      - "/var/lib/mysql" # /mnt/slurm/<local_hostname>/var/lib/mysql
+      - "/var/spool/slurm" # /mnt/slurm/<local_hostname>/var/spool/slurm
+    functional_group_prefix: ["slurm_control_node"]
+    permissions:
+      owner: "slurm"
+      group: "slurm"
+      mode: "0750"
+
+  - name: powervault2
+    ip:
+      - 172.1.2.4
+    port: 3260
+    iscsi_initiator: iqn.2025-01.com.dell:slurmd-node
+    volume_id: 00c0ff4343f1f1f1001c8c4e6901000001
+    mount_point: "/mnt/slurmd-persist"
+    mount_params: "powervault_iscsi"
+    groups: ["grp1", "grp2"]
 
 # -----------------------------Swap-------------------------------------------------
 # swap: Swap file configuration (list of swap configurations)
@@ -196,9 +325,9 @@ mounts:
 #   - functional_group_prefix: List of functional group prefixes. Mutually exclusive with group.
 #   - group: List of GROUP_NAME values from pxe_mapping_file.csv. Mutually exclusive with functional_group_prefix.
 
-# swap:
-#   - name: "compute_swap"
-#     filename: "/swapfile"
-#     size: "2G"
-#     maxsize: "4G"
-#     functional_group_prefix: ["slurm_node"]
+swap:
+  - name: "compute_swap"
+    filename: "/swapfile"
+    size: "2G"
+    maxsize: "4G"
+    functional_group_prefix: ["slurm_node"]
