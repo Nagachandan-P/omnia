@@ -360,7 +360,11 @@ def main():
 
     try:
         if not client.authenticate():
-            module.fail_json(msg=f"Failed to authenticate with OME at {ome_ip}")
+            module.fail_json(msg=(
+                f"Failed to authenticate with OME at {ome_ip}. "
+                "Please verify the ome_username and ome_password provided in "
+                "omnia_config_credentials.yml (managed via prepare_oim.yml) and rerun the playbook."
+            ))
 
         devices = client.get_all_devices(device_type)
         device_group_map, group_debug = client.build_device_group_map()
