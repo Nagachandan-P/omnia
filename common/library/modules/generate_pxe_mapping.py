@@ -103,6 +103,12 @@ server_count:
 DEFAULT_FUNCTIONAL_GROUP = "slurm_node_aarch64"
 SERVICE_CONTROL_PLANE_GROUP = "service_kube_control_plane_x86_64"
 
+# Roles that have a parent-child relationship with the control plane.
+# Only these roles should receive PARENT_SERVICE_TAG.
+CHILD_ROLES_OF_CONTROL_PLANE = {
+    "service_kube_node_x86_64",
+}
+
 
 def extract_su_from_hostname(bmc_hostname):
     """
@@ -229,8 +235,11 @@ def main():
             server_group = server.get('group_name', '').strip()
             resolved_functional_group = server_group if server_group else functional_group
 
-            # Derive GROUP_NAME from SU extracted from BMC hostname
+            # Derive GROUP_NAME: try SU from BMC hostname first,
+            # then from OME group name, then fall back to module default (grp0)
             su_name = extract_su_from_hostname(bmc_hostname)
+            if not su_name:
+                su_name = extract_su_from_hostname(server_group)
             resolved_group_name = su_name if su_name else group_name
 
             row = {
@@ -256,8 +265,11 @@ def main():
                 if su and su not in su_control_plane_map:
                     su_control_plane_map[su] = row["SERVICE_TAG"]
 
-        # Assign PARENT_SERVICE_TAG from control plane node of the same SU
+        # Assign PARENT_SERVICE_TAG only to child roles of the control plane
+        # within the same GROUP_NAME
         for row in rows:
+            if row["FUNCTIONAL_GROUP_NAME"] not in CHILD_ROLES_OF_CONTROL_PLANE:
+                continue
             su = row["GROUP_NAME"]
             if su in su_control_plane_map:
                 row["PARENT_SERVICE_TAG"] = su_control_plane_map[su]
