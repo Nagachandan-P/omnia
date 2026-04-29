@@ -38,6 +38,12 @@ Environment=SSL_CERTFILE=/etc/ssl/omnia/bs_cert.pem
 # Database configuration
 Environment=DATABASE_URL=postgresql://{{ postgres_user }}:{{ postgres_password }}@localhost:5432/{{ postgres_db_name }}
 
+# MinIO S3 configuration for s3cmd
+Environment=MINIO_ACCESS_KEY={{ minio_s3_username }}
+Environment=MINIO_SECRET_KEY={{ minio_s3_password }}
+Environment=MINIO_HOST={{ admin_nic_ip }}:9000
+Environment=MINIO_USE_HTTPS=False
+
 # Authentication and OAuth configuration
 Environment=ANSIBLE_VAULT_PASSWORD_FILE="/opt/omnia/input/project_default/.build_stream_oauth_credentials_key"
 Environment=OAUTH_CLIENTS_VAULT_PATH="/opt/omnia/input/project_default/build_stream_oauth_credentials.yml"
