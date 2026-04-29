@@ -97,7 +97,7 @@
               },
               "uniqueItems": true
             },
-            "group": {
+            "groups": {
               "type": "array",
               "description": "List of GROUP_NAME values from pxe_mapping_file.csv. Mutually exclusive with functional_group_prefix.",
               "items": {
@@ -135,7 +135,7 @@
           "required": ["name", "ip", "iscsi_initiator", "volume_id", "mount_point"],
           "oneOf": [
             { "required": ["functional_group_prefix"] },
-            { "required": ["group"] }
+            { "required": ["groups"] }
           ],
           "additionalProperties": false
         }
@@ -254,7 +254,10 @@
             }
           },
           "required": ["name", "source", "mount_point"],
-          "not": { "required": ["functional_group_prefix", "group"] },
+          "oneOf": [
+            { "required": ["functional_group_prefix"] },
+            { "required": ["groups"] }
+          ],
           "additionalProperties": false
         }
       },
@@ -322,7 +325,7 @@
               },
               "uniqueItems": true
             },
-            "group": {
+            "groups": {
               "type": "array",
               "description": "List of GROUP_NAME values from pxe_mapping_file.csv. Mutually exclusive with functional_group_prefix.",
               "items": {
@@ -335,7 +338,7 @@
           "required": ["filename", "size"],
           "oneOf": [
             { "required": ["functional_group_prefix"] },
-            { "required": ["group"] }
+            { "required": ["groups"] }
           ],
           "additionalProperties": false
         }

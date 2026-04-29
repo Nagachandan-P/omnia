@@ -553,6 +553,111 @@ def get_matching_clusters_for_nfs(nfs_name, omnia_config):
 
     return matching_clusters
 
+
+def _validate_groups_against_pxe_mapping(entries: list, section: str, valid_group_names: set) -> list:
+    """
+    Validates that every string in groups arrays exists in the pxe_mapping_file.csv.
+
+    Args:
+        entries (list): List of configuration entry dicts for the section.
+        section (str): Section name for error context ("powervault_config", "mounts", "swap").
+        valid_group_names (set): Set of valid GROUP_NAME values from pxe_mapping_file.csv.
+
+    Returns:
+        list: Error messages for any unrecognised group values.
+    """
+    errors = []
+
+    for idx, entry in enumerate(entries):
+        # Check 'group' field (powervault_config, swap)
+        if "group" in entry:
+            entry_name = (
+                entry.get("name")
+                or entry.get("filename")
+                or f"{section}[{idx}]"
+            )
+
+            for group in entry["group"]:
+                if group not in valid_group_names:
+                    errors.append(
+                        create_error_msg(
+                            section,
+                            entry_name,
+                            f"group value '{group}' does not match any GROUP_NAME from pxe_mapping_file.csv. "
+                            f"Valid groups are: {sorted(valid_group_names)}."
+                        )
+                    )
+
+        # Check 'groups' field (mounts)
+        if "groups" in entry:
+            entry_name = (
+                entry.get("name")
+                or entry.get("filename")
+                or f"{section}[{idx}]"
+            )
+
+            for group in entry["groups"]:
+                if group not in valid_group_names:
+                    errors.append(
+                        create_error_msg(
+                            section,
+                            entry_name,
+                            f"groups value '{group}' does not match any GROUP_NAME from pxe_mapping_file.csv. "
+                            f"Valid groups are: {sorted(valid_group_names)}."
+                        )
+                    )
+
+    return errors
+
+
+def _validate_functional_group_prefixes(entries: list, section: str) -> list:
+    """
+    Validates that every string in functional_group_prefix arrays matches at least one
+    defined functional group in FUNCTIONAL_GROUP_LAYER_MAP (prefix or exact match).
+
+    A value is valid if it is a prefix of (or equals) any key in FUNCTIONAL_GROUP_LAYER_MAP.
+    For example, "slurm_node" is valid because it prefixes "slurm_node_x86_64" and
+    "slurm_node_aarch64". An exact match such as "os_x86_64" is also valid.
+
+    Args:
+        entries (list): List of configuration entry dicts for the section.
+        section (str): Section name for error context ("powervault_config", "mounts", "swap").
+
+    Returns:
+        list: Error messages for any unrecognised functional_group_prefix values.
+    """
+    errors = []
+    valid_fg_names = set(config.FUNCTIONAL_GROUP_LAYER_MAP.keys())
+
+    for idx, entry in enumerate(entries):
+        if "functional_group_prefix" not in entry:
+            continue
+
+        entry_name = (
+            entry.get("name")
+            or entry.get("filename")
+            or f"{section}[{idx}]"
+        )
+
+        for prefix in entry["functional_group_prefix"]:
+            matched = any(
+                fg == prefix or fg.startswith(prefix + "_")
+                for fg in valid_fg_names
+            )
+            if not matched:
+                errors.append(
+                    create_error_msg(
+                        section,
+                        entry_name,
+                        f"functional_group_prefix value '{prefix}' does not match any defined "
+                        f"functional group. Valid functional groups (or their prefixes) are: "
+                        f"{sorted(valid_fg_names)}."
+                    )
+                )
+
+    return errors
+
+
 def validate_storage_config(
     input_file_path, data, logger, module, omnia_base_dir, module_utils_base, project_name
 ):
@@ -585,37 +690,279 @@ def validate_storage_config(
         software_config_json = json.load(schema_file)
     _ = software_config_json["softwares"]
 
-    allowed_options = {"nosuid", "rw", "sync", "hard", "intr"}
+    # Load pxe_mapping_file to extract valid GROUP_NAME values
+    # pxe_mapping_file_path is defined in provision_config.yml
+    provision_config_file_path = create_file_path(input_file_path, file_names["provision_config"])
+    valid_group_names = set()
+    try:
+        provision_config = validation_utils.load_yaml_as_json(
+            provision_config_file_path, omnia_base_dir, project_name, logger, module
+        )
+        pxe_mapping_file_path = provision_config.get("pxe_mapping_file_path", "")
+        if pxe_mapping_file_path and os.path.exists(pxe_mapping_file_path):
+            with open(pxe_mapping_file_path, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row and "GROUP_NAME" in row:
+                        group_name = row["GROUP_NAME"].strip()
+                        if group_name:
+                            valid_group_names.add(group_name)
+    except (IOError, OSError, ValueError, KeyError) as e:
+        logger.warning(f"Could not read pxe_mapping_file: {e}")
+
+    # Validate functional_group_prefix values against known functional groups
+    for section in ("powervault_config", "mounts", "swap"):
+        if section in data and data[section]:
+            entries = data[section]
+            errors.extend(_validate_functional_group_prefixes(entries, section))
+            # Validate groups field against pxe_mapping_file GROUP_NAME values
+            if valid_group_names:
+                errors.extend(_validate_groups_against_pxe_mapping(entries, section, valid_group_names))
 
     # Validate swap configurations for no overlapping functional groups
     if "swap" in data and data["swap"]:
         errors.extend(_validate_swap_no_overlap(data["swap"]))
+    
+    # Validate duplicate mount points per functional group and group across mounts and powervault_config
+    errors.extend(_validate_duplicate_mount_points(data))
+    
+    return errors
 
-    # for nfs_client_params in data["mounts"]:
-    #     client_mount_options = nfs_client_params["mount_point"]
-    #     client_mount_options_set = set(client_mount_options.split(","))
 
-        # if not (client_mount_options_set.issubset(allowed_options)):
-        #     errors.append(
-        #         create_error_msg(
-        #             "client_mount_options",
-        #             client_mount_options,
-        #             en_us_validation_msg.CLIENT_MOUNT_OPTIONS_FAIL_MSG,
-        #         )
-        #     )
+def _validate_duplicate_mount_points(data: dict) -> list:
+    """
+    Validates that mount points are not duplicated per expanded functional group.
+    Creates a map of expanded functional groups with all their mount points,
+    then checks for duplicates within each group's list.
 
-        # nfs_strg_name = nfs_client_params["nfs_name"]
-        # matching_clusters = get_matching_clusters_for_nfs(nfs_strg_name, omnia_config_json)
+    Args:
+        data (dict): The storage config data containing mounts and powervault_config sections.
 
-        # if not matching_clusters:
-        #     errors.append(
-        #         create_error_msg(
-        #             "For the mentioned",
-        #             nfs_strg_name,
-        #             f"in storage_config.yml, no matching cluster found in omnia_config.yml "
-        #             f"with deployment enabled for NFS '{nfs_strg_name}'."
-        #         )
-        #     )
+    Returns:
+        list: Error messages for any duplicate mount points per functional group.
+    """
+    errors = []
+    
+    # Map: {expanded_functional_group: [(mount_point, entry_name, section)]}
+    mount_map = {}
+    # Map: {mount_point: [entry_name1, entry_name2, ...]}
+    mount_point_names = {}
+    valid_fg_names = set(config.FUNCTIONAL_GROUP_LAYER_MAP.keys())
+    
+    # Helper function to expand functional group prefixes to actual functional groups
+    def expand_functional_groups(prefixes: list) -> set:
+        """Expand functional group prefixes to all matching functional groups."""
+        expanded = set()
+        for prefix in prefixes:
+            for fg in valid_fg_names:
+                if fg == prefix or fg.startswith(prefix + "_"):
+                    expanded.add(fg)
+        return expanded
+    
+    # Process mounts section
+    if "mounts" in data and data["mounts"]:
+        for mount_entry in data["mounts"]:
+            entry_name = mount_entry.get("name", "unknown")
+            mount_point = mount_entry.get("mount_point", "")
+            node_mount_points = mount_entry.get("node_mount_point", [])
+            
+            # Get functional groups and expand prefixes
+            functional_groups = mount_entry.get("functional_group_prefix", [])
+            groups = mount_entry.get("groups", [])
+            
+            expanded_fgs = expand_functional_groups(functional_groups)
+            
+            # Collect all mount points for this entry
+            all_mount_points = []
+            if mount_point:
+                all_mount_points.append(mount_point)
+            all_mount_points.extend(node_mount_points)
+            
+            # Track mount point names
+            for mp in all_mount_points:
+                if mp not in mount_point_names:
+                    mount_point_names[mp] = []
+                mount_point_names[mp].append(entry_name)
+            
+            # Add to map for each expanded functional group
+            for fg in expanded_fgs:
+                if fg not in mount_map:
+                    mount_map[fg] = []
+                for mp in all_mount_points:
+                    mount_map[fg].append((mp, entry_name, "mounts"))
+            
+            # Add to map for each group
+            for grp in groups:
+                if grp not in mount_map:
+                    mount_map[grp] = []
+                for mp in all_mount_points:
+                    mount_map[grp].append((mp, entry_name, "mounts"))
+    
+    # Process powervault_config section
+    if "powervault_config" in data and data["powervault_config"]:
+        for pv_entry in data["powervault_config"]:
+            entry_name = pv_entry.get("name", "unknown")
+            mount_point = pv_entry.get("mount_point", "")
+            node_mount_points = pv_entry.get("node_mount_point", [])
+            
+            # Get functional groups and expand prefixes
+            functional_groups = pv_entry.get("functional_group_prefix", [])
+            groups = pv_entry.get("group", [])
+            
+            expanded_fgs = expand_functional_groups(functional_groups)
+            
+            # Collect all mount points for this entry
+            all_mount_points = []
+            if mount_point:
+                all_mount_points.append(mount_point)
+            all_mount_points.extend(node_mount_points)
+            
+            # Track mount point names
+            for mp in all_mount_points:
+                if mp not in mount_point_names:
+                    mount_point_names[mp] = []
+                mount_point_names[mp].append(entry_name)
+            
+            # Add to map for each expanded functional group
+            for fg in expanded_fgs:
+                if fg not in mount_map:
+                    mount_map[fg] = []
+                for mp in all_mount_points:
+                    mount_map[fg].append((mp, entry_name, "powervault_config"))
+            
+            # Add to map for each group
+            for grp in groups:
+                if grp not in mount_map:
+                    mount_map[grp] = []
+                for mp in all_mount_points:
+                    mount_map[grp].append((mp, entry_name, "powervault_config"))
+    
+    # Check for duplicate mount points within each functional group/group
+    for fg_or_group, mount_entries in mount_map.items():
+        # Find duplicates by mount point
+        mount_point_entries = {}
+        for mp, entry_name, section in mount_entries:
+            if mp not in mount_point_entries:
+                mount_point_entries[mp] = []
+            mount_point_entries[mp].append((entry_name, section))
+        
+        # Report duplicates
+        for mount_point, entries in mount_point_entries.items():
+            if len(entries) > 1:
+                entry_names = ", ".join([f"{name}({section})" for name, section in entries])
+                errors.append(
+                    create_error_msg(
+                        "storage_config",
+                        f"functional_group/group '{fg_or_group}'",
+                        f"Mount point '{mount_point}' is duplicated in entries: {entry_names}. "
+                        f"Each mount point must be unique per functional group."
+                    )
+                )
+    
+    return errors
+
+
+def _validate_groups_against_pxe_mapping(entries: list, section: str, valid_group_names: set) -> list:
+    """
+    Validates that every string in groups arrays exists in the pxe_mapping_file.csv.
+
+    Args:
+        entries (list): List of configuration entry dicts for the section.
+        section (str): Section name for error context ("powervault_config", "mounts", "swap").
+        valid_group_names (set): Set of valid GROUP_NAME values from pxe_mapping_file.csv.
+
+    Returns:
+        list: Error messages for any unrecognised group values.
+    """
+    errors = []
+
+    for idx, entry in enumerate(entries):
+        # Check 'group' field (powervault_config, swap)
+        if "group" in entry:
+            entry_name = (
+                entry.get("name")
+                or entry.get("filename")
+                or f"{section}[{idx}]"
+            )
+
+            for group in entry["group"]:
+                if group not in valid_group_names:
+                    errors.append(
+                        create_error_msg(
+                            section,
+                            entry_name,
+                            f"group value '{group}' does not match any GROUP_NAME from pxe_mapping_file.csv. "
+                            f"Valid groups are: {sorted(valid_group_names)}."
+                        )
+                    )
+
+        # Check 'groups' field (mounts)
+        if "groups" in entry:
+            entry_name = (
+                entry.get("name")
+                or entry.get("filename")
+                or f"{section}[{idx}]"
+            )
+
+            for group in entry["groups"]:
+                if group not in valid_group_names:
+                    errors.append(
+                        create_error_msg(
+                            section,
+                            entry_name,
+                            f"groups value '{group}' does not match any GROUP_NAME from pxe_mapping_file.csv. "
+                            f"Valid groups are: {sorted(valid_group_names)}."
+                        )
+                    )
+
+    return errors
+
+
+def _validate_functional_group_prefixes(entries: list, section: str) -> list:
+    """
+    Validates that every string in functional_group_prefix arrays matches at least one
+    defined functional group in FUNCTIONAL_GROUP_LAYER_MAP (prefix or exact match).
+
+    A value is valid if it is a prefix of (or equals) any key in FUNCTIONAL_GROUP_LAYER_MAP.
+    For example, "slurm_node" is valid because it prefixes "slurm_node_x86_64" and
+    "slurm_node_aarch64". An exact match such as "os_x86_64" is also valid.
+
+    Args:
+        entries (list): List of configuration entry dicts for the section.
+        section (str): Section name for error context ("powervault_config", "mounts", "swap").
+
+    Returns:
+        list: Error messages for any unrecognised functional_group_prefix values.
+    """
+    errors = []
+    valid_fg_names = set(config.FUNCTIONAL_GROUP_LAYER_MAP.keys())
+
+    for idx, entry in enumerate(entries):
+        if "functional_group_prefix" not in entry:
+            continue
+
+        entry_name = (
+            entry.get("name")
+            or entry.get("filename")
+            or f"{section}[{idx}]"
+        )
+
+        for prefix in entry["functional_group_prefix"]:
+            matched = any(
+                fg == prefix or fg.startswith(prefix + "_")
+                for fg in valid_fg_names
+            )
+            if not matched:
+                errors.append(
+                    create_error_msg(
+                        section,
+                        entry_name,
+                        f"functional_group_prefix value '{prefix}' does not match any defined "
+                        f"functional group. Valid functional groups (or their prefixes) are: "
+                        f"{sorted(valid_fg_names)}."
+                    )
+                )
+
     return errors
 
 
