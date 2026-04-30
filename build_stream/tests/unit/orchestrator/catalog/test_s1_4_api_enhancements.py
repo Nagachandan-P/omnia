@@ -445,9 +445,22 @@ class TestResultPollerBuildImageCompletion:
         assert not ResultPoller._is_build_image_stage("parse-catalog")
         assert not ResultPoller._is_build_image_stage("deploy")
 
-    def test_on_build_image_success_creates_records(self):
+    @patch("orchestrator.common.result_poller._discover_s3_image_paths")
+    def test_on_build_image_success_creates_records(self, mock_discover):
         """Build-image success should create ImageGroup + Images."""
         from orchestrator.common.result_poller import ResultPoller
+
+        # Mock S3 discovery to return fake paths (no real s3cmd needed)
+        mock_discover.return_value = {
+            "slurm_node": [
+                "s3://boot-images/efi-images/slurm_node/img-dir/",
+                "s3://boot-images/slurm_node/img-dir/",
+            ],
+            "kube_node": [
+                "s3://boot-images/efi-images/kube_node/img-dir/",
+                "s3://boot-images/kube_node/img-dir/",
+            ],
+        }
 
         ig_repo = InMemoryImageGroupRepository()
         image_repo = InMemoryImageRepository()
@@ -507,13 +520,17 @@ class TestResultPollerBuildImageCompletion:
         assert ig.status == ImageGroupStatus.BUILT
         assert str(ig.job_id) == VALID_JOB_ID
 
-        # Verify Images were created
+        # Verify one Image per role (paths semicolon-delimited)
         images = image_repo.find_by_image_group_id(
             ImageGroupId("test-cluster")
         )
         assert len(images) == 2
         role_names = {img.role for img in images}
         assert role_names == {"slurm_node", "kube_node"}
+        for img in images:
+            paths = img.image_name.split(";")
+            assert len(paths) == 2
+            assert all(p.startswith("s3://") for p in paths)
 
     def test_on_build_image_success_no_metadata_skips(self):
         """Build-image success without catalog metadata should skip."""

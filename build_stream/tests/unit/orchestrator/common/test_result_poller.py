@@ -17,6 +17,7 @@
 import asyncio
 import json
 import uuid
+from unittest.mock import patch
 
 import pytest
 
@@ -344,8 +345,23 @@ def _store_catalog_metadata(artifact_store, artifact_metadata_repo, job_id, meta
 class TestBuildImageSuccess:
     """Tests for ImageGroup/Image creation on build-image success."""
 
-    def test_creates_image_group_and_images_on_build_image_success(self):
+    @patch("orchestrator.common.result_poller._discover_s3_image_paths")
+    def test_creates_image_group_and_images_on_build_image_success(
+        self, mock_discover
+    ):
         """On build-image success with artifact repos wired, ImageGroup + Images are created."""
+        # Mock S3 discovery to return fake paths (no real s3cmd needed)
+        mock_discover.return_value = {
+            "slurm_node_x86_64": [
+                "s3://boot-images/efi-images/slurm_node_x86_64/img-dir/",
+                "s3://boot-images/slurm_node_x86_64/img-dir/",
+            ],
+            "kube_cp_x86_64": [
+                "s3://boot-images/efi-images/kube_cp_x86_64/img-dir/",
+                "s3://boot-images/kube_cp_x86_64/img-dir/",
+            ],
+        }
+
         job_id = JobId(str(uuid.uuid4()))
 
         stage_repo = MockStageRepo()
@@ -405,11 +421,16 @@ class TestBuildImageSuccess:
         assert str(ig.id) == "test-cluster-v1"
         assert ig.status == ImageGroupStatus.BUILT
 
-        # Images should have been created for each role
+        # One Image per role (paths semicolon-delimited in image_name)
         images = img_repo.find_by_image_group_id("test-cluster-v1")
         assert len(images) == 2
         roles = {i.role for i in images}
         assert roles == {"slurm_node_x86_64", "kube_cp_x86_64"}
+        # Each image_name should contain semicolon-delimited paths
+        for img in images:
+            paths = img.image_name.split(";")
+            assert len(paths) == 2
+            assert all(p.startswith("s3://") for p in paths)
 
     def test_skips_image_group_when_artifact_repos_missing(self):
         """Without artifact repos, ImageGroup creation is skipped (the original bug)."""

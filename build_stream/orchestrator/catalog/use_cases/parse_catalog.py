@@ -383,9 +383,12 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
             key = self._artifact_store.generate_key(hint, ArtifactKind.FILE)
             raw = self._artifact_store.retrieve(key, ArtifactKind.FILE)
             digest = ArtifactDigest(hashlib.sha256(raw).hexdigest())
+            # Construct file URI directly - don't use memory:// for FileArtifactStore
+            from pathlib import Path
+            artifact_path = Path(self._artifact_store._base_path) / key.value
             metadata_ref = ArtifactRef(
                 key=key, digest=digest, size_bytes=len(raw),
-                uri=f"memory://{key.value}",
+                uri=f"file://{artifact_path}",
             )
 
         record = ArtifactRecord(

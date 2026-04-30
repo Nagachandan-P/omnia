@@ -312,7 +312,7 @@ class ImageModel(Base):
 
     # Business attributes
     role = Column(String(128), nullable=False)
-    image_name = Column(String(256), nullable=False)
+    image_name = Column(String(512), nullable=False)
 
     # Timestamps
     created_at = Column(
