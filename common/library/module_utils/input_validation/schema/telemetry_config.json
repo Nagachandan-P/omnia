@@ -39,6 +39,11 @@
       "default": 10001,
       "description": "LDMS sampler port on compute nodes. Valid range: 10001-10100. Default: 10001"
     },
+    "dcgm_support": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable or disable DCGM installation on Slurm GPU nodes."
+    },
     "powerscale_configurations": {
       "type": "object",
       "properties": {
@@ -169,7 +174,7 @@
       ]
     }
   },
-  "required": ["idrac_telemetry_support", "idrac_telemetry_collection_type", "ldms_sampler_configurations", "ldms_agg_port", "ldms_store_port", "ldms_sampler_port" ],
+  "required": ["idrac_telemetry_support", "idrac_telemetry_collection_type", "ldms_sampler_configurations", "ldms_agg_port", "ldms_store_port", "ldms_sampler_port", "dcgm_support" ],
   "$defs": {
     "kafka_configurations": {
       "type": "object",

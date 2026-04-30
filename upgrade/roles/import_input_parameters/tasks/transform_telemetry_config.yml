@@ -72,6 +72,7 @@
     telemetry_ldms_agg_port: "{{ backup_telemetry_config.ldms_agg_port | default(6001) }}"
     telemetry_ldms_store_port: "{{ backup_telemetry_config.ldms_store_port | default(6001) }}"
     telemetry_ldms_sampler_port: "{{ backup_telemetry_config.ldms_sampler_port | default(10001) }}"
+    telemetry_dcgm_support: "{{ backup_telemetry_config.dcgm_support | default(true) }}"
     telemetry_ldms_sampler_configurations: >-
       {{
         backup_telemetry_config.ldms_sampler_configurations
@@ -122,6 +123,7 @@
     telemetry_ldms_agg_port: "{{ telemetry_ldms_agg_port }}"
     telemetry_ldms_store_port: "{{ telemetry_ldms_store_port }}"
     telemetry_ldms_sampler_port: "{{ telemetry_ldms_sampler_port }}"
+    telemetry_dcgm_support: "{{ telemetry_dcgm_support }}"
     telemetry_ldms_sampler_configurations: "{{ telemetry_ldms_sampler_configurations }}"
 
 - name: Validate YAML syntax of transformed telemetry_config.yml

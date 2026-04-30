@@ -270,6 +270,14 @@ ldms_sampler_configurations:
     activation_parameters: "interval=30000000 offset=0"  # interval=30000000 microseconds (30 seconds), offset=0
 
 # ============================================================================
+# DCGM (NVIDIA Data Center GPU Manager) CONFIGURATION
+# ============================================================================
+# Enable or disable DCGM installation on Slurm GPU nodes.
+# Accepted values: true or false
+# Default: true
+dcgm_support: true
+
+# ============================================================================
 # POWERSCALE TELEMETRY CONFIGURATION
 # ============================================================================
 # PowerScale telemetry collects storage metrics from Dell PowerScale (OneFS)
