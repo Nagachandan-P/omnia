@@ -424,7 +424,8 @@
         - cp {{ k8s_client_mount_path }}/pulp_webserver.crt /etc/pki/ca-trust/source/anchors
         - update-ca-trust extract
         - sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/dnf/dnf.conf
-        - bash /usr/local/bin/doca-install.sh && bash /usr/local/bin/configure-ib-network.sh
+        - bash /usr/local/bin/doca-install.sh || true
+        - bash /usr/local/bin/configure-ib-network.sh
         - mkdir -p /etc/containers/registries.conf.d
         - mv /tmp/crio.conf /etc/containers/registries.conf.d/crio.conf
         - systemctl start crio.service
@@ -1040,6 +1041,10 @@
             fi
             systemctl restart nfs-client.target
             systemctl restart rpcbind
+
+{% if hostvars['localhost']['powerscale_configurations']['powerscale_telemetry_support'] | default(false) | bool %}
+{% include 'powerscale/deploy_powerscale_telemetry.sh.j2' %}
+{% endif %}
 
 {% if hostvars['localhost']['idrac_telemetry_support'] or hostvars['localhost']['ldms_support'] %}
             echo "Applying Telemetry Kubernetes deployments"
