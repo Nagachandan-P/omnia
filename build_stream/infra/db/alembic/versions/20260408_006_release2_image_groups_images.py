@@ -91,7 +91,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("role", sa.String(128), nullable=False),
-        sa.Column("image_name", sa.String(256), nullable=False),
+        sa.Column("image_name", sa.String(512), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
