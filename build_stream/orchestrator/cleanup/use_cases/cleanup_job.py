@@ -375,21 +375,25 @@ class CleanupJobUseCase:
 
         total_deleted = 0
         for img in ctx.images:
-            image_path = (img.image_name or "").strip()
-            if not image_path:
+            raw_path = (img.image_name or "").strip()
+            if not raw_path:
                 continue
-            if not image_path.startswith("s3://"):
-                # Legacy entries (pre-CleanUp release) stored only the
-                # filename; skip with a warning instead of raising.
-                log_secure_info(
-                    "warning",
-                    f"Skipping non-S3 legacy image_name='{image_path}' "
-                    f"for image_group={ctx.image_group_id_str}",
-                    job_id=str(ctx.image_group.job_id),
-                )
-                continue
-            result = self._s3_cleanup_service.delete_image_path(image_path)
-            total_deleted += result.objects_deleted
+            # image_name may contain multiple S3 paths separated by ";"
+            # (e.g., EFI image dir + full disk image dir for the same role).
+            individual_paths = [p.strip() for p in raw_path.split(";") if p.strip()]
+            for image_path in individual_paths:
+                if not image_path.startswith("s3://"):
+                    # Legacy entries (pre-CleanUp release) stored only the
+                    # filename; skip with a warning instead of raising.
+                    log_secure_info(
+                        "warning",
+                        f"Skipping non-S3 legacy image_name='{image_path}' "
+                        f"for image_group={ctx.image_group_id_str}",
+                        job_id=str(ctx.image_group.job_id),
+                    )
+                    continue
+                result = self._s3_cleanup_service.delete_image_path(image_path)
+                total_deleted += result.objects_deleted
         log_secure_info(
             "info",
             f"S3 cleanup totals: image_group={ctx.image_group_id_str}, "

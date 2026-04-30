@@ -459,6 +459,16 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
     )
 
     # --- Result poller ---
+    # ResultPoller needs a shared session for image_group_repo and image_repo
+    # to ensure atomic transactions (flush ImageGroup, then insert Images in same session).
+    result_poller_session = providers.Singleton(SessionLocal)
+    result_poller_image_group_repo = providers.Singleton(
+        SqlImageGroupRepository, session=result_poller_session
+    )
+    result_poller_image_repo = providers.Singleton(
+        SqlImageRepository, session=result_poller_session
+    )
+    
     result_poller = providers.Singleton(
         ResultPoller,
         result_service=playbook_queue_result_service,
@@ -467,8 +477,8 @@ class ProdContainer(containers.DeclarativeContainer):  # pylint: disable=R0903
         audit_repo=audit_repository,
         uuid_generator=uuid_generator,
         poll_interval=int(os.getenv("RESULT_POLL_INTERVAL", "5")),
-        image_group_repo=image_group_repository,
-        image_repo=image_repository,
+        image_group_repo=result_poller_image_group_repo,
+        image_repo=result_poller_image_repo,
         artifact_store=artifact_store,
         artifact_metadata_repo=artifact_metadata_repository,
     )

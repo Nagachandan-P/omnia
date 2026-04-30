@@ -497,7 +497,10 @@ class ResultPoller:
             )
 
             # Create Image entities for each role with discovered S3 paths.
-            # Note: Each role may have multiple S3 paths (e.g., EFI images + full disk images)
+            # Each role may have multiple S3 paths (e.g., EFI images + full disk images).
+            # The DB has a unique constraint on (image_group_id, role), so we store
+            # all S3 directory paths for a role in a single image_name field,
+            # semicolon-delimited.  Cleanup splits on ";" and deletes each path.
             images = []
             for role_name in role_names:
                 s3_paths = role_to_s3_paths.get(role_name, [])
@@ -510,16 +513,16 @@ class ResultPoller:
                     )
                     continue
 
-                # Create an Image record for each discovered S3 path
-                for s3_path in s3_paths:
-                    image = Image(
-                        id=str(uuid.uuid4()),
-                        image_group_id=image_group_id,
-                        role=role_name,
-                        image_name=s3_path,
-                        created_at=now,
-                    )
-                    images.append(image)
+                # Concatenate all S3 paths for this role with semicolon delimiter
+                combined_path = ";".join(s3_paths)
+                image = Image(
+                    id=str(uuid.uuid4()),
+                    image_group_id=image_group_id,
+                    role=role_name,
+                    image_name=combined_path,
+                    created_at=now,
+                )
+                images.append(image)
 
             if not images:
                 log_secure_info(
@@ -535,14 +538,17 @@ class ResultPoller:
             # In ProdContainer each repo may hold a different DB session
             # (Factory-created via providers.Factory(SessionLocal)).
             # The images table has a FK to image_groups, so the ImageGroup
-            # row must be committed (visible to other sessions) before the
+            # row must be flushed (visible within transaction) before the
             # Image INSERT can satisfy the FK constraint.
+            # We use flush() instead of commit() to keep the transaction atomic.
             try:
                 self._image_group_repo.save(image_group)
+                # Flush to make ImageGroup visible within transaction for FK constraint
                 if hasattr(self._image_group_repo, 'session'):
-                    self._image_group_repo.session.commit()
+                    self._image_group_repo.session.flush()
 
                 self._image_repo.save_batch(images)
+                # Commit only after both operations succeed
                 if hasattr(self._image_repo, 'session'):
                     self._image_repo.session.commit()
             except IntegrityError as integrity_exc:
