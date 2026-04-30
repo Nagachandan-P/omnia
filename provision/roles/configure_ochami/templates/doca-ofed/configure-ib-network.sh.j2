@@ -74,4 +74,16 @@ else
 fi
 
 echo "SUCCESS: Assigned $IB_IP/$NETMASK_BITS to $IB_NIC"
+
+# Configure DNS for InfiniBand network
+if [ -n "$IB_IP" ]; then
+    echo "Configuring DNS for InfiniBand interface"
+    
+    # Add VAST DNS servers (completely safe - handles empty arrays)
+    {% for dns_server in hostvars['localhost']['ib_network_dns'] %}
+    echo "nameserver {{ dns_server }}" >> /etc/resolv.conf
+    {% endfor %}
+    
+    echo "SUCCESS: DNS configured for IB network"
+fi
  
