@@ -250,9 +250,9 @@ list_images:
 
           # Sanitize ig_id for use as a YAML job name (replace special chars)
           safe_id = ig_id.replace('/', '_').replace(' ', '_').replace('-', '_')
-          needs_entries.append(f"select_{safe_id}")
+          needs_entries.append(f"{ig_id}")
 
-          lines.append(f"select_{safe_id}:")
+          lines.append(f"{ig_id}:")
           lines.append("  stage: select_image")
           lines.append("  when: manual")
           lines.append("  allow_failure: true")
@@ -299,11 +299,13 @@ list_images:
                   break
               print(f"  {line.rstrip()}")
       print("  " + "-" * 58)
+      print("")
+      print("  Image groups available for selection:")
       for ig in image_groups:
           ig_id = ig.get('image_group_id', 'unknown')
           job_id = ig.get('job_id', 'unknown')
           roles = ', '.join(img.get('role', '') for img in ig.get('images', []))
-          print(f"    - select_{ig_id} (Job: {job_id}, Roles: {roles})")
+          print(f"    - {ig_id} (Job: {job_id}, Roles: {roles})")
       GENERATE_CHILD_PIPELINE
 
       echo ""
@@ -311,7 +313,7 @@ list_images:
       echo ""
       echo "  User Action Required (2 clicks):"
       echo "  ------------------------------------------------------------"
-      echo "  1. Click the select_* job for the image group you want to deploy"
+      echo "  1. Click the image group job you want to deploy (e.g., 'image-build19')"
       echo "  2. After it completes, click the 'deploy' job to start deployment"
       echo "  3. Restart and validate stages will run automatically after deploy"
       echo "  ============================================================"

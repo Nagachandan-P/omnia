@@ -34,6 +34,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    """Apply migration: Add Release 2 schema changes.
+
+    Adds pipeline_phase column to jobs table, result_detail JSONB to job_stages table,
+    and creates image_groups and images tables for deployment lifecycle tracking.
+    """
     # ─── 1. Modify jobs table — add pipeline_phase ───
     op.add_column(
         "jobs",
@@ -109,6 +114,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Revert migration: Remove Release 2 schema changes.
+
+    Drops image_groups and images tables, removes result_detail from job_stages,
+    and removes pipeline_phase from jobs table.
+    """
     # Drop images table
     op.drop_index("uq_images_image_group_id_role", table_name="images")
     op.drop_index("idx_images_image_group_id", table_name="images")
