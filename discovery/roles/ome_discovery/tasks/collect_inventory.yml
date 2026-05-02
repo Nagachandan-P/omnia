@@ -47,7 +47,10 @@
       - "  Total pages:             {{ ome_inventory_result.pagination.total_pages }}"
       - "  Pages fetched:           {{ ome_inventory_result.pagination.pages_fetched }}"
       - "  Devices retrieved:       {{ ome_inventory_result.pagination.devices_retrieved }}"
-      - "  Devices after filtering: {{ ome_inventory_result.pagination.devices_after_type_filter | default(ome_inventory_result.pagination.devices_retrieved) }}"
+      - >-
+        Devices after filtering:
+        {{ ome_inventory_result.pagination.devices_after_type_filter
+        | default(ome_inventory_result.pagination.devices_retrieved) }}
 
 - name: Display connection status
   ansible.builtin.debug:
