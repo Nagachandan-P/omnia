@@ -111,7 +111,5 @@ omnia_credentials:
     mandatory:
       - { password: ldms_sampler_password }
   discovery:
-    conditional_mandatory:
-      - username: ome_username
-        password: ome_password
-        condition: "{{ ome_discovery_enabled | default(false) | bool }}"
+    mandatory:
+      - { username: ome_username, password: ome_password }
