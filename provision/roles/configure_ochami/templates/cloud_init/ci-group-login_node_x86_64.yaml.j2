@@ -150,34 +150,6 @@
           content: |
             {{ pv_entry.content | indent(12) }}
 {% endfor %}
-        - path: /root/render-host_mounts-fstab.sh
-          permissions: '0755'
-          content: |
-            #!/bin/bash
-            set -euo pipefail
-
-        {% raw %}
-            host="{{ local_hostname }}"
-            data='{{ ds.meta_data.instance_data.v1.vendor_data.groups.ssh.host_mount_map | tojson }}'
-
-            # Exit cleanly if host has no entry
-            if ! echo "$data" | jq -e --arg h "$host" '.[$h]' >/dev/null; then
-              echo "No mounts found for host $host"
-              exit 0
-            fi
-
-            # Write mounts to fstab (space separated)
-            echo "$data" | jq -r --arg h "$host" '
-              .[$h].mounts[] | join(" ")
-            ' >> /root/fstab
-
-            # Decode and execute b64_runcmd
-            echo "$data" | jq -r --arg h "$host" '
-              .[$h].b64_runcmd[]
-            ' | while read -r cmd; do
-              echo "$cmd" | base64 -d | bash
-            done
-        {% endraw %}
 
       runcmd:
 {# Mount-specific runcmd entries #}
