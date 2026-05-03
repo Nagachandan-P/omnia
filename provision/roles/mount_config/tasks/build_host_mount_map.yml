@@ -31,7 +31,7 @@
     group_host_map: >-
       {{
         group_host_map | combine({
-          item.PXE_GROUP: (group_host_map[item.PXE_GROUP] | default([])) + [item.HOSTNAME]
+          item.GROUP_NAME: (group_host_map[item.GROUP_NAME] | default([])) + [item.HOSTNAME]
         })
       }}
   loop: "{{ pxe_mapping_data.list | default([]) }}"

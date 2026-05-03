@@ -582,11 +582,26 @@
 
       runcmd:
 {# Mount-specific runcmd entries #}
-{% if cloud_init_groups_dict[functional_group_name].b64_runcmd is defined %}
+{%- if cloud_init_groups_dict[functional_group_name].b64_runcmd is defined %}
 {% for cmd in cloud_init_groups_dict[functional_group_name].b64_runcmd %}
         - {{ cmd | b64decode }}
 {% endfor %}
 {% endif %}
+{% raw %}
+      {% if ds.meta_data.instance_data.v1.vendor_data.groups.ssh.host_mount_map %}
+      {% set mymounts = ds.meta_data.instance_data.v1.vendor_data.groups.ssh.host_mount_map.get(local_hostname, {}) %}
+      {% if mymounts %}
+      {% for mount in mymounts.get("mounts", []) %}
+        - echo "{{ mount | join(' ') }}" >> /etc/fstab
+      {% endfor %}
+      {% for decoded_cmd in mymounts.get("b64_runcmd", []) %}
+        - {{ decoded_cmd }}
+      {% endfor %}
+      {% else %}
+        - echo "No mount entries found for this host"
+      {% endif %}
+      {% endif %}
+{% endraw %}
         - /usr/local/bin/set-ssh.sh
         - /usr/local/bin/install_nvidia_driver.sh
 {% if dcgm_support %}

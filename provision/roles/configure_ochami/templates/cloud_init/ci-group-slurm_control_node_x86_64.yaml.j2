@@ -291,11 +291,26 @@
 
       runcmd:
 {# Mount-specific runcmd entries #}
-{% if cloud_init_groups_dict[functional_group_name].b64_runcmd is defined %}
+{%- if cloud_init_groups_dict[functional_group_name].b64_runcmd is defined %}
 {% for cmd in cloud_init_groups_dict[functional_group_name].b64_runcmd %}
          - {{ cmd | b64decode }}
 {% endfor %}
 {% endif %}
+{% raw %}
+      {% if ds.meta_data.instance_data.v1.vendor_data.groups.ssh.host_mount_map %}
+      {% set mymounts = ds.meta_data.instance_data.v1.vendor_data.groups.ssh.host_mount_map.get(local_hostname, {}) %}
+      {% if mymounts %}
+      {% for mount in mymounts.get("mounts", []) %}
+         - echo "{{ mount | join(' ') }}" >> /etc/fstab
+      {% endfor %}
+      {% for decoded_cmd in mymounts.get("b64_runcmd", []) %}
+         - {{ decoded_cmd }}
+      {% endfor %}
+      {% else %}
+         - echo "No mount entries found for this host"
+      {% endif %}
+      {% endif %}
+{% endraw %}
          - /usr/local/bin/set-ssh.sh
          # Ensure Slurm NFS root is mounted at client_mount_path (e.g. /share_omnia)
          - mkdir -p {{ client_mount_path }}/slurm/ssh
@@ -329,7 +344,6 @@
 {% for pv_entry in cloud_init_groups_dict[functional_group_name].powervault_scripts | default([]) %}
          - bash /usr/local/bin/setup_iscsi_storage_{{ pv_entry.name }}.sh
 {% endfor %}
-
 
          - chown -R {{ slurm_user }}:{{ slurm_user }} {{ home_dir }}
          - chmod {{ file_mode_755 }} {{ home_dir }}

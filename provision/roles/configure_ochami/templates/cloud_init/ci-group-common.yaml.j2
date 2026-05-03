@@ -1,5 +1,12 @@
 - name: ssh
   description: "ssh config"
+  meta-data:
+    host_mount_map: {% set decoded_map = {} -%}
+      {%- for hostname, data in host_mount_map.items() -%}
+      {%- set decoded_cmds = data.get('b64_runcmd', []) | map('b64decode') | list -%}
+      {%- set _ = decoded_map.update({hostname: data | combine({'b64_runcmd': decoded_cmds}, recursive=True)}) -%}
+      {%- endfor -%}
+      {{ decoded_map | to_json }}
   file:
     encoding: plain
     content: |

@@ -156,7 +156,7 @@
             - name: Build permission commands
               ansible.builtin.set_fact:
                 host_permission_runcmds:
-                  - "{{ ('mkdir -p ' ~ mount_item.mount_point) | b64encode }}"
+                  - "{{ ('mkdir -pv ' ~ mount_item.mount_point) | b64encode }}"
                   - "{{ ('chown ' ~ host_perm_owner ~ ':' ~ host_perm_group ~ ' ' ~ mount_item.mount_point) | b64encode }}"
                   - "{{ ('chmod ' ~ host_perm_mode ~ ' ' ~ mount_item.mount_point) | b64encode }}"
 
@@ -179,18 +179,19 @@
           block:
             - name: Map node_key to cloud-init metadata variable
               ansible.builtin.set_fact:
-                host_cloud_init_node_var: "{{ '{{ ds.meta_data.instance_data.' + mount_item.node_key + ' }}' }}"
+                # host_cloud_init_node_var: "{{ '{% raw %}{{ ' + mount_item.node_key + ' }}{% endraw %}' }}"
+                host_cloud_init_node_var: "$(cloud-init query {{ mount_item.node_key }})"
 
             - name: Build runcmd to create node-specific subdirectory and mount points
               ansible.builtin.set_fact:
                 host_node_mount_runcmds: >-
                   {{
                     [
-                      ('mkdir -p ' ~ mount_item.mount_point ~ '/' ~ host_cloud_init_node_var) | b64encode
+                      ('mkdir -pv ' ~ mount_item.mount_point ~ '/' ~ host_cloud_init_node_var) | b64encode
                     ] +
                     (
                       mount_item.node_mount_point | map('regex_replace', '^/(.*)$',
-                        'mkdir -p ' ~ mount_item.mount_point ~ '/' ~ host_cloud_init_node_var ~ '/\1'
+                        'mkdir -pv ' ~ mount_item.mount_point ~ '/' ~ host_cloud_init_node_var ~ '/\1'
                       ) | map('b64encode') | list
                     )
                   }}
