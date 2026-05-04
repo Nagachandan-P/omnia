@@ -188,14 +188,6 @@ ldms_store_port: {{ telemetry_ldms_store_port | default(6001) }}
 # Default: 10001
 ldms_sampler_port: {{ telemetry_ldms_sampler_port | default(10001) }}
 
-# ============================================================================
-# DCGM (NVIDIA Data Center GPU Manager) CONFIGURATION
-# ============================================================================
-# Enable or disable DCGM installation on Slurm GPU nodes.
-# Accepted values: true or false
-# Default: true
-dcgm_support: {{ telemetry_dcgm_support | default(true) | bool | ternary('true', 'false') }}
-
 # LDMS Sampler Plugin Configurations
 # ----------------------------------------------------------------------------
 # Configure which metrics to collect from compute nodes and collection intervals.
