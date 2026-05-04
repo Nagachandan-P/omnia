@@ -111,7 +111,7 @@
             {{ lookup('template', 'templates/openldap/update_ldap_conf.sh.j2') | indent(12) }}
 {% endif %}
 
-{% if hostvars['localhost']['ldms_support'] %}
+{% if ldms_support %}
         - path: /root/ldms_sampler.sh
           owner: root:root
           permissions: '0755'
@@ -193,12 +193,14 @@
         - /usr/local/bin/configure_vast_installation.sh
         - mount -a
 
+
 {% if login_compiler_node_present %}
         - /usr/local/bin/generate_install_uuid.sh
         - /usr/local/bin/install_cuda_toolkit.sh
 {% endif %}
 
-{% if hostvars['localhost']['ucx_support'] or hostvars['localhost']['openmpi_support'] or hostvars['localhost']['ldms_support'] %}
+{% if hostvars['localhost']['ucx_support'] or hostvars['localhost']['openmpi_support'] or ldms_support %}
+
         # Add NFS entry and mount
         - mkdir -p {{ client_mount_path }}
         - echo "{{ cloud_init_slurm_nfs_path }} {{ client_mount_path }} nfs defaults,_netdev 0 0" >> /etc/fstab
@@ -224,7 +226,7 @@
         # - echo "NFS must be mounted at {{ client_mount_path }} before running."
 {% endif %}
 
-{% if hostvars['localhost']['ldms_support'] %}
+{% if ldms_support %}
         - echo " Starting LDMS setup " | tee -a /var/log/ldms-cloudinit.log
         - /root/ldms_sampler.sh
 {% endif %}
