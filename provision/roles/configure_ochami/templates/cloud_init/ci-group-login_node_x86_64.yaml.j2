@@ -152,10 +152,12 @@
 {% endfor %}
 
       runcmd:
+        - /usr/local/bin/set-ssh.sh
+        - /usr/local/bin/configure_vast_installation.sh
 {# Mount-specific runcmd entries #}
-{%- if cloud_init_groups_dict[functional_group_name].b64_runcmd is defined %}
-{% for cmd in cloud_init_groups_dict[functional_group_name].b64_runcmd %}
-        - {{ cmd | b64decode }}
+{%- if cloud_init_groups_dict[functional_group_name].runcmd is defined %}
+{% for cmd in cloud_init_groups_dict[functional_group_name].runcmd %}
+        - {{ cmd }}
 {% endfor %}
 {% endif %}
 {% raw %}
@@ -163,18 +165,26 @@
       {% set mymounts = ds.meta_data.instance_data.v1.vendor_data.groups.ssh.host_mount_map.get(local_hostname, {}) %}
       {% if mymounts %}
       {% for mount in mymounts.get("mounts", []) %}
+        - mkdir -pv {{ mount[1] }}
         - echo "{{ mount | join(' ') }}" >> /etc/fstab
       {% endfor %}
-      {% for decoded_cmd in mymounts.get("b64_runcmd", []) %}
+        - mount -av
+      {% for decoded_cmd in mymounts.get("runcmd", []) %}
         - {{ decoded_cmd }}
       {% endfor %}
       {% else %}
-        - echo "No mount entries found for this host"
+         - echo "No mount entries found for this host"
       {% endif %}
       {% endif %}
 {% endraw %}
-        - /root/render-host_mounts-fstab.sh
-        - /usr/local/bin/set-ssh.sh
+{% set fg_swap = cloud_init_groups_dict.get(functional_group_name, {}).get('swap', {}) %}
+{% if fg_swap %}
+        - fallocate -l {{ fg_swap.size }} {{ fg_swap.filename }} || dd if=/dev/zero of={{ fg_swap.filename }} bs=1M count={{ fg_swap.size | regex_replace('G', '000') | regex_replace('M', '') }}
+        - chmod 600 {{ fg_swap.filename }}
+        - mkswap {{ fg_swap.filename }}
+        - swapon {{ fg_swap.filename }}
+{% endif %}
+        - mount -av
         # Ensure Slurm NFS root is mounted at client_mount_path (e.g. /share_omnia)
         - mkdir -p {{ client_mount_path }}/slurm/ssh
         - mkdir -p {{ slurm_slurmd_log_dir_effective }} {{ slurm_slurmd_pid_dir_effective }} {{ slurm_slurmd_spool_dir_effective }} {{ slurm_epilog_dirs_all | join(' ') }} {% for d in slurm_prolog_dirs_all %}{{ d }} {% endfor %}/etc/munge /cert /var/log/track /var/lib/packages /hpc_tools/container_images /hpc_tools/scripts
@@ -194,8 +204,6 @@
         - chmod {{ file_mode }} /etc/fstab
         - cp /cert/pulp_webserver.crt /etc/pki/ca-trust/source/anchors && update-ca-trust
         - sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/dnf/dnf.conf
-        - /usr/local/bin/configure_vast_installation.sh
-        - mount -a
         - bash /usr/local/bin/doca-install.sh || true
         - bash /usr/local/bin/configure-ib-network.sh
 

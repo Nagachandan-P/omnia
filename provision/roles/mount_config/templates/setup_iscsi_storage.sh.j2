@@ -149,7 +149,7 @@ else
   log "Filesystem already exists on ${PART_DEV}; skipping format"
 fi
 
-mkdir -p "${MOUNT_POINT}"
+mkdir -pv "${MOUNT_POINT}"
 
 UUID=$(blkid -s UUID -o value "${PART_DEV}" 2>/dev/null || true)
 
@@ -185,14 +185,14 @@ log "Using node identifier: ${NODE_VALUE}"
 
 # Create node-specific subdirectory
 NODE_SUBDIR="${MOUNT_POINT}/${NODE_VALUE}"
-mkdir -p "${NODE_SUBDIR}"
+mkdir -pv "${NODE_SUBDIR}"
 
 {% for bind_mount in pv_entry.node_mount_point %}
 # Create bind mount subdirectory and target
 BIND_SOURCE="${NODE_SUBDIR}{{ bind_mount }}"
 BIND_TARGET="{{ bind_mount }}"
 
-mkdir -p "${BIND_SOURCE}" "${BIND_TARGET}"
+mkdir -pv "${BIND_SOURCE}" "${BIND_TARGET}"
 
 # Add bind mount to fstab if not already present
 if ! grep -qE "\s+${BIND_TARGET}\s+none\s+bind" /etc/fstab; then

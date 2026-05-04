@@ -20,7 +20,6 @@
   ansible.builtin.set_fact:
     target_functional_groups: []
 
-# Case A: functional_group_prefix specified
 - name: Match functional groups by prefix
   when: config_item.functional_group_prefix is defined and config_item.functional_group_prefix | length > 0
   block:
@@ -32,14 +31,3 @@
             select('match', '^(' + (config_item.functional_group_prefix | join('|')) + ')') |
             list
           }}
-
-# Case B: Neither specified - apply to all groups
-# - name: Apply to all functional groups when no targeting specified
-#   when: target_functional_groups | length == 0
-#   ansible.builtin.set_fact:
-#     target_functional_groups: "{{ cloud_init_groups_dict.keys() | list }}"
-
-# - name: Debug target functional groups for mount
-#   ansible.builtin.debug:
-#     msg: "Mount {{ mount_item.name | default('unnamed') }} will be added to groups: {{ target_functional_groups }}"
-#   when: target_functional_groups | length > 0
