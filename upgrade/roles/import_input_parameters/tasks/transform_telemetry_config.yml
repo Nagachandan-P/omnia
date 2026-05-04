@@ -122,7 +122,6 @@
     telemetry_ldms_agg_port: "{{ telemetry_ldms_agg_port }}"
     telemetry_ldms_store_port: "{{ telemetry_ldms_store_port }}"
     telemetry_ldms_sampler_port: "{{ telemetry_ldms_sampler_port }}"
-    telemetry_dcgm_support: "{{ telemetry_dcgm_support }}"
     telemetry_ldms_sampler_configurations: "{{ telemetry_ldms_sampler_configurations }}"
 
 - name: Validate YAML syntax of transformed telemetry_config.yml
