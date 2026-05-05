@@ -107,7 +107,7 @@
           content: |
             {{ lookup('template', 'templates/openldap/update_ldap_conf.sh.j2') | indent(12) }}
 {% endif %}
-{% if hostvars['localhost']['ldms_support'] %}
+{% if ldms_support %}
         - path: /root/ldms_sampler.sh
           owner: root:root
           permissions: '0755'
@@ -307,7 +307,7 @@
 
 {% endif %}
 
-{% if hostvars['localhost']['ldms_support'] %}
+{% if ldms_support %}
         - echo " Starting LDMS setup " | tee -a /var/log/ldms-cloudinit.log
 
         # Add NFS entry and mount
