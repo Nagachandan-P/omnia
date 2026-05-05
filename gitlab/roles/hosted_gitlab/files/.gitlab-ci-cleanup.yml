@@ -215,7 +215,7 @@ list_images:
 
           safe_id = ig_id.replace('/', '_').replace(' ', '_').replace('-', '_')
 
-          lines.append(f"select_{safe_id}:")
+          lines.append(f"{ig_id}:")
           lines.append("  stage: select_image")
           lines.append("  when: manual")
           lines.append("  allow_failure: true")
@@ -255,8 +255,7 @@ list_images:
           ig_id = ig.get('image_group_id', 'unknown')
           job_id = ig.get('job_id', 'unknown')
           status = ig.get('status', 'unknown')
-          safe = ig_id.replace('/', '_').replace(' ', '_').replace('-', '_')
-          print(f"    - select_{safe} (Job: {job_id}, Status: {status})")
+          print(f"    - {ig_id} (Job: {job_id}, Status: {status})")
       GENERATE_CHILD_PIPELINE
 
       echo ""
@@ -264,7 +263,7 @@ list_images:
       echo ""
       echo "  User Action Required (2 clicks):"
       echo "  ------------------------------------------------------------"
-      echo "  1. Click the select_* button for the image group to clean up"
+      echo "  1. Click the image group button to clean up (e.g., 'image-build19')"
       echo "  2. After it completes, click the 'cleanup' button to delete"
       echo "  3. Summary stage runs automatically after cleanup"
       echo "  ============================================================"
