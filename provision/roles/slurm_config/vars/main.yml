@@ -162,6 +162,10 @@ nvhpc_tarball_aarch64_relpath: "offline_repo/cluster/aarch64/rhel/{{ hostvars['l
 
 nvhpc_nfs_rel_dir: "hpc_tools/nvidia_sdk"
 
+# Benchmark pull script path
+pull_benchmarks_script_path: "{{ slurm_config_path }}/hpc_tools/scripts/pull_benchmarks.sh"
+benchmark_tools_list_path: "{{ slurm_config_path }}/hpc_tools/scripts/benchmark_tools.list"
+
 # parallel file copy
 parallel_copy_max_workers: 4
 
@@ -180,58 +184,5 @@ parallel_copy_candidates:
     src: "{{ oim_shared_path }}/omnia/{{ nvhpc_tarball_aarch64_relpath | dirname }}/"
     dest: "{{ slurm_config_path }}/hpc_tools/nvidia_sdk/"
 
-  # HPC Benchmark source artifacts (x86_64)
-  - name: benchmark_msr_safe_x86_64
-    src: "{{ oim_shared_path }}/omnia/offline_repo/cluster/x86_64/rhel/{{ hostvars['localhost']['cluster_os_version'] }}/tarball/msr-safe"
-    dest: "{{ slurm_config_path }}/hpc_tools/msr-safe"
-
-  - name: benchmark_likwid_x86_64
-    src: "{{ oim_shared_path }}/omnia/offline_repo/cluster/x86_64/rhel/{{ hostvars['localhost']['cluster_os_version'] }}/tarball/likwid"
-    dest: "{{ slurm_config_path }}/hpc_tools/likwid"
-
-  - name: benchmark_geopm_x86_64
-    src: "{{ oim_shared_path }}/omnia/offline_repo/cluster/x86_64/rhel/{{ hostvars['localhost']['cluster_os_version'] }}/tarball/geopm"
-    dest: "{{ slurm_config_path }}/hpc_tools/geopm"
-
-  - name: benchmark_papi_x86_64
-    src: "{{ oim_shared_path }}/omnia/offline_repo/cluster/x86_64/rhel/{{ hostvars['localhost']['cluster_os_version'] }}/tarball/papi"
-    dest: "{{ slurm_config_path }}/hpc_tools/papi"
-
-  - name: benchmark_sionlib_x86_64
-    src: "{{ oim_shared_path }}/omnia/offline_repo/cluster/x86_64/rhel/{{ hostvars['localhost']['cluster_os_version'] }}/tarball/sionlib"
-    dest: "{{ slurm_config_path }}/hpc_tools/sionlib"
-
-  - name: benchmark_osu_x86_64
-    src: "{{ oim_shared_path }}/omnia/offline_repo/cluster/x86_64/rhel/{{ hostvars['localhost']['cluster_os_version'] }}/tarball/osu-micro-benchmarks"
-    dest: "{{ slurm_config_path }}/hpc_tools/osu-micro-benchmarks"
-
-  - name: benchmark_imb_x86_64
-    src: "{{ oim_shared_path }}/omnia/offline_repo/cluster/x86_64/rhel/{{ hostvars['localhost']['cluster_os_version'] }}/tarball/imb"
-    dest: "{{ slurm_config_path }}/hpc_tools/imb"
-
-  # HPC Benchmark source artifacts (aarch64)
-  - name: benchmark_likwid_aarch64
-    src: "{{ oim_shared_path }}/omnia/offline_repo/cluster/aarch64/rhel/{{ hostvars['localhost']['cluster_os_version'] }}/tarball/likwid"
-    dest: "{{ slurm_config_path }}/hpc_tools/likwid"
-
-  - name: benchmark_geopm_aarch64
-    src: "{{ oim_shared_path }}/omnia/offline_repo/cluster/aarch64/rhel/{{ hostvars['localhost']['cluster_os_version'] }}/tarball/geopm"
-    dest: "{{ slurm_config_path }}/hpc_tools/geopm"
-
-  - name: benchmark_papi_aarch64
-    src: "{{ oim_shared_path }}/omnia/offline_repo/cluster/aarch64/rhel/{{ hostvars['localhost']['cluster_os_version'] }}/tarball/papi"
-    dest: "{{ slurm_config_path }}/hpc_tools/papi"
-
-  - name: benchmark_sionlib_aarch64
-    src: "{{ oim_shared_path }}/omnia/offline_repo/cluster/aarch64/rhel/{{ hostvars['localhost']['cluster_os_version'] }}/tarball/sionlib"
-    dest: "{{ slurm_config_path }}/hpc_tools/sionlib"
-
-  - name: benchmark_osu_aarch64
-    src: "{{ oim_shared_path }}/omnia/offline_repo/cluster/aarch64/rhel/{{ hostvars['localhost']['cluster_os_version'] }}/tarball/osu-micro-benchmarks"
-    dest: "{{ slurm_config_path }}/hpc_tools/osu-micro-benchmarks"
-
-  - name: benchmark_imb_aarch64
-    src: "{{ oim_shared_path }}/omnia/offline_repo/cluster/aarch64/rhel/{{ hostvars['localhost']['cluster_os_version'] }}/tarball/imb"
-    dest: "{{ slurm_config_path }}/hpc_tools/imb"
-
+  
 backup_dir: "{{ slurm_config_path }}/{{ ctld_list[0] }}/etc/slurm/backup_{{ ansible_date_time.date }}_{{ ansible_date_time.time | replace(':', '-') }}"

@@ -25,16 +25,6 @@
     - scripts
     - container_images
     - nvidia_sdk
-    - msr-safe
-    - likwid
-    - geopm
-    - papi
-    - sionlib
-    - osu-micro-benchmarks
-    - imb
-  when:
-    - (item != 'msr-safe') or (ansible_architecture == 'x86_64')
-  register: benchmark_dirs_created
 
 - name: Deploy download_container_image.sh to NFS share
   ansible.builtin.template:
@@ -48,6 +38,22 @@
   ansible.builtin.template:
     src: "container_image.list.j2"
     dest: "{{ container_image_list_path }}"
+    owner: "{{ root_user }}"
+    group: "{{ root_group }}"
+    mode: "0644"
+
+- name: Deploy pull_benchmarks.sh to NFS share
+  ansible.builtin.template:
+    src: "pull_benchmarks.sh.j2"
+    dest: "{{ pull_benchmarks_script_path }}"
+    owner: "{{ root_user }}"
+    group: "{{ root_group }}"
+    mode: "0755"
+
+- name: Deploy benchmark_tools.list to NFS share
+  ansible.builtin.template:
+    src: "benchmark_tools.list.j2"
+    dest: "{{ benchmark_tools_list_path }}"
     owner: "{{ root_user }}"
     group: "{{ root_group }}"
     mode: "0644"
@@ -156,24 +162,3 @@
     copy_pairs: "{{ parallel_copy_pairs }}"
     max_workers: "{{ parallel_copy_max_workers }}"
   when: parallel_copy_pairs | length > 0
-
-- name: Set benchmark tools to validate
-  ansible.builtin.set_fact:
-    benchmark_tools_to_validate: "{{ benchmark_tools_common + (['msr-safe'] if ansible_architecture == 'x86_64' else []) }}"
-  vars:
-    benchmark_tools_common:
-      - likwid
-      - geopm
-      - papi
-      - sionlib
-      - osu-micro-benchmarks
-      - imb
-  when: ansible_architecture in ['aarch64', 'x86_64']
-
-- name: Validate benchmark directories exist
-  ansible.builtin.stat:
-    path: "{{ slurm_config_path }}/hpc_tools/{{ item }}"
-  loop: "{{ benchmark_tools_to_validate }}"
-  register: benchmark_dir_stats
-  failed_when: not benchmark_dir_stats.stat.exists
-  ignore_errors: true
