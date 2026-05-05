@@ -125,6 +125,8 @@ cloud_init_failed_msg: |
   1. Check service status: systemctl status cloud-init-server
   2. View logs: journalctl -u cloud-init-server -n 50
   3. Restart service: systemctl restart cloud-init-server
+  4. Rerun provision.yml: ansible-playbook provision/provision.yml
+
 openchami_target_failed_msg: |
   openchami.target is not up after {{ service_retries }} retries.
   Next steps:
@@ -132,6 +134,8 @@ openchami_target_failed_msg: |
   2. View logs: journalctl -u openchami.target -n 50
   3. Check individual services: systemctl status smd bss cloud-init
   4. Restart target: systemctl restart openchami.target
+  5. Rerun provision.yml: ansible-playbook provision/provision.yml
+
 ochami_discovery_failed_msg: |
   Failed to discover ochami nodes after retries.
   Next steps:
@@ -140,3 +144,4 @@ ochami_discovery_failed_msg: |
   3. View SMD logs
   4. Check ochami CLI: /usr/bin/ochami smd service status
   5. Restart openchami.target: systemctl restart openchami.target
+  6. Rerun provision.yml: ansible-playbook provision/provision.yml
