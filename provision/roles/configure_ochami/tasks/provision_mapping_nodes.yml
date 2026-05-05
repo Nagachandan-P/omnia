@@ -118,7 +118,7 @@
             - smd_service_status is not success
 
         - name: Wait for SMD API to be ready
-          ansible.builtin.command: ochami smd service status
+          ansible.builtin.command: /usr/bin/ochami smd service status
           register: smd_api_ready
           retries: "{{ service_retries }}"
           delay: "{{ service_retry_interval }}"
