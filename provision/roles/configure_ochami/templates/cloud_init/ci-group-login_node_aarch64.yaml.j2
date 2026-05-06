@@ -180,12 +180,19 @@
 {% endraw %}
 {% set fg_swap = cloud_init_groups_dict.get(functional_group_name, {}).get('swap', {}) %}
 {% if fg_swap %}
-        - fallocate -l {{ fg_swap.size }} {{ fg_swap.filename }} || dd if=/dev/zero of={{ fg_swap.filename }} bs=1M count={{ fg_swap.size | regex_replace('G', '000') | regex_replace('M', '') }}
-        - chmod 600 {{ fg_swap.filename }}
-        - mkswap {{ fg_swap.filename }}
-        - swapon {{ fg_swap.filename }}
+        - |
+          set -e
+          if ! swapon --show | grep -q "{{ fg_swap.filename }}"; then
+            fallocate -l {{ fg_swap.size }} {{ fg_swap.filename }}
+            chmod 600 {{ fg_swap.filename }}
+            mkswap {{ fg_swap.filename }}
+            swapon {{ fg_swap.filename }}
+          fi
 {% endif %}
         - mount -av
+{% for pv_entry in cloud_init_groups_dict[functional_group_name].powervault_scripts | default([]) %}
+        - /usr/local/bin/setup_iscsi_storage_{{ pv_entry.name }}.sh
+{% endfor %}
         # Ensure Slurm NFS root is mounted at client_mount_path (e.g. /share_omnia)
         - mkdir -p {{ client_mount_path }}/slurm/ssh
         - mkdir -p {{ slurm_slurmd_log_dir_effective }} {{ slurm_slurmd_pid_dir_effective }} {{ slurm_slurmd_spool_dir_effective }} {{ slurm_epilog_dirs_all | join(' ') }} {% for d in slurm_prolog_dirs_all %}{{ d }} {% endfor %}/etc/munge /cert /var/log/track /var/lib/packages /hpc_tools/container_images /hpc_tools/scripts
@@ -206,9 +213,6 @@
 
         - bash /usr/local/bin/doca-install.sh || true
         - bash /usr/local/bin/configure-ib-network.sh
-{% for pv_entry in cloud_init_groups_dict[functional_group_name].powervault_scripts | default([]) %}
-        - /usr/local/bin/setup_iscsi_storage_{{ pv_entry.name }}.sh
-{% endfor %}
         - /usr/local/bin/check_slurm_controller_status.sh
         - chown -R {{ slurm_user }}:{{ slurm_user }} {{ slurm_slurmd_log_dir_effective }}
         - chown -R {{ slurm_user }}:{{ slurm_user }} {{ slurm_slurmd_pid_dir_effective }}
@@ -302,17 +306,14 @@
         - setsebool -P authlogin_yubikey on
         - sudo systemctl restart sssd
         - systemctl restart sshd
-
 {% endif %}
 
 {% if ldms_support %}
         - echo " Starting LDMS setup " | tee -a /var/log/ldms-cloudinit.log
-
         # Add NFS entry and mount
         - mkdir -p {{ client_mount_path }}
         - echo "{{ cloud_init_slurm_nfs_path }} {{ client_mount_path }} nfs defaults,_netdev 0 0" >> /etc/fstab
-        - mount -a
-
+        - mount -av
         - /root/ldms_sampler.sh
 {% endif %}
         - echo "Cloud-Init has completed successfully."

@@ -62,11 +62,7 @@
 
         - name: Add permissions to runcmd
           ansible.builtin.set_fact:
-            single_mnt_runcmd: "{{ single_mnt_runcmd + permission_runcmds }}"
-
-    - name: Refresh mounts
-      ansible.builtin.set_fact:
-        single_mnt_runcmd: "{{ single_mnt_runcmd + ['mount -av'] }}"
+            single_mnt_runcmd: "{{ single_mnt_runcmd + permission_runcmds + ['mount -av'] }}"
 
     - name: Add node_key bind mount runcmd entries if node_key specified
       when: mount_item.node_key is defined and mount_item.node_mount_point is defined
@@ -100,12 +96,8 @@
 
         - name: Add bind_fstab_runcmds to single_mnt_runcmd
           ansible.builtin.set_fact:
-            single_mnt_runcmd: "{{ single_mnt_runcmd + bind_fstab_runcmds }}"
+            single_mnt_runcmd: "{{ single_mnt_runcmd + bind_fstab_runcmds + ['mount -av'] }}"
             bind_fstab_runcmds: []
-
-    - name: Debug single_mnt_runcmd
-      ansible.builtin.debug:
-        var: single_mnt_runcmd
 
     - name: Determine target functional groups
       ansible.builtin.include_tasks: determine_target_groups.yml
@@ -121,6 +113,8 @@
                 }, recursive=True))
               }, recursive=True) }}
       loop: "{{ target_functional_groups }}"
+      loop_control:
+        label: "{{ item }}"
 
     - name: Add mount to host-specific map if groups field specified
       when: mount_item.groups is defined and mount_item.groups | length > 0 and group_host_map | length > 0
@@ -200,7 +194,11 @@
                         'mkdir -pv ' ~ host_cloud_init_node_mount_point ~ '/\1'
                       ) | list
                       +
-                      ( mount_item.node_mount_point | map('regex_replace', '^/(.*)$', 'mkdir -pv /\1') | list )
+                      (
+                        mount_item.node_mount_point | map('regex_replace', '^/(.*)$',
+                          'mkdir -pv /\1'
+                        ) | list
+                      )
                       +
                       (
                         mount_item.node_mount_point | map('regex_replace', '^/(.*)$',
