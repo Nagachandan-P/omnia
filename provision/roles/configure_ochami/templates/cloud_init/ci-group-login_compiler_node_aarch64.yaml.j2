@@ -211,7 +211,7 @@
           set -e
           if ! swapon --show | grep -q "{{ fg_swap.filename }}"; then
             fallocate -l {{ fg_swap.size }} {{ fg_swap.filename }}
-            chmod 600 {{ fg_swap.filename }}
+            chmod 0600 {{ fg_swap.filename }}
             mkswap {{ fg_swap.filename }}
             swapon {{ fg_swap.filename }}
           fi

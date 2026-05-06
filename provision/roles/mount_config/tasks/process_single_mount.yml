@@ -96,7 +96,7 @@
 
         - name: Add bind_fstab_runcmds to single_mnt_runcmd
           ansible.builtin.set_fact:
-            single_mnt_runcmd: "{{ single_mnt_runcmd + bind_fstab_runcmds + ['mount -av'] }}"
+            single_mnt_runcmd: "{{ single_mnt_runcmd + bind_fstab_runcmds }}"
             bind_fstab_runcmds: []
 
     - name: Determine target functional groups

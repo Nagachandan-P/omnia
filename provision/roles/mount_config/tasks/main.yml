@@ -20,17 +20,6 @@
     file: "{{ software_config_file }}"
     name: software_config
 
-# - ansible.builtin.debug:
-#     var: hostvars['localhost']['oim_shared_path']
-#   debugger: always
-
-# - name: Set PXE mapping file path if provided
-#   ansible.builtin.set_fact:
-#     pxe_mapping_file_path: "{{ hostvars['localhost']['pxe_mapping_file_path'] | default('') }}"
-
-
-# TODO: modify mounts to include mount_params
-
 - name: Generate cloud-init mounts module compatible format form mounts
   ansible.builtin.include_tasks: cloud_init.yml
 
@@ -39,7 +28,14 @@
 
 - name: Check if slurm support is true
   ansible.builtin.set_fact:
-    slurm_support: "{{ software_config.softwares | selectattr('name', 'in', ['slurm', 'slurm_custom']) | list | length > 0 }}"
+    slurm_support: false
+
+- name: Check if slurm support is true and if not slurm nodes in 'functional_groups'
+  ansible.builtin.set_fact:
+    slurm_support: true
+  when:
+    - (software_config.softwares | selectattr('name', 'in', ['slurm_custom']) | list | length) > 0
+    - "'slurm_control_node_x86_64' in (hostvars['localhost']['functional_groups'] | map(attribute='name') | list)"
 
 - name: Check if service_k8s support is true
   ansible.builtin.set_fact:

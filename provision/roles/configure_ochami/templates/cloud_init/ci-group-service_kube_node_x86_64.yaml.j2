@@ -180,6 +180,7 @@
         - bash /usr/local/bin/setup_iscsi_storage_{{ pv_entry.name }}.sh
 {% endfor %}
         # K8s NFS mount entries
+        - mkdir -pv /tmp/crio-storage {{ k8s_client_mount_path }} /var/lib/kubelet /etc/kubernetes /var/log/pods /var/lib/packages
         - echo "{{ k8s_nfs_server_path }}/{% raw %}{{ ds.meta_data.instance_data.local_ipv4 }}{% endraw %}/kubelet   /var/lib/kubelet     nfs noatime,nolock 0 0" >> /etc/fstab
         - echo "{{ k8s_nfs_server_path }}/{% raw %}{{ ds.meta_data.instance_data.local_ipv4 }}{% endraw %}/kubernetes   /etc/kubernetes      nfs noatime,nolock 0 0" >> /etc/fstab
         - echo "{{ k8s_nfs_server_path }}/{% raw %}{{ ds.meta_data.instance_data.local_ipv4 }}{% endraw %}/pod-logs   /var/log/pods      nfs noatime,nolock 0 0" >> /etc/fstab
@@ -230,7 +231,6 @@
         - sudo modprobe nf_conntrack || true
         - sudo modprobe vxlan || true
         - sysctl --system
-        - mkdir -p /tmp/crio-storage {{ k8s_client_mount_path }} /var/lib/kubelet /etc/kubernetes /var/log/pods /var/lib/packages
         - |
           tmpfile=$(mktemp)
 

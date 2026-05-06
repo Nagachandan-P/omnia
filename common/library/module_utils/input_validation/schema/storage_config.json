@@ -166,7 +166,7 @@
             "fs_type": {
               "type": "string",
               "description": "Filesystem type. Overrides mount_params profile when specified.",
-              "enum": ["auto", "ext2", "ext3", "ext4", "xfs", "btrfs", "nfs", "nfs4", "cifs", "tmpfs", "cephfs", "vfat", "ntfs", "none", "beegfs", "fuse.s3fs"]
+              "enum": ["auto", "ext2", "ext3", "ext4", "xfs", "nfs", "nfs4", "cifs", "tmpfs", "cephfs", "vfat", "ntfs", "none", "fuse.s3fs"]
             },
             "mnt_opts": {
               "type": "string",
@@ -271,7 +271,7 @@
               "fs_type": {
                 "type": "string",
                 "description": "Default filesystem type",
-                "enum": ["auto", "ext2", "ext3", "ext4", "xfs", "btrfs", "nfs", "nfs4", "cifs", "tmpfs", "cephfs", "vfat", "ntfs", "none", "beegfs", "fuse.s3fs"]
+                "enum": ["auto", "ext2", "ext3", "ext4", "xfs", "nfs", "nfs4", "cifs", "tmpfs", "cephfs", "vfat", "ntfs", "none", "fuse.s3fs"]
               },
               "mnt_opts": {
                 "type": "string",
