@@ -23,10 +23,10 @@
     },
     "slurm_control_node": {
         "cluster": [
-            {"package": "slurm-slurmctld", "type": "rpm", "repo_name": "x86_64_slurm_custom"},
-            {"package": "slurm-slurmdbd", "type": "rpm", "repo_name": "x86_64_slurm_custom"},
-            {"package": "python3-PyMySQL", "type": "rpm", "repo_name": "x86_64_appstream"},
-            {"package": "mariadb-server", "type": "rpm", "repo_name": "x86_64_appstream"}
+            {"package": "slurm-slurmctld", "type": "rpm", "repo_name": "slurm_custom"},
+            {"package": "slurm-slurmdbd", "type": "rpm", "repo_name": "slurm_custom"},
+            {"package": "python3-PyMySQL", "type": "rpm", "repo_name": "appstream"},
+            {"package": "mariadb-server", "type": "rpm", "repo_name": "appstream"}
         ]
     },
     "slurm_node": {
@@ -44,14 +44,14 @@
     },
     "login_node":{
         "cluster": [
-            {"package": "slurm-slurmd", "type": "rpm", "repo_name": "x86_64_slurm_custom"},
-            {"package": "slurm", "type": "rpm", "repo_name": "x86_64_slurm_custom"}
+            {"package": "slurm-slurmd", "type": "rpm", "repo_name": "slurm_custom"},
+            {"package": "slurm", "type": "rpm", "repo_name": "slurm_custom"}
         ]
     },
     "login_compiler_node":{
         "cluster": [
-            {"package": "slurm", "type": "rpm", "repo_name": "x86_64_slurm_custom"},
-            {"package": "slurm-slurmd", "type": "rpm", "repo_name": "x86_64_slurm_custom"}
+            {"package": "slurm", "type": "rpm", "repo_name": "slurm_custom"},
+            {"package": "slurm-slurmd", "type": "rpm", "repo_name": "slurm_custom"}
         ]
     }
 }
