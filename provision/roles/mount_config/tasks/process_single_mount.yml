@@ -62,7 +62,12 @@
 
         - name: Add permissions to runcmd
           ansible.builtin.set_fact:
-            single_mnt_runcmd: "{{ single_mnt_runcmd + permission_runcmds + ['mount -av'] }}"
+            single_mnt_runcmd: "{{ single_mnt_runcmd + permission_runcmds }}"
+
+    # Has to be mounted before submounts
+    - name: Add mount -av to runcmd # TODO minimize calls to mount -av
+      ansible.builtin.set_fact:
+        single_mnt_runcmd: "{{ single_mnt_runcmd + ['mount -av'] }}"
 
     - name: Add node_key bind mount runcmd entries if node_key specified
       when: mount_item.node_key is defined and mount_item.node_mount_point is defined
