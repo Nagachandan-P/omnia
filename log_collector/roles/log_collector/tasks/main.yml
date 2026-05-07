@@ -57,12 +57,28 @@
           message: >-
             {{
               (
-                'Node ' + inventory_hostname + ' (' + (ansible_host | default('unknown')) + ') not reachable via SSH during stage ' + stage + ': ' + failure_detail + '. Continuing bundle generation.'
+                'Node '
+                + inventory_hostname
+                + ' ('
+                + (ansible_host | default('unknown'))
+                + ') not reachable via SSH during stage '
+                + stage
+                + ': '
+                + failure_detail
+                + '. Continuing bundle generation.'
               )
               if failure_reason == 'unreachable'
               else
               (
-                'Collection task failed for stage ' + stage + ' on node ' + inventory_hostname + ' (' + (ansible_host | default('unknown')) + '): ' + failure_detail + '. Continuing bundle generation.'
+                'Collection task failed for stage '
+                + stage
+                + ' on node '
+                + inventory_hostname
+                + ' ('
+                + (ansible_host | default('unknown'))
+                + '): '
+                + failure_detail
+                + '. Continuing bundle generation.'
               )
             }}
           timestamp: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y-%m-%dT%H:%M:%S+05:30') }}"
@@ -97,12 +113,28 @@
           message: >-
             {{
               (
-                'Node ' + inventory_hostname + ' (' + (ansible_host | default('unknown')) + ') not reachable via SSH during stage ' + stage + ': ' + failure_detail + '. Continuing bundle generation.'
+                'Node '
+                + inventory_hostname
+                + ' ('
+                + (ansible_host | default('unknown'))
+                + ') not reachable via SSH during stage '
+                + stage
+                + ': '
+                + failure_detail
+                + '. Continuing bundle generation.'
               )
               if failure_reason == 'unreachable'
               else
               (
-                'Collection task failed for stage ' + stage + ' on node ' + inventory_hostname + ' (' + (ansible_host | default('unknown')) + '): ' + failure_detail + '. Continuing bundle generation.'
+                'Collection task failed for stage '
+                + stage
+                + ' on node '
+                + inventory_hostname
+                + ' ('
+                + (ansible_host | default('unknown'))
+                + '): '
+                + failure_detail
+                + '. Continuing bundle generation.'
               )
             }}
           timestamp: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y-%m-%dT%H:%M:%S+05:30') }}"

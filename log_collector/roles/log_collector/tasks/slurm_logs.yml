@@ -32,7 +32,16 @@
           node_name: "{{ inventory_hostname }}"
           node_ip: "{{ ansible_host | default('unknown') }}"
           reason: missing_source
-          message: "{{ 'Expected log directory ' + item.item + ' missing on node ' + inventory_hostname + ' (' + (ansible_host | default('unknown')) + '); continuing collection.' }}"
+          message: >-
+            {{
+              'Expected log directory '
+              + item.item
+              + ' missing on node '
+              + inventory_hostname
+              + ' ('
+              + (ansible_host | default('unknown'))
+              + '); continuing collection.'
+            }}
           timestamp: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y-%m-%dT%H:%M:%S+05:30') }}"
       loop: "{{ slurm_ctl_dir_stat.results }}"
       when: not (item.stat.isdir | default(false))
@@ -69,7 +78,16 @@
           node_name: "{{ inventory_hostname }}"
           node_ip: "{{ ansible_host | default('unknown') }}"
           reason: missing_source
-          message: "{{ 'Expected log file ' + item.item + ' missing on node ' + inventory_hostname + ' (' + (ansible_host | default('unknown')) + '); continuing collection.' }}"
+          message: >-
+            {{
+              'Expected log file '
+              + item.item
+              + ' missing on node '
+              + inventory_hostname
+              + ' ('
+              + (ansible_host | default('unknown'))
+              + '); continuing collection.'
+            }}
           timestamp: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y-%m-%dT%H:%M:%S+05:30') }}"
       loop: "{{ slurm_ctl_files.results }}"
       when: not (item.stat.isreg | default(false))
@@ -100,7 +118,16 @@
           node_name: "{{ inventory_hostname }}"
           node_ip: "{{ ansible_host | default('unknown') }}"
           reason: missing_source
-          message: "{{ 'Expected log directory ' + item.item + ' missing on node ' + inventory_hostname + ' (' + (ansible_host | default('unknown')) + '); continuing collection.' }}"
+          message: >-
+            {{
+              'Expected log directory '
+              + item.item
+              + ' missing on node '
+              + inventory_hostname
+              + ' ('
+              + (ansible_host | default('unknown'))
+              + '); continuing collection.'
+            }}
           timestamp: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y-%m-%dT%H:%M:%S+05:30') }}"
       loop: "{{ slurm_node_dir_stat.results }}"
       when: not (item.stat.isdir | default(false))
@@ -137,7 +164,16 @@
           node_name: "{{ inventory_hostname }}"
           node_ip: "{{ ansible_host | default('unknown') }}"
           reason: missing_source
-          message: "{{ 'Expected log file ' + item.item + ' missing on node ' + inventory_hostname + ' (' + (ansible_host | default('unknown')) + '); continuing collection.' }}"
+          message: >-
+            {{
+              'Expected log file '
+              + item.item
+              + ' missing on node '
+              + inventory_hostname
+              + ' ('
+              + (ansible_host | default('unknown'))
+              + '); continuing collection.'
+            }}
           timestamp: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y-%m-%dT%H:%M:%S+05:30') }}"
       loop: "{{ slurm_node_files.results }}"
       when: not (item.stat.isreg | default(false))
@@ -168,7 +204,16 @@
           node_name: "{{ inventory_hostname }}"
           node_ip: "{{ ansible_host | default('unknown') }}"
           reason: missing_source
-          message: "{{ 'Expected log directory ' + item.item + ' missing on node ' + inventory_hostname + ' (' + (ansible_host | default('unknown')) + '); continuing collection.' }}"
+          message: >-
+            {{
+              'Expected log directory '
+              + item.item
+              + ' missing on node '
+              + inventory_hostname
+              + ' ('
+              + (ansible_host | default('unknown'))
+              + '); continuing collection.'
+            }}
           timestamp: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y-%m-%dT%H:%M:%S+05:30') }}"
       loop: "{{ login_node_dir_stat.results }}"
       when: not (item.stat.isdir | default(false))
@@ -205,7 +250,16 @@
           node_name: "{{ inventory_hostname }}"
           node_ip: "{{ ansible_host | default('unknown') }}"
           reason: missing_source
-          message: "{{ 'Expected log file ' + item.item + ' missing on node ' + inventory_hostname + ' (' + (ansible_host | default('unknown')) + '); continuing collection.' }}"
+          message: >-
+            {{
+              'Expected log file '
+              + item.item
+              + ' missing on node '
+              + inventory_hostname
+              + ' ('
+              + (ansible_host | default('unknown'))
+              + '); continuing collection.'
+            }}
           timestamp: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y-%m-%dT%H:%M:%S+05:30') }}"
       loop: "{{ login_node_files.results }}"
       when: not (item.stat.isreg | default(false))
@@ -236,7 +290,16 @@
           node_name: "{{ inventory_hostname }}"
           node_ip: "{{ ansible_host | default('unknown') }}"
           reason: missing_source
-          message: "{{ 'Expected log directory ' + item.item + ' missing on node ' + inventory_hostname + ' (' + (ansible_host | default('unknown')) + '); continuing collection.' }}"
+          message: >-
+            {{
+              'Expected log directory '
+              + item.item
+              + ' missing on node '
+              + inventory_hostname
+              + ' ('
+              + (ansible_host | default('unknown'))
+              + '); continuing collection.'
+            }}
           timestamp: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y-%m-%dT%H:%M:%S+05:30') }}"
       loop: "{{ login_compiler_dir_stat.results }}"
       when: not (item.stat.isdir | default(false))
@@ -273,7 +336,16 @@
           node_name: "{{ inventory_hostname }}"
           node_ip: "{{ ansible_host | default('unknown') }}"
           reason: missing_source
-          message: "{{ 'Expected log file ' + item.item + ' missing on node ' + inventory_hostname + ' (' + (ansible_host | default('unknown')) + '); continuing collection.' }}"
+          message: >-
+            {{
+              'Expected log file '
+              + item.item
+              + ' missing on node '
+              + inventory_hostname
+              + ' ('
+              + (ansible_host | default('unknown'))
+              + '); continuing collection.'
+            }}
           timestamp: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y-%m-%dT%H:%M:%S+05:30') }}"
       loop: "{{ login_compiler_files.results }}"
       when: not (item.stat.isreg | default(false))
