@@ -12,28 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 ---
-# -----------------------------Mount Params (Profiles)-------------------------------
-# Named default profiles for mount configurations.
-# Apart from fs_type, mnt_opts, dump_freq, fsck_pass, additional custom fields
-# can be defined and used in mount templates (e.g., vast_nfs_ip).
-
-mount_params:
-  # Default NFS mount - standard NFS4.1 with high-performance options
-  nfs_default:
-    fs_type: "nfs"
-    mnt_opts: "nosuid,rw,sync,hard,intr"
-    dump_freq: "0"
-    fsck_pass: "0"
-
-  vast_nfs:
-    fs_type: "nfs"
-    mnt_opts: "nosuid,rw,sync,hard,intr"
-
-  # VAST NFS storage - standard configuration
-  vast_rdma:
-    fs_type: "nfs"
-    mnt_opts: "proto=rdma,port=20049,nconnect=8,timeo=600,retrans=2,rsize=1048576,wsize=1048576,hard,intr,localaddr=192.168.0.23"
-
 # -------------------------------------- Mounts------------------------------------------------
 # mounts
 # Configure mount points compatible with cloud-init mounts module.
@@ -59,8 +37,9 @@ mount_params:
 #       - group: Group owner (name or numeric GID, e.g., "root", "slurm", "1001"). Default: "root"
 #       - mode: Octal permission string (e.g., "0755", "1777"). Default: "0755"
 #       - Applied via cloud-init runcmd (chown + chmod) after mount
-#   - node_key: ds.meta_data key for per-node bind mounts (e.g., "local_hostname", "local_ipv4"). Optional
-#       - When present, implies bind mount with per-node source path
+#   - node_key: cloud-init datasource variable accessible via 'cloud-init query <var_name>' (e.g., "local_hostname", "ds.meta_data.instance_data.local_ipv4"). Optional
+#       - When present, implies per-node bind mount where source path is constructed using the queried variable value
+#       - The variable chosen must be unique per host to ensure isolation between nodes
 #       - fs_type forced to "none", mnt_opts forced to "bind" (automatic)
 #       - Source becomes: <source>/<ds.meta_data.node_key>/<mount_point_stripped_leading_slash>
 #   - node_mount_point: List of bind mount targets. Required when node_key is set
@@ -123,6 +102,28 @@ mounts:
     mount_on_oim: true
     functional_group_prefix: ["service_kube"]
 
+# -----------------------------Mount Params (Profiles)-------------------------------
+# Named default profiles for mount configurations.
+# Apart from fs_type, mnt_opts, dump_freq, fsck_pass, additional custom fields
+# can be defined and used in mount templates (e.g., vast_nfs_ip).
+
+mount_params:
+  # Default NFS mount - standard NFS4.1 with high-performance options
+  nfs_default:
+    fs_type: "nfs"
+    mnt_opts: "nosuid,rw,sync,hard,intr"
+    dump_freq: "0"
+    fsck_pass: "0"
+
+  vast_nfs:
+    fs_type: "nfs"
+    mnt_opts: "nosuid,rw,sync,hard,intr"
+
+  # VAST NFS storage - standard configuration
+  vast_rdma:
+    fs_type: "nfs"
+    mnt_opts: "proto=rdma,port=20049,nconnect=8,timeo=600,retrans=2,rsize=1048576,wsize=1048576,hard,intr,localaddr=192.168.0.23"
+
 # -----------------------------Powervault-------------------------------------------
 # powervault_config
 # Processed entirely via runcmd script (setup_iscsi_storage.sh).
@@ -141,7 +142,7 @@ mounts:
 # Optional parameters:
 #   - port: TCP port for iSCSI target service. Default: 3260
 #   - mount_params: Named profile for fs_type/mnt_opts (read by the runcmd script). Optional
-#   - node_key: ds.meta_data key for per-node bind mounts (e.g., "local_hostname"). Optional
+#   - node_key: ds.meta_data key for per-node bind mounts (e.g., "local_hostname", "ds.meta_data.instance_data.local_ipv4"). Optional
 #       - When present, implies bind mount: <mount_point>/<node_key_value>/<subdir> -> <target>
 #       - fs_type forced to "none", mnt_opts forced to "bind" (automatic)
 #   - node_mount_point: List of bind mount targets. Required when node_key is set
@@ -155,7 +156,8 @@ mounts:
 # powervault_config:
 #   # This mounts the whole powervault volume with <volume_id> to /mnt/slurm
 #   # followed by bind creation of dir <node_key> under /mnt/slurm
-#   # node_key is the key in ds.meta_data so that its unique per host
+#   # node_key is the key in cloud-init so that its unique per host
+
 #   - name: powervault1
 #     ip:
 #       - 172.1.2.3
@@ -182,8 +184,7 @@ mounts:
 #   - filename: Path to the swap file (e.g., /swapfile). Required
 #   - size: Size in bytes, 'auto', or human-readable (e.g., "2G", "512M"). Required
 #   - maxsize: Max size (used with size: auto). Optional
-#   - functional_group_prefix: List of functional group prefixes. Mutually exclusive with group.
-#   - group: List of GROUP_NAME values from pxe_mapping_file.csv. Mutually exclusive with functional_group_prefix.
+#   - functional_group_prefix: List of functional group prefixes.
 
 # swap:
 #   - name: "compute_swap"

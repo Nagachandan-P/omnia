@@ -185,12 +185,12 @@
             },
             "mount_on_oim": {
               "type": "boolean",
-              "description": "Whether to mount this filesystem on the OIM node. Default: false",
+              "description": "Whether to mount this filesystem on the OIM node. Default: false. Ensure the storage system is accessible to OIM",
               "default": false
             },
             "node_key": {
               "type": "string",
-              "description": "ds.meta_data key for per-node bind mounts. When present, fs_type is forced to none and mnt_opts to bind."
+              "description": "Directory name to be created under mount_point. cloud-init datasource variable accessible via 'cloud-init query <var_name>' (e.g., local_hostname, ds.meta_data.instance_data.local_ipv4). Optional"
             },
             "node_mount_point": {
               "type": "array",
