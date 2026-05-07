@@ -50,7 +50,8 @@
              "fs_type": {
               "type": "string",
               "description": "Filesystem type. Overrides mount_params profile when specified.",
-              "enum": ["auto", "ext2", "ext3", "ext4", "xfs", "btrfs", "nfs", "nfs4", "cifs", "tmpfs", "cephfs", "vfat", "ntfs", "none", "beegfs", "fuse.s3fs"]
+              "enum": ["xfs", "ext4", "ext3", "ext2", "nfs", "nfs4", "cifs", "ntfs", "auto"],
+              "default": "xfs"
             },
             "mnt_opts": {
               "type": "string",
@@ -71,7 +72,7 @@
             },
             "mount_params": {
               "type": "string",
-              "description": "Named profile for fs_type/mnt_opts (read by the runcmd script)",
+              "description": "Named profile key from mount_params section. Must reference an existing profile defined in mount_params.",
               "pattern": "^[a-zA-Z0-9_-]+$"
             },
             "node_key": {
@@ -91,15 +92,6 @@
             "functional_group_prefix": {
               "type": "array",
               "description": "List of functional group prefixes for node targeting. Mutually exclusive with group.",
-              "items": {
-                "type": "string",
-                "pattern": "^[a-zA-Z0-9_-]+$"
-              },
-              "uniqueItems": true
-            },
-            "groups": {
-              "type": "array",
-              "description": "List of GROUP_NAME values from pxe_mapping_file.csv. Mutually exclusive with functional_group_prefix.",
               "items": {
                 "type": "string",
                 "pattern": "^[a-zA-Z0-9_-]+$"
@@ -126,16 +118,16 @@
                   "type": "string",
                   "description": "Octal permission mode (e.g., 0755, 1777)",
                   "pattern": "^[0-7]{3,4}$",
-                  "default": "0755"
+                  "default": "0644"
                 }
               },
               "additionalProperties": false
             }
           },
-          "required": ["name", "ip", "iscsi_initiator", "volume_id", "mount_point"],
+          "required": ["name", "ip", "iscsi_initiator", "volume_id", "mount_point", "functional_group_prefix"],
           "oneOf": [
-            { "required": ["functional_group_prefix"] },
-            { "required": ["groups"] }
+            { "required": ["node_key", "node_mount_point"] },
+            { "not": { "required": ["node_key"] } }
           ],
           "additionalProperties": false
         }
@@ -166,7 +158,8 @@
             "fs_type": {
               "type": "string",
               "description": "Filesystem type. Overrides mount_params profile when specified.",
-              "enum": ["auto", "ext2", "ext3", "ext4", "xfs", "nfs", "nfs4", "cifs", "tmpfs", "cephfs", "vfat", "ntfs", "none", "fuse.s3fs"]
+              "enum": ["auto", "ext2", "ext3", "ext4", "xfs", "nfs", "nfs4", "cifs", "tmpfs", "cephfs", "vfat", "ntfs", "none", "fuse.s3fs"],
+              "default": "auto"
             },
             "mnt_opts": {
               "type": "string",
@@ -187,7 +180,7 @@
             },
             "mount_params": {
               "type": "string",
-              "description": "Name of the mount_params profile to use for unspecified fields",
+              "description": "Named profile key from mount_params section. Must reference an existing profile defined in mount_params.",
               "pattern": "^[a-zA-Z0-9_-]+$"
             },
             "mount_on_oim": {
@@ -254,9 +247,19 @@
             }
           },
           "required": ["name", "source", "mount_point"],
-          "oneOf": [
-            { "required": ["functional_group_prefix"] },
-            { "required": ["groups"] }
+          "allOf": [
+            {
+              "oneOf": [
+                { "required": ["functional_group_prefix"] },
+                { "required": ["groups"] }
+              ]
+            },
+            {
+              "oneOf": [
+                { "required": ["node_key", "node_mount_point"] },
+                { "not": { "required": ["node_key"] } }
+              ]
+            }
           ],
           "additionalProperties": false
         }
@@ -324,22 +327,9 @@
                 "pattern": "^[a-zA-Z0-9_-]+$"
               },
               "uniqueItems": true
-            },
-            "groups": {
-              "type": "array",
-              "description": "List of GROUP_NAME values from pxe_mapping_file.csv. Mutually exclusive with functional_group_prefix.",
-              "items": {
-                "type": "string",
-                "pattern": "^[a-zA-Z0-9_-]+$"
-              },
-              "uniqueItems": true
             }
           },
-          "required": ["filename", "size"],
-          "oneOf": [
-            { "required": ["functional_group_prefix"] },
-            { "required": ["groups"] }
-          ],
+          "required": ["filename", "size", "functional_group_prefix"],
           "additionalProperties": false
         }
       }

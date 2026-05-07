@@ -54,6 +54,11 @@ mount_params:
 #       - If specified, takes PRIORITY over mount_params profile
 #   - mount_params: Name of a profile in mount_params section. Optional
 #       - Used ONLY for fields not explicitly specified in the mount entry
+#   - permissions: Directory ownership and mode for the mount point. Optional
+#       - owner: User owner (name or numeric UID, e.g., "root", "slurm", "1001"). Default: "root"
+#       - group: Group owner (name or numeric GID, e.g., "root", "slurm", "1001"). Default: "root"
+#       - mode: Octal permission string (e.g., "0755", "1777"). Default: "0755"
+#       - Applied via cloud-init runcmd (chown + chmod) after mount
 #   - node_key: ds.meta_data key for per-node bind mounts (e.g., "local_hostname", "local_ipv4"). Optional
 #       - When present, implies bind mount with per-node source path
 #       - fs_type forced to "none", mnt_opts forced to "bind" (automatic)
@@ -68,11 +73,6 @@ mount_params:
 #   - groups: List of GROUP_NAME values from pxe_mapping_file.csv. Optional
 #       - Mutually exclusive with functional_group_prefix
 #       - e.g., groups: ["grp1", "grp2"] targets only nodes in those groups
-#   - permissions: Directory ownership and mode for the mount point. Optional
-#       - owner: User owner (name or numeric UID, e.g., "root", "slurm", "1001"). Default: "root"
-#       - group: Group owner (name or numeric GID, e.g., "root", "slurm", "1001"). Default: "root"
-#       - mode: Octal permission string (e.g., "0755", "1777"). Default: "0755"
-#       - Applied via cloud-init runcmd (chown + chmod) after mount
 #
 
 # Example: static mount with all explicit params (no profile)
@@ -94,8 +94,8 @@ mount_params:
 #     mount_point: "/mnted/scratch"
 #     node_key: "local_hostname"
 #     node_mount_point:
-#       - "/scratch"
-#       - "/tmp"
+#       - /scratch
+#       - /tmp
 
 #     functional_group_prefix: ["slurm_node"]
 #   # On node001 generates fstab:
@@ -136,10 +136,10 @@ mounts:
 #   - ip: List of PowerVault controller IPv4 addresses for iSCSI target discovery. Required
 #   - iscsi_initiator: InitiatorName IQN for the host. Required
 #   - volume_id: WWN/identifier for the volume (used for multipath device matching). Required
-#
+#   - mount_point: Where the discovered device gets mounted. Required
+
 # Optional parameters:
 #   - port: TCP port for iSCSI target service. Default: 3260
-#   - mount_point: Where the discovered device gets mounted. Required
 #   - mount_params: Named profile for fs_type/mnt_opts (read by the runcmd script). Optional
 #   - node_key: ds.meta_data key for per-node bind mounts (e.g., "local_hostname"). Optional
 #       - When present, implies bind mount: <mount_point>/<node_key_value>/<subdir> -> <target>
@@ -147,8 +147,6 @@ mounts:
 #   - node_mount_point: List of bind mount targets. Required when node_key is set
 #       - Pattern: <mount_point>/<node_key_value>/<target_stripped_leading_slash> -> <target>
 #   - functional_group_prefix: List of functional group prefixes for node targeting. Mutually exclusive with group.
-#   - group: List of GROUP_NAME values from pxe_mapping_file.csv. Mutually exclusive with functional_group_prefix.
-#       - e.g., group: ["grp1"] targets only nodes in grp1
 #   - permissions: Directory ownership and mode for the mount point. Optional
 #       - owner: User owner (name or UID). Default: "root"
 #       - group: Group owner (name or GID). Default: "root"
@@ -176,16 +174,6 @@ mounts:
 #       owner: "slurm"
 #       group: "slurm"
 #       mode: "0750"
-
-  # - name: powervault2
-  #   ip:
-  #     - 172.1.2.4
-  #   port: 3260
-  #   iscsi_initiator: iqn.2025-01.com.dell:slurmd-node
-  #   volume_id: 00c0ff4343f1f1f1001c8c4e6901000001
-  #   mount_point: "/mnt/slurmd-persist"
-  #   mount_params: "powervault_iscsi"
-  #   groups: ["grp1", "grp2"]
 
 # -----------------------------Swap-------------------------------------------------
 # swap: Swap file configuration (list of swap configurations)

@@ -19,9 +19,9 @@
 
 mount_params:
   # Default NFS mount - standard NFS4.1 with high-performance options
-  default:
+  default_nfs:
     fs_type: "nfs"
-    mnt_opts: "nfsvers=4.1,hard,intr,noatime,nconnect=16,rsize=1048576,wsize=1048576"
+    mnt_opts: "nosuid,rw,sync,hard,intr"
     dump_freq: "0"
     fsck_pass: "0"
 
@@ -31,7 +31,6 @@ mount_params:
     mnt_opts: "proto=rdma,hard,intr,noatime,nconnect=16,rsize=1048576,wsize=1048576"
     dump_freq: "0"
     fsck_pass: "0"
-    vast_nfs_ip: "192.168.1.100"
 
   # VAST NFS storage - high-performance with large buffers
   vast_nfs_performance:
@@ -114,7 +113,7 @@ mount_params:
 #       - e.g., ["slurm"] matches slurm_control_node, slurm_node, etc.
 #       - If omitted (and no group), mount applies to all nodes
 #       - Mutually exclusive with group
-#   - group: List of GROUP_NAME values from pxe_mapping_file.csv. Optional
+#   - groups: List of GROUP_NAME values from pxe_mapping_file.csv. Optional
 #       - Mutually exclusive with functional_group_prefix
 #       - e.g., group: ["grp1", "grp2"] targets only nodes in those groups
 #   - permissions: Directory ownership and mode for the mount point. Optional
@@ -123,52 +122,10 @@ mount_params:
 #       - mode: Octal permission string (e.g., "0755", "1777"). Default: "0755"
 #       - Applied via cloud-init runcmd (chown + chmod) after mount
 #
-
-# Example: static mount with all explicit params (no profile)
-# mounts:
-
-#   - name: "atomic_mount"
-#     source: "192.168.1.100:/export"
-#     mount_point: "/mnt/data"
-#     fs_type: "nfs4"
-#     mnt_opts: "nfsvers=4.1,hard,intr,noatime,nconnect=16,rsize=1048576,wsize=1048576"
-#     dump_freq: "0"
-#     fsck_pass: "0"
-#
-# Example: static mount using profile
-#   - name: "vast_home"
-#     source: "192.168.1.100:/home"
-#     mount_point: "/home"
-#     mount_params: "vast_nfs"
-#     functional_group_prefix: ["slurm"]
-#     permissions:
-#       owner: "root"
-#       group: "root"
-#       mode: "0755"
-#
-# Example: per-node bind mount (node_key triggers bind behavior)
-#   - name: "scratch_isolation"
-#     source: "/mnt/scratch"
-#     mount_point: "/mnted/scratch"
-#     node_key: "local_hostname"
-#     node_mount_point:
-#       - "/scratch"
-#       - "/tmp"
-
-#     functional_group_prefix: ["slurm_node"]
-#   # On node001 generates fstab:
-#   #   /mnted/scratch/node001/scratch  /scratch  none  bind  0  0
-#   #   /mnted/scratch/node001/tmp      /tmp      none  bind  0  0
-#   # slurm.conf: SlurmdSpoolDir=/scratch,/tmp
-
-# /mnt/scratch /mnted/sctratch nfs4 defaults,nofail,_netdev,x-systemd.after=cloud-init-network.service 0 0
-
-# /mnted/scratch/node001/var/loig/state  /var/loig/state  none  bind  0  0
-vast_enabled: true
 mounts:
   # VAST NFS: shared export for home directories
   - name: "vast_home"
-    source: "{{ vast_nfs_ip }}:/home"
+    source: "192.168.1.100:/home"
     mount_point: "/home"
     mount_params: "vast_nfs"
     # Where
@@ -176,14 +133,14 @@ mounts:
 
   # VAST NFS: shared export for applications
   - name: "vast_apps"
-    source: "{{ vast_nfs_ip }}:/apps"
+    source: "192.168.1.100:/apps"
     mount_point: "/apps"
     mount_params: "vast_nfs"
     functional_group_prefix: ["slurm", "login"]
 
   # VAST NFS: shared export for slurm state (controller)
   - name: "vast_slurm_state"
-    source: "{{ vast_nfs_ip }}:/slurm"
+    source: "192.168.1.100:/slurm"
     mount_point: "/var/slurm"
     mount_params: "vast_nfs"
     functional_group_prefix: ["slurm_control_node_x86_64"]
@@ -194,7 +151,7 @@ mounts:
 
   # VAST NFS: shared scratch export
   - name: "vast_scratch_shared"
-    source: "192.168.1.100:/scratch"
+    source: "192.168.1.101:/scratch"
     mount_point: "/mnt/scratch"
     mount_params: "vast_nfs_performance"
     functional_group_prefix: ["slurm", "login"]
@@ -230,7 +187,29 @@ mounts:
     mnt_opts: "proto=rdma,defaults,nofail,_netdev,x-systemd.after=cloud-init-network.service"
     dump_freq: "0"
     fsck_pass: "0"
-    functional_group_prefix: ["all"]
+    functional_group_prefix: ["slurm_node_x86_64"]
+
+  # Kubernetes worker node: shared NFS for persistent volumes
+  - name: "kube_pv_storage"
+    source: "192.168.1.102:/k8s-pv"
+    mount_point: "/mnt/k8s-pv"
+    mount_params: "vast_nfs"
+    functional_group_prefix: ["service_kube"]
+    permissions:
+      owner: "root"
+      group: "root"
+      mode: "0755"
+
+  # Kubernetes worker node: local scratch for container images
+  - name: "kube_scratch"
+    source: "192.168.1.103:/k8s-scratch"
+    mount_point: "/var/lib/containers"
+    mount_params: "scratch_storage"
+    functional_group_prefix: ["service_kube_node"]
+    permissions:
+      owner: "root"
+      group: "root"
+      mode: "0755"
 
 # -----------------------------Powervault-------------------------------------------
 # powervault_config
@@ -245,10 +224,10 @@ mounts:
 #   - ip: List of PowerVault controller IPv4 addresses for iSCSI target discovery. Required
 #   - iscsi_initiator: InitiatorName IQN for the host. Required
 #   - volume_id: WWN/identifier for the volume (used for multipath device matching). Required
+#   - mount_point: Where the discovered device gets mounted. Required
 #
 # Optional parameters:
 #   - port: TCP port for iSCSI target service. Default: 3260
-#   - mount_point: Where the discovered device gets mounted. Required
 #   - mount_params: Named profile for fs_type/mnt_opts (read by the runcmd script). Optional
 #   - node_key: ds.meta_data key for per-node bind mounts (e.g., "local_hostname"). Optional
 #       - When present, implies bind mount: <mount_point>/<node_key_value>/<subdir> -> <target>
@@ -256,31 +235,10 @@ mounts:
 #   - node_mount_point: List of bind mount targets. Required when node_key is set
 #       - Pattern: <mount_point>/<node_key_value>/<target_stripped_leading_slash> -> <target>
 #   - functional_group_prefix: List of functional group prefixes for node targeting. Mutually exclusive with group.
-#   - group: List of GROUP_NAME values from pxe_mapping_file.csv. Mutually exclusive with functional_group_prefix.
-#       - e.g., group: ["grp1"] targets only nodes in grp1
 #   - permissions: Directory ownership and mode for the mount point. Optional
 #       - owner: User owner (name or UID). Default: "root"
 #       - group: Group owner (name or GID). Default: "root"
 #       - mode: Octal permission string (e.g., "0755"). Default: "0755"
-
-# Example:
-# powervault_config:
-#   - name: powervault1
-#     ip: [172.1.2.3]
-#     port: 3260
-#     iscsi_initiator: iqn.2025-01.com.dell:scontrol-node
-#     volume_id: 00c0ff4343f1f1f1001c8c4e6901000000
-#     mount_point: "/mnt/slurm-persist"
-#     mount_params: "powervault_iscsi"
-#     node_key: "local_ipv4"
-#     node_mount_point:
-#       - "/var/lib/mysql"
-#       - "/var/spool/slurm"
-#     functional_group_prefix: ["slurm_control_node"]
-#     permissions:
-#       owner: "slurm"
-#       group: "slurm"
-#       mode: "0750"
 
 powervault_config:
   # This mounts the whole powervault volume with <volume_id> to /mnt/slurm
@@ -295,25 +253,21 @@ powervault_config:
     # mount params
     mount_point: "/mnt/slurm"
     mount_params: "powervault_iscsi"
-    node_key: "local_hostname" # per_node_id,node_subdir_key
-    node_mount_point: # bind_paths, sub_mounts
-      - "/var/lib/mysql" # /mnt/slurm/<local_hostname>/var/lib/mysql
-      - "/var/spool/slurm" # /mnt/slurm/<local_hostname>/var/spool/slurm
+    node_key: "local_hostname"
+    node_mount_point:
+      - "/var/lib/mysql" 
+      - "/var/spool/slurm"
     functional_group_prefix: ["slurm_control_node"]
-    permissions:
-      owner: "slurm"
-      group: "slurm"
-      mode: "0750"
 
   - name: powervault2
     ip:
       - 172.1.2.4
     port: 3260
-    iscsi_initiator: iqn.2025-01.com.dell:slurmd-node
+    iscsi_initiator: iqn.2025-01.com.dell:kube-node
     volume_id: 00c0ff4343f1f1f1001c8c4e6901000001
-    mount_point: "/mnt/slurmd-persist"
+    mount_point: "/mnt/kube-persist"
     mount_params: "powervault_iscsi"
-    groups: ["grp1", "grp2"]
+    functional_group_prefix: ["service_kube"]
 
 # -----------------------------Swap-------------------------------------------------
 # swap: Swap file configuration (list of swap configurations)
