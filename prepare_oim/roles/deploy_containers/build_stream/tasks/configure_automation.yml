@@ -92,7 +92,7 @@
 
 - name: Display setup_env.sh result
   ansible.builtin.debug:
-    msg: 
+    msg:
       - "Virtual environment setup completed successfully"
       - "Output: {{ setup_env_result.stdout_lines | default([]) }}"
     verbosity: 1
