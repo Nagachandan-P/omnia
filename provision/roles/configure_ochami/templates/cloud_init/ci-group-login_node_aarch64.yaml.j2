@@ -164,16 +164,7 @@
       {% endif %}
 {% endraw %}
 {% set fg_swap = cloud_init_groups_dict.get(functional_group_name, {}).get('swap', {}) %}
-{% if fg_swap %}
-        - |
-          set -e
-          if ! swapon --show | grep -q "{{ fg_swap.filename }}"; then
-            fallocate -l {{ fg_swap.size }} {{ fg_swap.filename }}
-            chmod 600 {{ fg_swap.filename }}
-            mkswap {{ fg_swap.filename }}
-            swapon {{ fg_swap.filename }}
-          fi
-{% endif %}
+{% include 'configure_swap.yaml.j2' %}
         - mount -av
 {% for pv_entry in cloud_init_groups_dict[functional_group_name].powervault_scripts | default([]) %}
         - /usr/local/bin/setup_iscsi_storage_{{ pv_entry.name }}.sh
