@@ -63,7 +63,7 @@
   ansible.builtin.debug:
     msg: "{{ automation_git_success_msg }}"
     verbosity: 1
-  when: (git_clone_result is defined and git_clone_result is succeeded) or 
+  when: (git_clone_result is defined and git_clone_result is succeeded) or
         (git_update_result is defined and git_update_result is succeeded)
 
 - name: Make automation scripts executable
