@@ -368,7 +368,7 @@
         - /usr/local/bin/update_ldap_conf.sh
         - mkdir /ldapcerts
         - echo "{{ cloud_init_nfs_path_openldap }}/certs                /ldapcerts       nfs defaults,_netdev 0 0" >> /etc/fstab
-        - echo "{{ cloud_init_nfs_path_openldap }}/ldapuser             /home            nfs defaults,_netdev 0 0" >> /etc/fstab
+        - if ! mountpoint -q /home; then echo "{{ cloud_init_nfs_path_openldap }}/ldapuser /home nfs defaults,_netdev 0 0" >> /etc/fstab; fi
         - chmod {{ file_mode }} /etc/fstab
         - mount -a
         - yes | cp /ldapcerts/* /etc/openldap/certs
