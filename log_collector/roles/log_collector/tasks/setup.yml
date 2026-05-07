@@ -18,6 +18,7 @@
   run_once: true
   ansible.builtin.set_fact:
     log_ts: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y%m%dT%H%M%S') }}"
+    missing_source_warnings: []
     log_root: "{{ log_root }}"
     k8s_master_log_dirs: "{{ k8s_master_log_dirs }}"
     k8s_master_log_files: "{{ k8s_master_log_files }}"

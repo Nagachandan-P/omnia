@@ -23,6 +23,20 @@
       register: k8s_master_dir_stat
       with_items: "{{ hostvars['localhost'].k8s_master_log_dirs | default(k8s_master_log_dirs, true) }}"
 
+    - name: Record missing k8s master log directories
+      ansible.builtin.set_fact:
+        missing_source_warnings_host: "{{ (missing_source_warnings_host | default([])) + [warning_payload] }}"
+      vars:
+        warning_payload:
+          source: k8s_master
+          node_name: "{{ inventory_hostname }}"
+          node_ip: "{{ ansible_host | default('unknown') }}"
+          reason: missing_source
+          message: "{{ 'Expected log directory ' + item.item + ' missing on node ' + inventory_hostname + ' (' + (ansible_host | default('unknown')) + '); continuing collection.' }}"
+          timestamp: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y-%m-%dT%H:%M:%S+05:30') }}"
+      loop: "{{ k8s_master_dir_stat.results }}"
+      when: not (item.stat.isdir | default(false))
+
     - name: Find files under existing k8s master log directories
       ansible.builtin.find:
         paths: "{{ item.item }}"
@@ -46,6 +60,20 @@
       register: k8s_master_files
       with_items: "{{ hostvars['localhost'].k8s_master_log_files | default(k8s_master_log_files, true) }}"
 
+    - name: Record missing k8s master log files
+      ansible.builtin.set_fact:
+        missing_source_warnings_host: "{{ (missing_source_warnings_host | default([])) + [warning_payload] }}"
+      vars:
+        warning_payload:
+          source: k8s_master
+          node_name: "{{ inventory_hostname }}"
+          node_ip: "{{ ansible_host | default('unknown') }}"
+          reason: missing_source
+          message: "{{ 'Expected log file ' + item.item + ' missing on node ' + inventory_hostname + ' (' + (ansible_host | default('unknown')) + '); continuing collection.' }}"
+          timestamp: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y-%m-%dT%H:%M:%S+05:30') }}"
+      loop: "{{ k8s_master_files.results }}"
+      when: not (item.stat.isreg | default(false))
+
     - name: Fetch k8s master log files
       ansible.builtin.fetch:
         src: "{{ item.item }}"
@@ -62,6 +90,20 @@
         path: "{{ item }}"
       register: k8s_worker_files
       with_items: "{{ hostvars['localhost'].k8s_worker_log_files | default(k8s_worker_log_files, true) }}"
+
+    - name: Record missing k8s worker log files
+      ansible.builtin.set_fact:
+        missing_source_warnings_host: "{{ (missing_source_warnings_host | default([])) + [warning_payload] }}"
+      vars:
+        warning_payload:
+          source: k8s_worker
+          node_name: "{{ inventory_hostname }}"
+          node_ip: "{{ ansible_host | default('unknown') }}"
+          reason: missing_source
+          message: "{{ 'Expected log file ' + item.item + ' missing on node ' + inventory_hostname + ' (' + (ansible_host | default('unknown')) + '); continuing collection.' }}"
+          timestamp: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y-%m-%dT%H:%M:%S+05:30') }}"
+      loop: "{{ k8s_worker_files.results }}"
+      when: not (item.stat.isreg | default(false))
 
     - name: Fetch k8s worker log files
       ansible.builtin.fetch:

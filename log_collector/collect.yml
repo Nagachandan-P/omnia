@@ -1,10 +1,17 @@
 ---
-# Playbook: collect_cluster_logs.yml
-# Purpose: collect k8s and slurm logs from nodes defined in pxe_mapping_file.csv and store on OIM under /opt/omnia/logs
-# Assumptions:
-#  - pxe_mapping_file.csv headers include FUNCTIONAL_GROUP_NAME,GROUP_NAME,SERVICE_TAG,HOSTNAME,ADMIN_MAC,ADMIN_IP,BMC_MAC,BMC_IP
-#  - SSH from OIM to ADMIN_IP of nodes works (passwordless or via configured auth)
-#  - K8s services use standard log locations (see role tasks); Slurm uses journalctl units slurmctld/slurmd
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 - name: Stage globals
   hosts: localhost

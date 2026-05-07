@@ -30,6 +30,23 @@
   ansible.builtin.set_fact:
     warning_ts: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y-%m-%dT%H:%M:%S+05:30') }}"
 
+- name: Validate output root path is writable
+  ansible.builtin.file:
+    path: "{{ log_root }}"
+    state: directory
+    mode: "0755"
+
+- name: Validate output root write permission
+  ansible.builtin.copy:
+    dest: "{{ log_root }}/.write_test"
+    content: "ok\n"
+    mode: "0600"
+
+- name: Remove output root write test file
+  ansible.builtin.file:
+    path: "{{ log_root }}/.write_test"
+    state: absent
+
 - name: Initialize warnings list
   ansible.builtin.set_fact:
     warnings_list: []
@@ -118,6 +135,29 @@
   loop: "{{ groups['login_compiler_nodes'] | default([]) }}"
   when: hostvars[item].ansible_unreachable | default(false)
 
+- name: Build missing-source warnings list from all collected hosts
+  ansible.builtin.set_fact:
+    missing_source_warnings_all: >-
+      {{
+        (
+          (groups['k8s_masters'] | default([]))
+          + (groups['k8s_workers'] | default([]))
+          + (groups['slurm_controllers'] | default([]))
+          + (groups['slurm_nodes'] | default([]))
+          + (groups['login_nodes'] | default([]))
+          + (groups['login_compiler_nodes'] | default([]))
+        )
+        | map('extract', hostvars)
+        | selectattr('missing_source_warnings_host', 'defined')
+        | map(attribute='missing_source_warnings_host')
+        | flatten
+        | list
+      }}
+
+- name: Merge missing-source warnings into warning list
+  ansible.builtin.set_fact:
+    warnings_list: "{{ warnings_list + (missing_source_warnings_all | default([])) }}"
+
 - name: Find temporary and stale files to exclude (curated_support mode)
   ansible.builtin.find:
     paths: "{{ log_root }}"
@@ -171,7 +211,7 @@
       host_os: "{{ meta_os }}"
       identifier: "{{ log_identifier }}"
       collection_mode: "{{ collection_mode }}"
-      exclusions_applied: "{{ exclude_patterns | default([]) }}"
+      exclusions_applied: "{{ exclude_patterns if collection_mode == 'curated_support' else [] }}"
       warning_count: "{{ warnings_list | length }}"
       warnings: "{{ warnings_list }}"
 
@@ -185,6 +225,13 @@
   args:
     executable: /bin/bash
   changed_when: true
+
+- name: Validate archive readability
+  ansible.builtin.shell: |
+    tar -tzf "{{ log_root }}/{{ bundle_name }}" >/dev/null
+  args:
+    executable: /bin/bash
+  changed_when: false
 
 - name: Compute SHA256 checksum of bundle
   ansible.builtin.shell: |
