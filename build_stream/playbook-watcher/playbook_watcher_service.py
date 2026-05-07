@@ -42,7 +42,12 @@ from threading import Thread, Semaphore
 from typing import Dict, Optional, Any, List
 
 # Implicit logging utilities for secure logging
-def log_secure_info(level: str, message: str, identifier: Optional[str] = None) -> None:
+def log_secure_info(
+    level: str,
+    message: str,
+    identifier: Optional[str] = None,
+    exc_info: bool = False,
+) -> None:
     """Log information securely with optional identifier truncation.
 
     This function provides consistent secure logging across all modules.
@@ -53,6 +58,7 @@ def log_secure_info(level: str, message: str, identifier: Optional[str] = None) 
         level: Log level ('info', 'warning', 'error', 'debug', 'critical')
         message: Log message template
         identifier: Optional identifier (job_id, request_id, etc.) - first 8 chars logged
+        exc_info: If True, append current exception traceback (replaces logger.exception())
     """
     logger = logging.getLogger(__name__)
 
@@ -64,7 +70,7 @@ def log_secure_info(level: str, message: str, identifier: Optional[str] = None) 
         log_message = message
 
     log_func = getattr(logger, level)
-    log_func(log_message)
+    log_func(log_message, exc_info=exc_info)
 
 # Configuration
 QUEUE_BASE = Path(os.getenv("PLAYBOOK_QUEUE_BASE", ""))
@@ -78,6 +84,10 @@ NFS_SHARE_PATH = Path(os.getenv("NFS_SHARE_PATH", ""))
 HOST_LOG_BASE_DIR = NFS_SHARE_PATH / "omnia" / "log" / "build_stream"
 CONTAINER_LOG_BASE_DIR = Path("/opt/omnia/log/build_stream")
 
+# Build Stream artifacts directory (configurable via environment variable)
+BUILD_STREAM_ROOT = Path(os.getenv("BUILD_STREAM_ROOT", "/opt/omnia/build_stream_root"))
+ARTIFACTS_DIR = BUILD_STREAM_ROOT / "artifacts"
+
 POLL_INTERVAL_SECONDS = int(os.getenv("POLL_INTERVAL_SECONDS", "2"))
 MAX_CONCURRENT_JOBS = int(os.getenv("MAX_CONCURRENT_JOBS", "1"))
 DEFAULT_TIMEOUT_MINUTES = int(os.getenv("DEFAULT_TIMEOUT_MINUTES", "30"))
@@ -89,6 +99,8 @@ PLAYBOOK_NAME_TO_PATH = {
     "build_image_x86_64.yml": "/omnia/build_image_x86_64/build_image_x86_64.yml",
     "discovery.yml": "/omnia/discovery/discovery.yml",
     "local_repo.yml": "/omnia/local_repo/local_repo.yml",
+    "provision.yml": "/omnia/provision/provision.yml",
+    "set_pxe_boot.yml": "/omnia/utils/set_pxe_boot.yml",
 }
 
 # Logging configuration
@@ -100,8 +112,6 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
-logger = logging.getLogger("playbook_watcher")
-
 # Global state
 SHUTDOWN_REQUESTED = False
 job_semaphore = Semaphore(MAX_CONCURRENT_JOBS)
@@ -453,10 +463,7 @@ def parse_request_file(request_path: Path) -> Optional[Dict[str, Any]]:
         missing_fields = [field for field in required_fields if field not in request_data]
 
         if missing_fields:
-            logger.error(
-                "Request file missing required fields: %s",
-                ', '.join(missing_fields)
-            )
+            log_secure_info('error', f"Request file missing required fields: {', '.join(missing_fields)}")
             return None
 
         # Validate inputs to prevent injection
@@ -726,22 +733,24 @@ def execute_playbook(request_data: Dict[str, Any]) -> Dict[str, Any]:
             inventory_file_path[:8]
         )
 
-    # Add extra_vars if present for build_image playbooks
-    if "extra_vars" in request_data:
-        import json
-        extra_vars = request_data["extra_vars"]
+    # Build extra_vars: always inject job_id so playbooks can reference it
+    import json
+    extra_vars = request_data.get("extra_vars", {})
+    if not isinstance(extra_vars, dict):
+        extra_vars = {}
 
-        # Convert extra_vars to a JSON string
-        extra_vars_json = json.dumps(extra_vars)
+    # Always inject job_id into extra_vars (playbook requires it for artifact paths)
+    extra_vars["job_id"] = job_id
 
-        # Add as a single --extra-vars parameter
-        cmd.extend(["--extra-vars", extra_vars_json])
+    # Pass extra_vars to ansible-playbook
+    extra_vars_json = json.dumps(extra_vars)
+    cmd.extend(["--extra-vars", extra_vars_json])
 
-        log_secure_info(
-            "info",
-            "Added extra_vars as JSON for build_image playbook",
-            job_id
-        )
+    log_secure_info(
+        "info",
+        "Added extra_vars with job_id for playbook",
+        job_id
+    )
 
     # Add verbosity flag
     cmd.append("-v")
@@ -852,6 +861,18 @@ def execute_playbook(request_data: Dict[str, Any]) -> Dict[str, Any]:
             result_data["error_code"] = "PLAYBOOK_EXECUTION_FAILED"
             result_data["error_summary"] = f"Playbook exited with code {result.returncode}"
 
+        # For restart stage, include path to per-node results JSON if it exists
+        # Per spec 12.4: node_results.json is at BUILD_STREAM_ROOT/artifacts/<job_id>/
+        if stage_name == "restart":
+            node_results_path = ARTIFACTS_DIR / job_id / "node_results.json"
+            if node_results_path.exists():
+                result_data["node_results_file_path"] = str(node_results_path)
+                log_secure_info(
+                    "info",
+                    "Node results file found for restart stage",
+                    job_id
+                )
+
         return result_data
 
     except subprocess.TimeoutExpired:
@@ -885,10 +906,7 @@ def execute_playbook(request_data: Dict[str, Any]) -> Dict[str, Any]:
         completed_at = datetime.now(timezone.utc)
         duration_seconds = (completed_at - started_at).total_seconds()
 
-        logger.exception(
-            "Unexpected error executing playbook for job %s",
-            job_id
-        )
+        log_secure_info('error', f"Unexpected error executing playbook for job {job_id}", exc_info=True)
 
         return {
             "job_id": job_id,
@@ -1151,10 +1169,7 @@ def run_watcher_loop():
                 )
 
         except RuntimeError as e:
-            logger.exception(
-                "Unexpected error in watcher loop iteration %d",
-                iteration
-            )
+            log_secure_info('error', f"Unexpected error in watcher loop iteration {iteration}", exc_info=True)
 
         # Sleep before next poll
         time.sleep(POLL_INTERVAL_SECONDS)
