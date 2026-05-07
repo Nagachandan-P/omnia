@@ -1,0 +1,214 @@
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+
+- name: Set log identifier (hostname fallback when not provided)
+  ansible.builtin.set_fact:
+    log_identifier: "{{ identifier | default(lookup('pipe', 'hostname -s')) }}"
+    collection_mode: "full"
+
+- name: Override collection mode to curated_support when tag is active
+  tags:
+    - curated_support
+    - never
+  ansible.builtin.set_fact:
+    collection_mode: "curated_support"
+
+- name: Set ISO-8601 warning timestamp for this run
+  ansible.builtin.set_fact:
+    warning_ts: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y-%m-%dT%H:%M:%S+05:30') }}"
+
+- name: Initialize warnings list
+  ansible.builtin.set_fact:
+    warnings_list: []
+
+- name: Build warnings for unreachable k8s_masters
+  ansible.builtin.set_fact:
+    warnings_list: >-
+      {{ warnings_list + [{
+        'source': 'k8s_master',
+        'node_name': item,
+        'node_ip': hostvars[item].ansible_host | default('unknown'),
+        'reason': 'unreachable',
+        'message': 'Node ' + item + ' (' + (hostvars[item].ansible_host | default('unknown')) + ') unreachable; continuing collection for remaining nodes.',
+        'timestamp': warning_ts
+      }] }}
+  loop: "{{ groups['k8s_masters'] | default([]) }}"
+  when: hostvars[item].ansible_unreachable | default(false)
+
+- name: Build warnings for unreachable k8s_workers
+  ansible.builtin.set_fact:
+    warnings_list: >-
+      {{ warnings_list + [{
+        'source': 'k8s_worker',
+        'node_name': item,
+        'node_ip': hostvars[item].ansible_host | default('unknown'),
+        'reason': 'unreachable',
+        'message': 'Node ' + item + ' (' + (hostvars[item].ansible_host | default('unknown')) + ') unreachable; continuing collection for remaining nodes.',
+        'timestamp': warning_ts
+      }] }}
+  loop: "{{ groups['k8s_workers'] | default([]) }}"
+  when: hostvars[item].ansible_unreachable | default(false)
+
+- name: Build warnings for unreachable slurm_controllers
+  ansible.builtin.set_fact:
+    warnings_list: >-
+      {{ warnings_list + [{
+        'source': 'slurm_controller',
+        'node_name': item,
+        'node_ip': hostvars[item].ansible_host | default('unknown'),
+        'reason': 'unreachable',
+        'message': 'Node ' + item + ' (' + (hostvars[item].ansible_host | default('unknown')) + ') unreachable; continuing collection for remaining nodes.',
+        'timestamp': warning_ts
+      }] }}
+  loop: "{{ groups['slurm_controllers'] | default([]) }}"
+  when: hostvars[item].ansible_unreachable | default(false)
+
+- name: Build warnings for unreachable slurm_nodes
+  ansible.builtin.set_fact:
+    warnings_list: >-
+      {{ warnings_list + [{
+        'source': 'slurm_node',
+        'node_name': item,
+        'node_ip': hostvars[item].ansible_host | default('unknown'),
+        'reason': 'unreachable',
+        'message': 'Node ' + item + ' (' + (hostvars[item].ansible_host | default('unknown')) + ') unreachable; continuing collection for remaining nodes.',
+        'timestamp': warning_ts
+      }] }}
+  loop: "{{ groups['slurm_nodes'] | default([]) }}"
+  when: hostvars[item].ansible_unreachable | default(false)
+
+- name: Build warnings for unreachable login_nodes
+  ansible.builtin.set_fact:
+    warnings_list: >-
+      {{ warnings_list + [{
+        'source': 'login_node',
+        'node_name': item,
+        'node_ip': hostvars[item].ansible_host | default('unknown'),
+        'reason': 'unreachable',
+        'message': 'Node ' + item + ' (' + (hostvars[item].ansible_host | default('unknown')) + ') unreachable; continuing collection for remaining nodes.',
+        'timestamp': warning_ts
+      }] }}
+  loop: "{{ groups['login_nodes'] | default([]) }}"
+  when: hostvars[item].ansible_unreachable | default(false)
+
+- name: Build warnings for unreachable login_compiler_nodes
+  ansible.builtin.set_fact:
+    warnings_list: >-
+      {{ warnings_list + [{
+        'source': 'login_compiler_node',
+        'node_name': item,
+        'node_ip': hostvars[item].ansible_host | default('unknown'),
+        'reason': 'unreachable',
+        'message': 'Node ' + item + ' (' + (hostvars[item].ansible_host | default('unknown')) + ') unreachable; continuing collection for remaining nodes.',
+        'timestamp': warning_ts
+      }] }}
+  loop: "{{ groups['login_compiler_nodes'] | default([]) }}"
+  when: hostvars[item].ansible_unreachable | default(false)
+
+- name: Find temporary and stale files to exclude (curated_support mode)
+  ansible.builtin.find:
+    paths: "{{ log_root }}"
+    patterns: "{{ exclude_patterns }}"
+    recurse: true
+    file_type: file
+  register: curated_exclude_files
+  when: collection_mode == 'curated_support'
+
+- name: Remove excluded files from workspace (curated_support mode)
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ curated_exclude_files.files | default([]) }}"
+  when:
+    - collection_mode == 'curated_support'
+    - curated_exclude_files is defined
+
+- name: Gather OIM host context for metadata
+  ansible.builtin.shell: |
+    printf '%s|%s|%s' \
+      "$(whoami)" \
+      "$(hostname -f)" \
+      "$(. /etc/os-release 2>/dev/null && echo "${PRETTY_NAME:-unknown}")"
+  register: oim_context_raw
+  changed_when: false
+
+- name: Set bundle timestamp
+  ansible.builtin.set_fact:
+    bundle_ts: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y%m%d-%H%M%S') }}"
+
+- name: Set bundle name and metadata context variables
+  ansible.builtin.set_fact:
+    bundle_name: "omnia-logs-{{ log_identifier }}-{{ bundle_ts }}-IST.tar.gz"
+    meta_user: "{{ oim_context_raw.stdout.split('|')[0] }}"
+    meta_hostname: "{{ oim_context_raw.stdout.split('|')[1] }}"
+    meta_os: "{{ oim_context_raw.stdout.split('|')[2] }}"
+
+- name: Write metadata.json into collected workspace
+  ansible.builtin.copy:
+    dest: "{{ log_root }}/metadata.json"
+    content: "{{ metadata_payload | to_nice_json }}"
+    mode: "0644"
+  vars:
+    metadata_payload:
+      bundle_name: "{{ bundle_name }}"
+      bundle_generated_at_utc: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
+      bundle_generated_at_local: "{{ lookup('pipe', 'TZ=Asia/Kolkata date +%Y-%m-%dT%H:%M:%S+05:30') }}"
+      trigger_user: "{{ meta_user }}"
+      host_name: "{{ meta_hostname }}"
+      host_os: "{{ meta_os }}"
+      identifier: "{{ log_identifier }}"
+      collection_mode: "{{ collection_mode }}"
+      exclusions_applied: "{{ exclude_patterns | default([]) }}"
+      warning_count: "{{ warnings_list | length }}"
+      warnings: "{{ warnings_list }}"
+
+- name: Create tar.gz bundle from collected workspace
+  ansible.builtin.shell: |
+    dirs=""
+    [ -d "{{ log_root }}/k8s" ]          && dirs="$dirs k8s"
+    [ -d "{{ log_root }}/slurm" ]         && dirs="$dirs slurm"
+    [ -f "{{ log_root }}/metadata.json" ] && dirs="$dirs metadata.json"
+    tar -czf "{{ log_root }}/{{ bundle_name }}" -C "{{ log_root }}" $dirs
+  args:
+    executable: /bin/bash
+  changed_when: true
+
+- name: Compute SHA256 checksum of bundle
+  ansible.builtin.shell: |
+    sha256sum "{{ log_root }}/{{ bundle_name }}" | awk '{print $1}'
+  register: bundle_sha256
+  changed_when: false
+
+- name: Write SHA256 sidecar file alongside bundle
+  ansible.builtin.copy:
+    dest: "{{ log_root }}/{{ bundle_name }}.sha256"
+    content: "{{ bundle_sha256.stdout }}  {{ bundle_name }}\n"
+    mode: "0644"
+
+- name: Print completion summary
+  ansible.builtin.debug:
+    msg: |-
+      ============================================================
+      OMNIA LOG COLLECTION COMPLETE
+      ============================================================
+      Collected Workspace : {{ log_root }}
+      Bundle Path         : {{ log_root }}/{{ bundle_name }}
+      SHA256              : {{ bundle_sha256.stdout }}
+      Collection Mode     : {{ collection_mode }}
+      Warnings ({{ warnings_list | length }}) :
+      {% if warnings_list | length == 0 %}  None
+      {% else %}{% for w in warnings_list %}  [WARN] {{ w.message }}
+      {% endfor %}{% endif %}============================================================

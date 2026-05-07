@@ -1,0 +1,103 @@
+---
+# Playbook: collect_cluster_logs.yml
+# Purpose: collect k8s and slurm logs from nodes defined in pxe_mapping_file.csv and store on OIM under /opt/omnia/logs
+# Assumptions:
+#  - pxe_mapping_file.csv headers include FUNCTIONAL_GROUP_NAME,GROUP_NAME,SERVICE_TAG,HOSTNAME,ADMIN_MAC,ADMIN_IP,BMC_MAC,BMC_IP
+#  - SSH from OIM to ADMIN_IP of nodes works (passwordless or via configured auth)
+#  - K8s services use standard log locations (see role tasks); Slurm uses journalctl units slurmctld/slurmd
+
+- name: Stage globals
+  hosts: localhost
+  gather_facts: false
+  tags:
+    - setup
+    - always
+  roles:
+    - role: log_collector
+      stage: setup
+
+- name: Prepare targets and inventory
+  hosts: localhost
+  gather_facts: false
+  tags:
+    - prepare
+    - always
+  roles:
+    - role: log_collector
+      stage: prepare
+
+- name: Collect k8s master logs
+  hosts: k8s_masters
+  gather_facts: false
+  ignore_unreachable: true
+  tags:
+    - k8s
+    - always
+  roles:
+    - role: log_collector
+      stage: k8s_master
+
+- name: Collect k8s worker logs
+  hosts: k8s_workers
+  gather_facts: false
+  ignore_unreachable: true
+  tags:
+    - k8s
+    - always
+  roles:
+    - role: log_collector
+      stage: k8s_worker
+
+- name: Collect slurm controller logs
+  hosts: slurm_controllers
+  gather_facts: false
+  ignore_unreachable: true
+  tags:
+    - slurm
+    - always
+  roles:
+    - role: log_collector
+      stage: slurm_ctl
+
+- name: Collect slurm node logs
+  hosts: slurm_nodes
+  gather_facts: false
+  ignore_unreachable: true
+  tags:
+    - slurm
+    - always
+  roles:
+    - role: log_collector
+      stage: slurm_node
+
+- name: Collect login node logs
+  hosts: login_nodes
+  gather_facts: false
+  ignore_unreachable: true
+  tags:
+    - slurm
+    - always
+  roles:
+    - role: log_collector
+      stage: login_node
+
+- name: Collect login compiler node logs
+  hosts: login_compiler_nodes
+  gather_facts: false
+  ignore_unreachable: true
+  tags:
+    - slurm
+    - always
+  roles:
+    - role: log_collector
+      stage: login_compiler_node
+
+- name: Bundle collected logs and publish summary
+  hosts: localhost
+  gather_facts: false
+  tags:
+    - bundle
+    - always
+  roles:
+    - role: log_collector
+      stage: bundle

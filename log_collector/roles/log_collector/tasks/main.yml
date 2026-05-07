@@ -1,0 +1,40 @@
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+
+- name: Load role variables
+  ansible.builtin.include_vars:
+    file: "{{ role_path }}/vars/main.yml"
+  run_once: true
+
+- name: Initialize globals and timestamp
+  ansible.builtin.include_tasks: setup.yml
+  when: stage == 'setup'
+
+- name: Parse node inventory and prepare workspace
+  ansible.builtin.include_tasks: prepare.yml
+  when: stage == 'prepare'
+
+- name: Collect k8s node logs
+  ansible.builtin.include_tasks: k8s_logs.yml
+  when: stage in ['k8s_master', 'k8s_worker']
+
+- name: Collect slurm node logs
+  ansible.builtin.include_tasks: slurm_logs.yml
+  when: stage in ['slurm_ctl', 'slurm_node', 'login_node', 'login_compiler_node']
+
+- name: Bundle logs and publish summary
+  ansible.builtin.include_tasks: bundle.yml
+  when: stage == 'bundle'
