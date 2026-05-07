@@ -236,6 +236,12 @@
             # Optional: Set up bash completion
             /usr/local/bin/helm completion bash > /etc/bash_completion.d/helm.sh
             chmod 0755 /etc/bash_completion.d/helm.sh
+{% for pv_entry in cloud_init_groups_dict[functional_group_name].powervault_scripts | default([]) %}
+        - path: /usr/local/bin/setup_iscsi_storage_{{ pv_entry.name }}.sh
+          permissions: '{{ file_mode_755 }}'
+          content: |
+            {{ pv_entry.content | indent(12) }}
+{% endfor %}
 
       runcmd:
         - /usr/local/bin/set-ssh.sh

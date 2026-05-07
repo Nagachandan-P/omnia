@@ -142,6 +142,7 @@ fi
 
 log "Using partition device: ${PART_DEV}"
 
+# TODO: remove this partitioning and add it as prereq - as it may happen simultaneously
 if ! blkid -s TYPE -o value "${PART_DEV}" 2>/dev/null | grep -q .; then
   log "Formatting ${PART_DEV} with ${FS_TYPE}"
   mkfs."${FS_TYPE}" -f "${PART_DEV}"
