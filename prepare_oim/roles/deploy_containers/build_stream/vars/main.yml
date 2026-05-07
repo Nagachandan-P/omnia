@@ -122,3 +122,37 @@ build_stream_container_failure_msg: |
   The deployment of the {{ build_stream_container_name }} container has failed. To resolve this issue,
   please run the utility/oim_cleanup.yml playbook to clean up any existing OIM resources.
   After the cleanup, you can re-run the original playbook to deploy the {{ build_stream_container_name }} container successfully.
+
+# Automation Framework Configuration (Phase 2 - Component 5 Validate Module Spec)
+# Repository and branch configuration
+automation_repo_url: "https://github.com/dell/omnia-artifactory.git"
+automation_repo_branch: "automation-v2.1.0.0"
+automation_base_dir: "/opt/omnia/automation"
+automation_venv_dir: "{{ automation_base_dir }}/.venv"
+automation_config_file: "{{ automation_base_dir }}/omnia_test_config.yml"
+
+# Git clone configuration with retry logic
+automation_git_retries: 3
+automation_git_delay: 10
+automation_git_success_msg: "Automation repository cloned/updated successfully from {{ automation_repo_url }} branch {{ automation_repo_branch }}"
+
+# Script permissions and execution
+automation_script_mode: "0755"
+
+# Dataset and NFS paths for local execution mode
+automation_dataset_path: "/opt/omnia/input/project_default"
+automation_nfs_share_path: "{{ build_stream_root_dir }}/artifacts"
+
+# Test execution defaults
+automation_default_timeout: 120
+automation_max_retries: 3
+automation_log_level: "INFO"
+
+# Success messages
+automation_setup_success_msg: |
+  Automation framework setup completed successfully:
+  - Repository cloned to {{ automation_base_dir }}
+  - Virtual environment created at {{ automation_venv_dir }}
+  - Molecule and dependencies installed
+  - Configuration generated for local execution mode
+  - Ready for validate stage execution
