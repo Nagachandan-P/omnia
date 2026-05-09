@@ -24,7 +24,7 @@ Enhanced (S1-4 Part A):
 """
 
 import json
-import logging
+from api.logging_utils import log_secure_info
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -73,7 +73,6 @@ from core.jobs.value_objects import (
 from orchestrator.catalog.commands.parse_catalog import ParseCatalogCommand
 from orchestrator.catalog.dtos import ParseCatalogResult
 
-logger = logging.getLogger(__name__)
 
 
 class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
@@ -257,103 +256,96 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
     # S1-4 Part A: ImageGroup ID extraction and uniqueness
     # ------------------------------------------------------------------
 
-    def _extract_image_group_id(self, catalog_data: dict) -> str:
-        """Extract ImageGroupID from the catalog JSON top-level key.
+    def _extract_image_group_id(self, catalog_data: dict) -> ImageGroupId:
+        """Extract ImageGroupID from the Catalog.Identifier field.
 
-        The catalog JSON has exactly one top-level key that serves as the
-        ImageGroupID (e.g., 'omnia-cluster-v1.2').
+        The catalog JSON has a top-level ``Catalog`` object containing an
+        ``Identifier`` field that serves as the ImageGroupID
+        (e.g., ``'image-build'``).
 
         Args:
             catalog_data: Parsed catalog JSON as a dict.
 
         Returns:
-            The ImageGroupID string (1-128 characters).
+            An ``ImageGroupId`` value object (validated, 1-128 characters).
 
         Raises:
-            InvalidCatalogFormatError: If catalog has zero or multiple
-                top-level keys, or if the key is empty/too long.
+            InvalidCatalogFormatError: If the ``Catalog`` key is missing,
+                the ``Identifier`` field is absent/empty, or the value
+                exceeds the maximum length.
         """
-        top_level_keys = list(catalog_data.keys())
-
-        if len(top_level_keys) == 0:
+        catalog_obj = catalog_data.get("Catalog")
+        if not catalog_obj or not isinstance(catalog_obj, dict):
             raise InvalidCatalogFormatError(
-                "Catalog JSON is empty - no top-level key found"
+                "Catalog JSON missing required 'Catalog' top-level key"
             )
 
-        if len(top_level_keys) > 1:
+        raw_id = catalog_obj.get("Identifier", "")
+
+        try:
+            return ImageGroupId(raw_id)
+        except ValueError as exc:
             raise InvalidCatalogFormatError(
-                f"Catalog JSON has {len(top_level_keys)} top-level keys; "
-                f"expected exactly 1. Keys found: {top_level_keys}"
-            )
+                f"Catalog 'Identifier' is invalid: {exc}"
+            ) from exc
 
-        image_group_id = top_level_keys[0]
-
-        if not image_group_id or not image_group_id.strip():
-            raise InvalidCatalogFormatError(
-                "Catalog top-level key is empty or whitespace"
-            )
-
-        if len(image_group_id) > ImageGroupId.MAX_LENGTH:
-            raise InvalidCatalogFormatError(
-                f"Catalog top-level key exceeds {ImageGroupId.MAX_LENGTH} "
-                f"characters (length: {len(image_group_id)})"
-            )
-
-        return image_group_id
-
-    def _check_image_group_uniqueness(self, image_group_id: str) -> None:
+    def _check_image_group_uniqueness(self, image_group_id: ImageGroupId) -> None:
         """Check that no ImageGroup with this ID already exists.
 
         Args:
-            image_group_id: The extracted ImageGroupID from the catalog.
+            image_group_id: The validated ImageGroupId from the catalog.
 
         Raises:
             DuplicateImageGroupError: If an ImageGroup with this ID
                 already exists in the database. Maps to HTTP 409 Conflict.
         """
         if self._image_group_repo is None:
-            logger.debug(
+            log_secure_info(
+                'debug',
                 "ImageGroup repo not available; skipping uniqueness check"
             )
             return
 
-        exists = self._image_group_repo.exists(ImageGroupId(image_group_id))
+        exists = self._image_group_repo.exists(image_group_id)
         if exists:
-            raise DuplicateImageGroupError(image_group_id)
+            raise DuplicateImageGroupError(str(image_group_id))
 
     def _extract_catalog_metadata(
-        self, catalog_data: dict, image_group_id: str
+        self, catalog_data: dict, image_group_id: ImageGroupId
     ) -> dict:
         """Extract role/image mappings from catalog for build-image.
 
+        Reads the ``Catalog.FunctionalLayer`` list and derives one Image
+        record per layer entry.  Each layer's ``Name`` becomes the role,
+        and the image name defaults to ``<role>.img``.
+
         Args:
             catalog_data: Parsed catalog JSON as a dict.
-            image_group_id: The top-level key (ImageGroupID).
+            image_group_id: The validated ImageGroupId from the catalog.
 
         Returns:
             Dict with image_group_id, roles, role_images, and catalog info.
         """
-        catalog_content = catalog_data.get(image_group_id, {})
-        roles_section = catalog_content.get("roles", {})
+        catalog_content = catalog_data.get("Catalog", {})
+        functional_layers = catalog_content.get("FunctionalLayer", [])
 
-        roles = sorted(roles_section.keys())
+        roles: List[str] = []
         role_images: Dict[str, str] = {}
-        for role_name, role_config in roles_section.items():
-            image_name = (
-                role_config.get("image_name")
-                if isinstance(role_config, dict) else None
-            )
-            if not image_name:
-                image_name = f"{role_name}.img"
-            role_images[role_name] = image_name
+        for layer in functional_layers:
+            if not isinstance(layer, dict):
+                continue
+            role_name = layer.get("Name", "")
+            if role_name:
+                roles.append(role_name)
+                role_images[role_name] = f"{role_name}.img"
+        roles.sort()
 
         return {
-            "image_group_id": image_group_id,
+            "image_group_id": str(image_group_id),
             "roles": roles,
             "role_images": role_images,
-            "os": catalog_content.get("os", ""),
-            "version": catalog_content.get("version", ""),
-            "arch": catalog_content.get("arch", "x86_64"),
+            "name": catalog_content.get("Name", ""),
+            "version": catalog_content.get("Version", ""),
         }
 
     def _store_catalog_metadata_artifact(
@@ -391,9 +383,12 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
             key = self._artifact_store.generate_key(hint, ArtifactKind.FILE)
             raw = self._artifact_store.retrieve(key, ArtifactKind.FILE)
             digest = ArtifactDigest(hashlib.sha256(raw).hexdigest())
+            # Construct file URI directly - don't use memory:// for FileArtifactStore
+            from pathlib import Path
+            artifact_path = Path(self._artifact_store._base_path) / key.value
             metadata_ref = ArtifactRef(
                 key=key, digest=digest, size_bytes=len(raw),
-                uri=f"memory://{key.value}",
+                uri=f"file://{artifact_path}",
             )
 
         record = ArtifactRecord(
@@ -408,12 +403,11 @@ class ParseCatalogUseCase:  # pylint: disable=too-few-public-methods
         )
         self._artifact_metadata_repo.save(record)
 
-        logger.info(
-            "Stored catalog metadata artifact: job_id=%s, "
-            "image_group_id=%s, roles=%s",
-            command.job_id,
-            catalog_metadata.get("image_group_id"),
-            catalog_metadata.get("roles"),
+        log_secure_info(
+            'info',
+            f"Stored catalog metadata artifact: job_id={command.job_id}, "
+            f"image_group_id={catalog_metadata.get('image_group_id')}, "
+            f"roles={catalog_metadata.get('roles')}"
         )
 
         return metadata_ref

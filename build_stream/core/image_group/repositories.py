@@ -112,6 +112,26 @@ class ImageGroupRepository(ABC):
         ...
 
     @abstractmethod
+    def list_post_built(
+        self,
+        limit: int,
+        offset: int,
+    ) -> Tuple[List[ImageGroup], int]:
+        """List ImageGroups in all post-BUILT states with pagination.
+
+        Returns image groups with status >= BUILT (BUILT, DEPLOYING, DEPLOYED,
+        RESTARTING, RESTARTED, VALIDATING, PASSED, FAILED).
+
+        Args:
+            limit: Maximum number of results.
+            offset: Number of results to skip.
+
+        Returns:
+            Tuple of (image_groups_with_images, total_count).
+        """
+        ...
+
+    @abstractmethod
     def exists(self, image_group_id: ImageGroupId) -> bool:
         """Check if an ImageGroup with the given ID exists.
 
@@ -120,6 +140,35 @@ class ImageGroupRepository(ABC):
 
         Returns:
             True if exists, False otherwise.
+        """
+        ...
+
+    @abstractmethod
+    def count_non_cleaned(self) -> int:
+        """Count Image Groups that are not in CLEANED status.
+
+        Used by the build-image stage guard to enforce the image
+        retention limit.
+
+        Returns:
+            Number of Image Groups whose status is not ``CLEANED``.
+        """
+        ...
+
+    @abstractmethod
+    def list_by_status_all(
+        self, status: ImageGroupStatus
+    ) -> List[ImageGroup]:
+        """List all Image Groups with the given status (no pagination).
+
+        Used by the automated cleanup cron to iterate over every
+        ``FAILED`` Image Group.
+
+        Args:
+            status: Filter by this status.
+
+        Returns:
+            List of ImageGroup entities (with ``images`` eager-loaded).
         """
         ...
 

@@ -15,13 +15,14 @@
 """Upload files use case implementation."""
 
 import hashlib
-import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
 
+from api.logging_utils import log_secure_info
 from common.config import BuildStreamConfig
 from core.artifacts.entities import ArtifactRecord
+from core.artifacts.exceptions import ArtifactAlreadyExistsError
 from core.artifacts.interfaces import ArtifactMetadataRepository, ArtifactStore
 from core.artifacts.value_objects import ArtifactKind, StoreHint
 from core.jobs.repositories import JobRepository, StageRepository, AuditEventRepository
@@ -40,12 +41,12 @@ from orchestrator.upload.results.upload_files import (
 from orchestrator.upload.exceptions import InvalidFilenameError, FileSizeExceededError
 
 
-logger = logging.getLogger(__name__)
-
-
 # Shared input directory path for playbook consumption
 # This matches the path used by NfsInputRepository and expected by Omnia playbooks
 DEFAULT_PLAYBOOK_INPUT_DIR = "/opt/omnia/input/project_default/"
+
+# Restart state directory where the playbook reads failed_nodes.json for retry logic
+RESTART_STATE_DIR = "/opt/omnia/build_stream_root/restart_state"
 
 # Whitelist of allowed configuration files
 ALLOWED_CONFIG_FILES = {
@@ -60,6 +61,7 @@ ALLOWED_CONFIG_FILES = {
     "high_availability_config.yml",
     "omnia_config.yml",
     "build_stream_config.yml",
+    "failed_nodes.json",
 }
 
 
@@ -119,7 +121,7 @@ class UploadFilesUseCase:
             InvalidFilenameError: If any filename is not in whitelist.
             FileSizeExceededError: If any file exceeds size limit.
         """
-        logger.info("Executing upload files for job_id=%s", command.job_id)
+        log_secure_info('info', f"Executing upload files for job_id={command.job_id}")
 
         # Validate job exists and is in valid state
         self._current_job = self._validate_job(command.job_id)
@@ -130,8 +132,12 @@ class UploadFilesUseCase:
         # Validate all files before processing (fail-fast)
         self._validate_all_files(command.files)
 
-        # Mark stage as started (first upload transitions to IN_PROGRESS)
-        # Allow uploads even if stage is already COMPLETED
+        # Reset stage if in a terminal state (FAILED/COMPLETED) to allow retry
+        if stage.stage_state in {StageState.FAILED, StageState.COMPLETED}:
+            stage.reset()
+            self._stage_repo.save(stage)
+
+        # Mark stage as started (transitions PENDING -> IN_PROGRESS)
         if stage.stage_state == StageState.PENDING:
             # Collect filenames for audit event
             filenames = [filename for filename, _ in command.files]
@@ -155,7 +161,7 @@ class UploadFilesUseCase:
         if stage.stage_state != StageState.COMPLETED:
             # First upload: mark stage as completed
             self._mark_stage_completed(stage)
-        
+
         # Always emit audit event with file details (for all uploads)
         self._emit_upload_files_audit_event(command, uploaded_files)
 
@@ -172,12 +178,9 @@ class UploadFilesUseCase:
             files=uploaded_files,
         )
 
-        logger.info(
-            "Upload completed: job_id=%s, total=%d, changed=%d, unchanged=%d",
-            command.job_id,
-            summary.total_files,
-            summary.changed_files,
-            summary.unchanged_files,
+        log_secure_info(
+            'info',
+            f"Upload completed: job_id={command.job_id}, total={summary.total_files}, changed={summary.changed_files}, unchanged={summary.unchanged_files}"
         )
 
         return result
@@ -199,7 +202,7 @@ class UploadFilesUseCase:
         if job is None:
             raise JobNotFoundError(f"Job not found: {job_id}")
 
-        if job.is_completed() or job.is_failed() or job.is_cancelled():
+        if job.is_completed() or job.is_cancelled():
             raise TerminalStateViolationError(
                 entity_type="Job",
                 entity_id=str(job_id),
@@ -285,17 +288,23 @@ class UploadFilesUseCase:
         # Determine change status
         if previous_record and previous_record.artifact_ref.digest.value == current_digest:
             status = FileChangeStatus.UNCHANGED
-            logger.debug("File unchanged: %s (digest: %s)", filename, current_digest[:12])
+            log_secure_info('debug', f"File unchanged: {filename} (digest: {current_digest[:12]})")
         else:
             status = FileChangeStatus.CHANGED
-            logger.debug("File changed: %s (digest: %s)", filename, current_digest[:12])
+            log_secure_info('debug', f"File changed: {filename} (digest: {current_digest[:12]})")
 
             # Store in ArtifactStore only for changed files
             self._store_in_artifact_store(job_id, filename, content)
 
         # Always write to both NFS locations (job-scoped and shared)
         self._write_to_nfs_job_directory(job_id, filename, content)
-        self._write_to_shared_input_directory(filename, content)
+
+        # For failed_nodes.json, ONLY write to job-specific restart_state directory
+        # DO NOT write to shared input directory (not needed for this file)
+        if filename == "failed_nodes.json":
+            self._write_to_restart_state_directory(str(job_id), filename, content)
+        else:
+            self._write_to_shared_input_directory(filename, content)
 
         return UploadedFileInfo(
             filename=filename,
@@ -317,33 +326,38 @@ class UploadFilesUseCase:
             tags={"job_id": str(job_id)},
         )
 
-        artifact_ref = self._artifact_store.store(
-            hint=hint,
-            kind=ArtifactKind.FILE,
-            content=content,
-            content_type="application/octet-stream",
-        )
+        try:
+            artifact_ref = self._artifact_store.store(
+                hint=hint,
+                kind=ArtifactKind.FILE,
+                content=content,
+                content_type="application/octet-stream",
+            )
 
-        # Save metadata
-        record = ArtifactRecord(
-            id=self._generate_id(),
-            job_id=job_id,
-            stage_name=StageName(StageType.UPLOAD.value),
-            label=filename,
-            artifact_ref=artifact_ref,
-            kind=ArtifactKind.FILE,
-            content_type="application/octet-stream",
-            tags={"filename": filename},
-            created_at=None,  # Will be set by repository
-        )
+            # Save metadata
+            record = ArtifactRecord(
+                id=self._generate_id(),
+                job_id=job_id,
+                stage_name=StageName(StageType.UPLOAD.value),
+                label=filename,
+                artifact_ref=artifact_ref,
+                kind=ArtifactKind.FILE,
+                content_type="application/octet-stream",
+                tags={"filename": filename},
+                created_at=None,  # Will be set by repository
+            )
 
-        self._artifact_metadata_repo.save(record)
+            self._artifact_metadata_repo.save(record)
 
-        logger.debug(
-            "Stored in ArtifactStore: %s (key: %s)",
-            filename,
-            artifact_ref.key,
-        )
+            log_secure_info(
+                'debug',
+                f"Stored in ArtifactStore: {filename} (key: {artifact_ref.key})"
+            )
+        except ArtifactAlreadyExistsError:
+            log_secure_info(
+                'debug',
+                f"Artifact already exists in store: {filename} (skipping storage)"
+            )
 
     def _write_to_nfs_job_directory(self, job_id, filename: str, content: bytes):
         """Write file to job-scoped NFS directory.
@@ -360,7 +374,7 @@ class UploadFilesUseCase:
         target_file = target_dir / filename
         target_file.write_bytes(content)
 
-        logger.debug("Wrote to NFS job directory: %s", target_file)
+        log_secure_info('debug', f"Wrote to NFS job directory: {target_file}")
 
     def _write_to_shared_input_directory(self, filename: str, content: bytes):
         """Write file to shared input directory.
@@ -377,7 +391,32 @@ class UploadFilesUseCase:
         target_file = playbook_input_dir / filename
         target_file.write_bytes(content)
 
-        logger.debug("Wrote to shared input directory: %s", target_file)
+        log_secure_info('debug', f"Wrote to shared input directory: {target_file}")
+
+    def _write_to_restart_state_directory(self, job_id: str, filename: str, content: bytes):
+        """Write file to job-specific restart_state directory for playbook consumption.
+
+        The set_pxe_boot.yml Play 1.5 reads failed_nodes.json from
+        /opt/omnia/build_stream_root/restart_state/{job_id}/ for the retry logic.
+        When the GitLab pipeline uploads failed_nodes.json via PUT /upload,
+        it must also land in this job-specific directory.
+
+        This ensures:
+        - New job_id = fresh start (no previous state)
+        - Same job_id re-run = uses previous failed_nodes.json for retry
+
+        Args:
+            job_id: Job identifier.
+            filename: Filename.
+            content: File content.
+        """
+        restart_state_path = Path(RESTART_STATE_DIR) / job_id
+        restart_state_path.mkdir(parents=True, exist_ok=True)
+
+        target_file = restart_state_path / filename
+        target_file.write_bytes(content)
+
+        log_secure_info('debug', f"Wrote {filename} to job-specific restart_state directory: {target_file}")
 
     def _generate_id(self) -> str:
         """Generate unique identifier for artifact record.
@@ -432,7 +471,7 @@ class UploadFilesUseCase:
                 "file_count": len(filenames),
             }
         )
-        logger.info("Upload stage started: job_id=%s, files=%s", stage.job_id, filenames)
+        log_secure_info('info', f"Upload stage started: job_id={stage.job_id}, files={filenames}")
 
     def _mark_stage_completed(self, stage):
         """Transition stage to COMPLETED.
@@ -442,7 +481,7 @@ class UploadFilesUseCase:
         """
         stage.complete()
         self._stage_repo.save(stage)
-        logger.info("Upload stage marked as completed: job_id=%s", stage.job_id)
+        log_secure_info('info', f"Upload stage marked as completed: job_id={stage.job_id}")
 
     def _emit_upload_files_audit_event(
         self,
@@ -480,10 +519,10 @@ class UploadFilesUseCase:
                 "unchanged_files": unchanged_count,
             }
         )
-        
-        logger.info(
-            "Files uploaded: job_id=%s, total=%d, changed=%d, unchanged=%d",
-            command.job_id, len(uploaded_files), changed_count, unchanged_count
+
+        log_secure_info(
+            'info',
+            f"Files uploaded: job_id={command.job_id}, total={len(uploaded_files)}, changed={changed_count}, unchanged={unchanged_count}"
         )
 
     def _emit_audit_event(
@@ -509,3 +548,5 @@ class UploadFilesUseCase:
             details=details,
         )
         self._audit_repo.save(event)
+     
+    

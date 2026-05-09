@@ -12,6 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# pylint: disable=C0103,E0401,E1102
+# C0103: Module name and constant names follow Alembic migration naming conventions
+# E0401: Import errors due to pylint running outside package context
+# E1102: SQLAlchemy func.now() is callable at runtime
+
 """Release 2: Create image_groups and images tables, modify jobs and job_stages.
 
 Revision ID: 006
@@ -34,6 +39,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    """Apply migration: Add Release 2 schema changes.
+
+    Adds pipeline_phase column to jobs table, result_detail JSONB to job_stages table,
+    and creates image_groups and images tables for deployment lifecycle tracking.
+    """
     # ─── 1. Modify jobs table — add pipeline_phase ───
     op.add_column(
         "jobs",
@@ -91,7 +101,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("role", sa.String(128), nullable=False),
-        sa.Column("image_name", sa.String(256), nullable=False),
+        sa.Column("image_name", sa.String(512), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -109,6 +119,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Revert migration: Remove Release 2 schema changes.
+
+    Drops image_groups and images tables, removes result_detail from job_stages,
+    and removes pipeline_phase from jobs table.
+    """
     # Drop images table
     op.drop_index("uq_images_image_group_id_role", table_name="images")
     op.drop_index("idx_images_image_group_id", table_name="images")

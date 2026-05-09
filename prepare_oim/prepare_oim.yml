@@ -32,7 +32,7 @@
           {{
             (
               ansible_run_tags | default([]) +
-              ['prepare_oim', 'local_repo', 'discovery']
+              ['prepare_oim', 'local_repo', 'discovery', 'provision']
             ) | unique
           }}
         cacheable: true
@@ -89,7 +89,7 @@
                 name: telemetry_config
               when: telemetry_config_stat.stat.exists
 
-            - name: Add telemetry tag if idrac_telemetry_support is enabled
+            - name: Add telemetry tag if any telemetry source is enabled
               ansible.builtin.set_fact:
                 omnia_run_tags: >-
                   {{
@@ -97,7 +97,56 @@
                   }}
               when:
                 - telemetry_config_stat.stat.exists
-                - telemetry_config.idrac_telemetry_support | default(false) | bool
+                - >-
+                  (telemetry_config.telemetry_sources.idrac.metrics_enabled | default(false) | bool) or
+                  (telemetry_config.telemetry_sources.ldms.metrics_enabled | default(false) | bool) or
+                  (telemetry_config.telemetry_sources.powerscale.metrics_enabled | default(false) | bool) or
+                  (telemetry_config.telemetry_sources.powerscale.logs_enabled | default(false) | bool) or
+                  (telemetry_config.telemetry_sources.dcgm.metrics_enabled | default(false) | bool)
+
+        - name: Check discovery configuration for OME
+          block:
+            - name: Check if discovery_config.yml exists
+              ansible.builtin.stat:
+                path: "{{ input_project_dir }}/discovery_config.yml"
+              register: discovery_config_stat
+
+            - name: Load discovery_config.yml
+              ansible.builtin.include_vars:
+                file: "{{ input_project_dir }}/discovery_config.yml"
+                name: discovery_config
+              when: discovery_config_stat.stat.exists
+              failed_when: false
+
+            - name: Set ome_discovery_enabled flag
+              ansible.builtin.set_fact:
+                ome_discovery_enabled: "{{ discovery_config_stat.stat.exists and (discovery_config.enable_bmc_discovery | default(false) | bool) }}"
+                cacheable: true
+
+            - name: Set enable_bmc_discovery at top level for credential utility
+              ansible.builtin.set_fact:
+                enable_bmc_discovery: "{{ discovery_config.enable_bmc_discovery | default(false) | bool }}"
+                cacheable: true
+              when: discovery_config_stat.stat.exists
+
+        - name: Check discovery configuration for OME
+          block:
+            - name: Check if discovery_config.yml exists
+              ansible.builtin.stat:
+                path: "{{ input_project_dir }}/discovery_config.yml"
+              register: discovery_config_stat
+
+            - name: Load discovery_config.yml
+              ansible.builtin.include_vars:
+                file: "{{ input_project_dir }}/discovery_config.yml"
+                name: discovery_config
+              when: discovery_config_stat.stat.exists
+              failed_when: false
+
+            - name: Set ome_discovery_enabled flag
+              ansible.builtin.set_fact:
+                ome_discovery_enabled: "{{ discovery_config_stat.stat.exists and (discovery_config.enable_bmc_discovery | default(false) | bool) }}"
+                cacheable: true
 
 - name: Invoke validate_config.yml to perform L1 and L2 validations with prepare_oim tag
   ansible.builtin.import_playbook: ../input_validation/validate_config.yml
