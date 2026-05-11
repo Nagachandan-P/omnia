@@ -114,13 +114,13 @@ class CreateRestartUseCase:
         stage = self._validate_stage(command)
         image_group_id = self._get_image_group_id(job)
 
-        # Create per-attempt log file
+        # Create per-attempt log file and set on stage
         log_path = create_stage_log_file(
             str(command.job_id), StageType.RESTART.value, stage.attempt
         )
         if log_path:
             stage.log_file_path = str(log_path)
-            self._stage_repo.save(stage)
+            # Note: Don't save here - will be saved in _submit_to_queue after stage.start()
 
         request = self._build_playbook_request(command, stage)
         self._submit_to_queue(command, request, stage)

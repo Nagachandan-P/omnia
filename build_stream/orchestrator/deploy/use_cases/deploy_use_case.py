@@ -138,13 +138,13 @@ class DeployUseCase:
         # [5] Validate stage record
         stage = self._validate_stage(command)
 
-        # [5a] Create per-attempt log file
+        # [5a] Create per-attempt log file and set on stage
         log_path = create_stage_log_file(
             str(command.job_id), StageType.DEPLOY.value, stage.attempt
         )
         if log_path:
             stage.log_file_path = str(log_path)
-            self._stage_repo.save(stage)
+            # Note: Don't save here - will be saved in _submit_to_queue after stage.start()
 
         # [6] Create deploy request and submit to queue
         request = self._create_request(command, stage)
