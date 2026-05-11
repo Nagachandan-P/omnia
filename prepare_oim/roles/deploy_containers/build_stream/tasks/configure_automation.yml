@@ -110,6 +110,8 @@
 - name: Verify Molecule installation in virtual environment
   ansible.builtin.command:
     cmd: "{{ automation_venv_dir }}/bin/python3 -m molecule --version"
+  environment:
+    PATH: "{{ automation_venv_dir }}/bin:{{ ansible_env.PATH }}"
   register: molecule_version_check
   changed_when: false
   failed_when: molecule_version_check.rc != 0
