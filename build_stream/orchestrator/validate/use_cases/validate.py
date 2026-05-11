@@ -169,20 +169,18 @@ class ValidateUseCase:
                 correlation_id=str(command.correlation_id),
             )
 
-        # Check no active validate stage (QUEUED or IN_PROGRESS)
+        # Check no active validate stage (IN_PROGRESS only)
+        # PENDING is allowed since it means nothing is running
         validate_stage_name = StageName(StageType.VALIDATE.value)
         validate_stage = self._stage_repo.find_by_job_and_name(
             command.job_id, validate_stage_name
         )
-        if validate_stage is not None and validate_stage.stage_state in (
-            StageState.PENDING,
-            StageState.IN_PROGRESS,
-        ):
+        if validate_stage is not None and validate_stage.stage_state == StageState.IN_PROGRESS:
             raise InvalidStateTransitionError(
                 entity_type="Stage",
                 entity_id=f"{command.job_id}/validate",
                 from_state=validate_stage.stage_state.value,
-                to_state="QUEUED",
+                to_state=StageState.IN_PROGRESS.value,
                 correlation_id=str(command.correlation_id),
             )
 
@@ -200,15 +198,37 @@ class ValidateUseCase:
         return 1
 
     def _create_stage(self, command: ValidateCommand, attempt: int) -> Stage:
-        """Create a new job_stages record with status QUEUED."""
-        stage = Stage(
-            job_id=command.job_id,
-            stage_name=StageName(StageType.VALIDATE.value),
-            stage_state=StageState.PENDING,
-            attempt=attempt,
+        """Create or update a job_stages record with status QUEUED."""
+        validate_stage_name = StageName(StageType.VALIDATE.value)
+        existing_stage = self._stage_repo.find_by_job_and_name(
+            command.job_id, validate_stage_name
         )
-        self._stage_repo.save(stage)
-        return stage
+        
+        if existing_stage is not None:
+            # Update existing stage instead of creating duplicate
+            existing_stage.stage_state = StageState.PENDING
+            existing_stage.attempt = attempt
+            existing_stage.version = existing_stage.version + 1  # Increment version for optimistic locking
+            existing_stage.error_code = None  # Clear error fields from previous attempt
+            existing_stage.error_summary = None
+            existing_stage.ended_at = None  # Clear ended_at from previous attempt
+            existing_stage.result_detail = None  # Clear result_detail from previous attempt
+            self._stage_repo.save(existing_stage)
+            if hasattr(self._stage_repo, 'session'):
+                self._stage_repo.session.commit()
+            return existing_stage
+        else:
+            # Create new stage if none exists
+            stage = Stage(
+                job_id=command.job_id,
+                stage_name=validate_stage_name,
+                stage_state=StageState.PENDING,
+                attempt=attempt,
+            )
+            self._stage_repo.save(stage)
+            if hasattr(self._stage_repo, 'session'):
+                self._stage_repo.session.commit()
+            return stage
 
     def _transition_job_to_validating(self, command: ValidateCommand) -> None:
         """Update job status to VALIDATING (IN_PROGRESS)."""
@@ -262,6 +282,8 @@ class ValidateUseCase:
         try:
             stage.start()
             self._stage_repo.save(stage)
+            if hasattr(self._stage_repo, 'session'):
+                self._stage_repo.session.commit()
         except Exception as save_exc:
             log_secure_info(
                 "warning",
@@ -349,7 +371,7 @@ class ValidateUseCase:
         return ValidateResponse(
             job_id=str(command.job_id),
             stage_name=StageType.VALIDATE.value,
-            status="QUEUED",
+            status="accepted",
             submitted_at=request.submitted_at,
             correlation_id=str(command.correlation_id),
             attempt=attempt,
