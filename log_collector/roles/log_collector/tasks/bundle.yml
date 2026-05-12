@@ -17,14 +17,12 @@
 - name: Set log identifier (hostname fallback when not provided)
   ansible.builtin.set_fact:
     log_identifier: "{{ identifier | default(inventory_hostname) }}"
-    collection_mode: "full"
+    collection_mode: "complete logs"
 
 - name: Override collection mode to curated_support when tag is active
-  tags:
-    - curated_support
-    - never
   ansible.builtin.set_fact:
     collection_mode: "curated_support"
+  when: "'curated_support' in ansible_run_tags"
 
 - name: Set ISO-8601 warning timestamp for this run
   ansible.builtin.set_fact:
@@ -366,7 +364,7 @@
     - "{{ log_root }}/k8s"
     - "{{ log_root }}/slurm"
 
-- name: Print completion summary
+- name: Completion summary
   ansible.builtin.shell: |
     echo "============================================================"
     echo "OMNIA LOG COLLECTION COMPLETE"
@@ -388,4 +386,9 @@
     echo "============================================================"
   args:
     executable: /bin/bash
+  register: completion_output
   changed_when: false
+
+- name: Display completion summary
+  ansible.builtin.debug:
+    var: completion_output.stdout_lines
