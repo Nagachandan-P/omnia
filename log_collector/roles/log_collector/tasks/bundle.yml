@@ -375,14 +375,7 @@
     echo "Metadata Path       : {{ log_root }}/{{ meta_rel_path }}"
     echo "SHA256              : {{ bundle_sha256.stat.checksum }}"
     echo "Collection Mode     : {{ collection_mode }}"
-    echo "Warnings ({{ warnings_list | length }}) :"
-    {% if warnings_list | length == 0 %}
-    echo "  None"
-    {% else %}
-    {% for w in warnings_list %}
-    echo "  [WARN] {{ w.message }}"
-    {% endfor %}
-    {% endif %}
+    echo "Warnings            : {{ warnings_list | length }}"
     echo "============================================================"
   args:
     executable: /bin/bash
