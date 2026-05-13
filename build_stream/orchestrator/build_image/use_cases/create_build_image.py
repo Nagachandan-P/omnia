@@ -347,6 +347,28 @@ class CreateBuildImageUseCase:
                 correlation_id=str(command.correlation_id),
             )
         
+        # Reset FAILED stages for retry (build stages don't support re-run from COMPLETED)
+        if stage.stage_state == StageState.FAILED:
+            prev_state = stage.stage_state.value
+            stage.reset()
+            self._stage_repo.save(stage)
+            log_secure_info(
+                "info",
+                f"Resetting {stage_type.value} stage from {prev_state} to PENDING "
+                f"for retry (attempt {stage.attempt}): job_id={command.job_id}",
+                job_id=str(command.job_id),
+            )
+            # Resume job from FAILED to IN_PROGRESS so CI polling doesn't exit early
+            JobStateHelper.handle_job_resume(
+                job_repo=self._job_repo,
+                audit_repo=self._audit_repo,
+                uuid_generator=self._uuid_generator,
+                job_id=command.job_id,
+                stage_name=stage_type.value,
+                correlation_id=str(command.correlation_id),
+                client_id=str(command.client_id),
+            )
+        
         # Only allow PENDING stages to transition to IN_PROGRESS
         if stage.stage_state == StageState.COMPLETED:
             raise StageAlreadyCompletedError(

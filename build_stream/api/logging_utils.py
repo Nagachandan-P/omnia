@@ -91,12 +91,16 @@ def create_job_log_file(job_id: str) -> Optional[Path]:
 def create_stage_log_file(
     job_id: str, stage_name: str, attempt: int
 ) -> Optional[Path]:
-    """Create a per-attempt log file for a stage.
+    """Ensure the job log directory exists for a stage execution.
 
-    Path: ``<LOG_BASE>/<job_id>/<stage_name>_<job_id>_attempt<attempt>.log``
+    The actual log file is created by the playbook watcher (via
+    ``ANSIBLE_LOG_PATH``) and moved into this directory after completion.
+    The result poller then updates the stage's ``log_file_path`` with
+    the real file path.  This function only guarantees the parent
+    directory is ready.
 
-    Each stage execution gets its own log file so that retry attempts
-    preserve the logs from previous runs.
+    Returns ``None`` so callers do **not** set a stale placeholder path
+    on the stage entity before the watcher produces the real log.
 
     Args:
         job_id: Parent job identifier.
@@ -104,20 +108,16 @@ def create_stage_log_file(
         attempt: Current attempt number (1-indexed).
 
     Returns:
-        Path to the created log file, or ``None`` on failure.
+        None — the log path is set later by the result poller.
     """
     job_log_dir = _LOG_BASE / job_id
     try:
         job_log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = job_log_dir / f"{stage_name}_{job_id}_attempt{attempt}.log"
-        log_file.touch(exist_ok=True)
-        return log_file
     except OSError:
         logging.getLogger(__name__).warning(
-            "Failed to create stage log file for job: %s, stage: %s, attempt: %d",
+            "Failed to create stage log directory for job: %s, stage: %s, attempt: %d",
             job_id, stage_name, attempt,
         )
-        return None
 
 
 def remove_job_logger(job_id: str) -> None:

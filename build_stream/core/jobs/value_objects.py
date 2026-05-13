@@ -112,7 +112,6 @@ class StageType(str, Enum):
     # New (Release 2 — Deploy Pipeline)
     UPLOAD = "upload"
     DEPLOY = "deploy"
-    PXE_BOOT = "pxe_boot"
 
 
 @dataclass(frozen=True)

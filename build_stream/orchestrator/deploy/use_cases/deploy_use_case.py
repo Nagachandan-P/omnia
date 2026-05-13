@@ -228,6 +228,16 @@ class DeployUseCase:
                 f"job_id={command.job_id}",
                 job_id=str(command.job_id),
             )
+            # Resume job from FAILED to IN_PROGRESS so CI polling doesn't exit early
+            JobStateHelper.handle_job_resume(
+                job_repo=self._job_repo,
+                audit_repo=self._audit_repo,
+                uuid_generator=self._uuid_generator,
+                job_id=command.job_id,
+                stage_name=StageType.DEPLOY.value,
+                correlation_id=str(command.correlation_id),
+                client_id=str(command.client_id),
+            )
 
         if stage.stage_state != StageState.PENDING:
             raise InvalidStateTransitionError(
