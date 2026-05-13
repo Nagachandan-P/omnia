@@ -606,12 +606,13 @@ def extract_playbook_name(full_playbook_path: str) -> str:
     return os.path.basename(full_playbook_path)
 
 
-def _build_log_paths(playbook_path: str, started_at: datetime) -> tuple:
-    """Build host and container log file paths without job_id.
+def _build_log_paths(playbook_path: str, started_at: datetime, attempt: int = 1) -> tuple:
+    """Build host and container log file paths with attempt number.
 
     Args:
         playbook_path: Full path to the playbook file
         started_at: Start time for timestamp
+        attempt: Attempt number (1-indexed)
 
     Returns:
         Tuple of (host_log_file_path, container_log_file_path, host_log_dir)
@@ -623,13 +624,13 @@ def _build_log_paths(playbook_path: str, started_at: datetime) -> tuple:
     host_log_dir = HOST_LOG_BASE_DIR
     host_log_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create log file path with playbook name and timestamp only (no job_id)
+    # Create log file path with playbook name, timestamp, and attempt number
     timestamp = started_at.strftime("%Y%m%d_%H%M%S")
-    host_log_file_path = host_log_dir / f"{playbook_name}_{timestamp}.log"
+    host_log_file_path = host_log_dir / f"{playbook_name}_{timestamp}_attempt{attempt}.log"
 
     # Container log path (equivalent path in container)
     container_log_file_path = (
-        CONTAINER_LOG_BASE_DIR / f"{playbook_name}_{timestamp}.log"
+        CONTAINER_LOG_BASE_DIR / f"{playbook_name}_{timestamp}_attempt{attempt}.log"
     )
 
     return host_log_file_path, container_log_file_path, host_log_dir
@@ -709,8 +710,13 @@ def execute_playbook(request_data: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     started_at = datetime.now(timezone.utc)
+
+    # Extract attempt number from extra_vars (default to 1 if not present)
+    extra_vars = request_data.get("extra_vars", {})
+    attempt = extra_vars.get("attempt", 1) if isinstance(extra_vars, dict) else 1
+
     host_log_file_path, container_log_file_path, _ = _build_log_paths(
-        playbook_path, started_at
+        playbook_path, started_at, attempt
     )
 
     # Build podman command to execute playbook in omnia_core container

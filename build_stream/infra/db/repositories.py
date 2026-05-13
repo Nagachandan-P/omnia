@@ -30,7 +30,7 @@ from core.jobs.entities.idempotency import IdempotencyRecord
 from core.jobs.entities.job import Job
 from core.jobs.entities.stage import Stage
 from core.jobs.exceptions import OptimisticLockError
-from core.jobs.value_objects import IdempotencyKey, JobId, StageName
+from core.jobs.value_objects import IdempotencyKey, JobId, StageName, StageType
 from core.artifacts.ports import ArtifactMetadataRepository
 from core.artifacts.entities import ArtifactRecord, ArtifactRef, ArtifactKind
 from core.artifacts.value_objects import ArtifactKey, ArtifactDigest
@@ -246,9 +246,13 @@ class SqlStageRepository:
         Returns:
             List of stage entities (may be empty).
         """
+        valid_names = [st.value for st in StageType]
         stmt = (
             select(StageModel)
-            .where(StageModel.job_id == str(job_id))
+            .where(
+                StageModel.job_id == str(job_id),
+                StageModel.stage_name.in_(valid_names),
+            )
             .order_by(StageModel.stage_name)
         )
         stage_models = self.session.execute(stmt).scalars().all()
