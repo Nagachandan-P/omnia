@@ -173,7 +173,7 @@ default:
 # Deploy stage -- upload config files, call deploy API, poll for completion
 # Manual trigger: user clicks deploy after selecting an image group
 # The dotenv artifact from the selected image group provides JOB_ID and
-# IMAGE_GROUP_ID variables.
+# IMAGE_GROUP_ID variables. 
 # ---------------------------------------------------------------------------
 deploy:
   stage: deploy
