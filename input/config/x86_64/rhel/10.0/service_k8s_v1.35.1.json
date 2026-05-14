@@ -108,7 +108,6 @@
       { "package": "git", "type": "rpm", "repo_name": "appstream"},
       { "package": "kubernetes==35.0.0", "type": "pip_module" },
       { "package": "PyMySQL==1.1.2", "type": "pip_module" }
-      
     ]
   },
 
