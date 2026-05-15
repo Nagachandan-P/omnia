@@ -33,7 +33,7 @@ if rpm -q kernel-devel-$(uname -r) >/dev/null 2>&1; then
     echo "kernel-devel package is already installed."
 else
     echo "kernel-devel package is not installed. Installing..."
-    dnf install  -y kernel-devel-$(uname -r)
+    dnf install -y kernel-devel-$(uname -r)
 fi
 
 echo "Check if kernel-headers package is present"
